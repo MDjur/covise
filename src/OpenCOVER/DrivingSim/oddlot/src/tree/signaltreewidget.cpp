@@ -279,7 +279,6 @@ SignalTreeWidget::selectionChanged(const QItemSelection &selected, const QItemSe
 					double repeatDistance = objectContainer->getObjectRepeatDistance();
 					const QString &file = objectContainer->getObjectFile();
 
-
 					foreach (DataElement *element, projectWidget_->getProjectData()->getSelectedElements())
 					{
 						Object *object = dynamic_cast<Object *>(element);
@@ -319,8 +318,6 @@ SignalTreeWidget::selectionChanged(const QItemSelection &selected, const QItemSe
 			emit toolAction(action);
 	//		delete action;
 		}
-
-
 		QTreeWidget::selectionChanged(selected, deselected);
 	}
 	else
@@ -342,7 +339,7 @@ void SignalTreeWidget::mousePressEvent(QMouseEvent *event)
 
 void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
 {
-	QTreeWidget::mouseMoveEvent(event);
+    QTreeWidget::mouseMoveEvent(event);
 
     if (!(event->buttons() & Qt::LeftButton))
         return;
@@ -376,6 +373,47 @@ void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
     default:
         break;
 	}
+    /*if (!(event->buttons() & Qt::LeftButton))
+        return;
+    if ((event->pos() - dragStartPosition_).manhattanLength() < QApplication::startDragDistance())
+        return;*/
+
+    if((event->buttons() & Qt::LeftButton) && signalEditor_ && signalManager_ && (selectedItems().size() > 0))
+    {
+        if(!((event->pos()-dragStartPosition_).manhattanLength() < QApplication::startDragDistance()))
+        {
+            SignalContainer *signalContainer = signalManager_->getSelectedSignalContainer();
+            //QTreeWidget::mouseMoveEvent(event);
+
+            if(signalContainer)
+            {
+                QIcon signalIcon = signalContainer->getSignalIcon();
+                if(!signalIcon.isNull())
+                {
+                    PrepareDrag(signalIcon);
+                    //clearSelection();
+                    signalManager_->setSelectedSignalContainer(nullptr);
+                }
+            }
+            else
+            {
+                QTreeWidgetItem *item = selectedItems().at(0);
+                const QString text = item->text(0);
+                //ObjectContainer *objectContainer = signalManager_->getSelectedObjectContainer();
+                ObjectContainer *objectContainer = signalManager_->getObjectContainer(text);
+                if(objectContainer)
+                {
+                    QIcon objectIcon = objectContainer->getObjectIcon();
+                    if(!objectIcon.isNull())
+                    {
+                        PrepareDrag(objectIcon);
+                        //clearSelection();
+                        signalManager_->setSelectedObjectContainer(nullptr);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -394,26 +432,28 @@ void SignalTreeWidget::PrepareDrag(QIcon *icon)
 
     mimeData->setData("text/plain", QByteArray::fromStdString(entryName));
     drag->setMimeData(mimeData);
-	if (icon && !icon->isNull())
-	{
-		drag->setPixmap(icon->pixmap(QSize(35, 35)));
-	}
-	else
-	{
-		QLabel *label = new QLabel(text, this);
-		label->setAutoFillBackground(true);
-		label->setFrameShape(QFrame::Panel);
-		label->setFrameShadow(QFrame::Raised);
-		label->setAlignment(Qt::AlignCenter);
-		//	qreal dpr = devicePixelRatio();
-		//	QPixmap pixmap(label->size() * dpr);
-		//	pixmap.setDevicePixelRatio(dpr);
-		QPixmap pixmap(label->size());
-		label->render(&pixmap);
-		drag->setPixmap(pixmap);
-	}
-
-	Qt::DropAction dropAction = drag->exec(Qt::CopyAction | Qt::MoveAction);
+    if (icon && !icon->isNull())
+    {
+	drag->setPixmap(icon->pixmap(QSize(35, 35)));
+    }
+    else
+    {
+	QLabel *label = new QLabel(text, this);
+	label->setAutoFillBackground(true);
+	label->setFrameShape(QFrame::Panel);
+	label->setFrameShadow(QFrame::Raised);
+	label->setAlignment(Qt::AlignCenter);
+	//	qreal dpr = devicePixelRatio();
+	//	QPixmap pixmap(label->size() * dpr);
+	//	pixmap.setDevicePixelRatio(dpr);
+	QPixmap pixmap(label->size());
+	label->render(&pixmap);
+	drag->setPixmap(pixmap);
+    }
+    Qt::DropAction dropAction = drag->exec(Qt::CopyAction | Qt::MoveAction);
+    drag->setPixmap(icon.pixmap(QSize(35,35)));
+    drag->exec(Qt::CopyAction | Qt::MoveAction);
+    //Qt::DropAction dropAction = drag->exec(Qt::CopyAction | Qt::MoveAction);
     //return drag;
 }
 

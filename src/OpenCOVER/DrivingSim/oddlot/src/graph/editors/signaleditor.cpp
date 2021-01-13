@@ -692,6 +692,10 @@ SignalEditor::mouseAction(MouseAction *mouseAction)
 				}
 			}
 		}
+            QMessageBox msg;
+            msg.setText("HELLO!");
+            msg.exec();
+        }
 	}
 
     //	ProjectEditor::mouseAction(mouseAction);
