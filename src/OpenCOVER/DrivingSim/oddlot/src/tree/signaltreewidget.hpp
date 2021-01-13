@@ -53,7 +53,13 @@ private:
     SignalTreeWidget(const SignalTreeWidget &); /* not allowed */
     SignalTreeWidget &operator=(const SignalTreeWidget &); /* not allowed */
 
+<<<<<<< HEAD
     void PrepareDrag(QIcon *icon = NULL);
+=======
+//    template<class T>
+//    void PrepareDrag(T* myContainer);
+    void DoDrag(const QIcon &icon, const QString &text);
+>>>>>>> Rename function PrepareDrag(...)
     void init();
 
     //################//

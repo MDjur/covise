@@ -339,6 +339,7 @@ void SignalTreeWidget::mousePressEvent(QMouseEvent *event)
 
 void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
 {
+<<<<<<< HEAD
     QTreeWidget::mouseMoveEvent(event);
 
     if (!(event->buttons() & Qt::LeftButton))
@@ -378,36 +379,33 @@ void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
     if ((event->pos() - dragStartPosition_).manhattanLength() < QApplication::startDragDistance())
         return;*/
 
+=======
+>>>>>>> Rename function PrepareDrag(...)
     if((event->buttons() & Qt::LeftButton) && signalEditor_ && signalManager_ && (selectedItems().size() > 0))
     {
         if(!((event->pos()-dragStartPosition_).manhattanLength() < QApplication::startDragDistance()))
         {
+            QTreeWidgetItem *item = selectedItems().at(0);
+            const QString text = item->text(0);
             SignalContainer *signalContainer = signalManager_->getSelectedSignalContainer();
-            //QTreeWidget::mouseMoveEvent(event);
-
             if(signalContainer)
             {
                 QIcon signalIcon = signalContainer->getSignalIcon();
                 if(!signalIcon.isNull())
                 {
-                    PrepareDrag(signalIcon);
-                    //clearSelection();
+                    DoDrag(signalIcon,text);
                     signalManager_->setSelectedSignalContainer(nullptr);
                 }
             }
             else
             {
-                QTreeWidgetItem *item = selectedItems().at(0);
-                const QString text = item->text(0);
-                //ObjectContainer *objectContainer = signalManager_->getSelectedObjectContainer();
                 ObjectContainer *objectContainer = signalManager_->getObjectContainer(text);
                 if(objectContainer)
                 {
                     QIcon objectIcon = objectContainer->getObjectIcon();
                     if(!objectIcon.isNull())
                     {
-                        PrepareDrag(objectIcon);
-                        //clearSelection();
+                        DoDrag(objectIcon,text);
                         signalManager_->setSelectedObjectContainer(nullptr);
                     }
                 }
@@ -417,10 +415,12 @@ void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
 }
 
 /**
- * @brief SignalTreeWidget::PrepareDrag
+ * @brief
  * Initialize a drag pointer with mimedata and set the icon.
  * @param icon
+ * @param text
  */
+<<<<<<< HEAD
 void SignalTreeWidget::PrepareDrag(QIcon *icon)
 {
     QDrag* drag = new QDrag(this);
@@ -428,6 +428,16 @@ void SignalTreeWidget::PrepareDrag(QIcon *icon)
 
     QTreeWidgetItem *item = selectedItems().at(0);
     const QString text = item->text(0);
+=======
+void SignalTreeWidget::DoDrag(const QIcon& icon, const QString &text)
+{
+    QDrag* drag = new QDrag(this);
+    QMimeData *mimeData = new QMimeData;
+    //QTreeWidgetItem *item = selectedItems().at(0);
+    //const QString text = item->text(0);
+    //Signal *signal = dynamic_cast<Signal *>(projectWidget_->getProjectData()->getSelectedElements().at(0));
+    //QString signalName = signal->getName();
+>>>>>>> Rename function PrepareDrag(...)
     std::string entryName = text.toUtf8().constData();
 
     mimeData->setData("text/plain", QByteArray::fromStdString(entryName));
@@ -453,8 +463,25 @@ void SignalTreeWidget::PrepareDrag(QIcon *icon)
     Qt::DropAction dropAction = drag->exec(Qt::CopyAction | Qt::MoveAction);
     drag->setPixmap(icon.pixmap(QSize(35,35)));
     drag->exec(Qt::CopyAction | Qt::MoveAction);
-    //Qt::DropAction dropAction = drag->exec(Qt::CopyAction | Qt::MoveAction);
-    //return drag;
 }
 
+<<<<<<< HEAD
+=======
+//template<class T>
+//void SignalTreeWidget::PrepareDrag(T* myContainer)
+//{
+//    QTreeWidgetItem *item = selectedItems().at(0);
+//    const QString text = item->text(0);
+//    if(myContainer)
+//    {
+//        decltype (myContainer) container;
+//        QIcon icon = container->getIcon();
+//        if(!icon.isNull())
+//        {
+//            DoDrag(icon,text);
+//            Problem with signal
+//        }
+//    }
+//}
+>>>>>>> Rename function PrepareDrag(...)
 
