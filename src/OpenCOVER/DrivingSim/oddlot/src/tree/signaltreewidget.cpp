@@ -339,7 +339,6 @@ void SignalTreeWidget::mousePressEvent(QMouseEvent *event)
 
 void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
 {
-<<<<<<< HEAD
     QTreeWidget::mouseMoveEvent(event);
 
     if (!(event->buttons() & Qt::LeftButton))
@@ -379,8 +378,6 @@ void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
     if ((event->pos() - dragStartPosition_).manhattanLength() < QApplication::startDragDistance())
         return;*/
 
-=======
->>>>>>> Rename function PrepareDrag(...)
     if((event->buttons() & Qt::LeftButton) && signalEditor_ && signalManager_ && (selectedItems().size() > 0))
     {
         if(!((event->pos()-dragStartPosition_).manhattanLength() < QApplication::startDragDistance()))
@@ -420,7 +417,6 @@ void SignalTreeWidget::mouseMoveEvent(QMouseEvent *event)
  * @param icon
  * @param text
  */
-<<<<<<< HEAD
 void SignalTreeWidget::PrepareDrag(QIcon *icon)
 {
     QDrag* drag = new QDrag(this);
@@ -428,8 +424,9 @@ void SignalTreeWidget::PrepareDrag(QIcon *icon)
 
     QTreeWidgetItem *item = selectedItems().at(0);
     const QString text = item->text(0);
-=======
-void SignalTreeWidget::DoDrag(const QIcon& icon, const QString &text)
+}
+
+void SignalTreeWidget::DoDrag( const QIcon& icon, const QString& text)
 {
     QDrag* drag = new QDrag(this);
     QMimeData *mimeData = new QMimeData;
@@ -437,14 +434,13 @@ void SignalTreeWidget::DoDrag(const QIcon& icon, const QString &text)
     //const QString text = item->text(0);
     //Signal *signal = dynamic_cast<Signal *>(projectWidget_->getProjectData()->getSelectedElements().at(0));
     //QString signalName = signal->getName();
->>>>>>> Rename function PrepareDrag(...)
     std::string entryName = text.toUtf8().constData();
 
     mimeData->setData("text/plain", QByteArray::fromStdString(entryName));
     drag->setMimeData(mimeData);
-    if (icon && !icon->isNull())
+    if (!icon.isNull())
     {
-	drag->setPixmap(icon->pixmap(QSize(35, 35)));
+	drag->setPixmap(icon.pixmap(QSize(35, 35)));
     }
     else
     {
@@ -465,8 +461,6 @@ void SignalTreeWidget::DoDrag(const QIcon& icon, const QString &text)
     drag->exec(Qt::CopyAction | Qt::MoveAction);
 }
 
-<<<<<<< HEAD
-=======
 //template<class T>
 //void SignalTreeWidget::PrepareDrag(T* myContainer)
 //{
@@ -483,5 +477,3 @@ void SignalTreeWidget::DoDrag(const QIcon& icon, const QString &text)
 //        }
 //    }
 //}
->>>>>>> Rename function PrepareDrag(...)
-

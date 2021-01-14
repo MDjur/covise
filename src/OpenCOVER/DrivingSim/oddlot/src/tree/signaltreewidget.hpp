@@ -38,7 +38,7 @@ class SignalTreeWidget : public QTreeWidget
     //################//
 
 public:
-	explicit SignalTreeWidget(SignalManager *signalManager, MainWindow *mainWindow);
+    explicit SignalTreeWidget(SignalManager *signalManager, MainWindow *mainWindow);
     virtual ~SignalTreeWidget();
 
 	void setActiveProject(ProjectWidget *projectWidget)
@@ -53,13 +53,10 @@ private:
     SignalTreeWidget(const SignalTreeWidget &); /* not allowed */
     SignalTreeWidget &operator=(const SignalTreeWidget &); /* not allowed */
 
-<<<<<<< HEAD
     void PrepareDrag(QIcon *icon = NULL);
-=======
 //    template<class T>
 //    void PrepareDrag(T* myContainer);
-    void DoDrag(const QIcon &icon, const QString &text);
->>>>>>> Rename function PrepareDrag(...)
+    void DoDrag(const QIcon& icon, const QString& text);
     void init();
 
     //################//

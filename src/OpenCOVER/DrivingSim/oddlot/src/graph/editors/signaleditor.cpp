@@ -696,7 +696,6 @@ SignalEditor::mouseAction(MouseAction *mouseAction)
             msg.setText("HELLO!");
             msg.exec();
         }
-	}
 
     //	ProjectEditor::mouseAction(mouseAction);
 }
