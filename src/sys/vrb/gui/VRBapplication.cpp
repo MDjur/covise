@@ -13,6 +13,7 @@
 #include "VRBCurve.h"
 
 #include "VrbUiClientList.h"
+#include <qnamespace.h>
 #include <vrb/client/VRBMessage.h>
 #include <net/tokenbuffer.h>
 #include "VRBServer.h"
@@ -293,7 +294,7 @@ void ApplicationWindow::createTabWidget(QSplitter *split)
 
         curve[j] = new VRBCurve(wtab[0]);
         curve[j]->setLabel(text);
-        grid[0]->addWidget(curve[j], row, 0, 1, 2, 0);
+        grid[0]->addWidget(curve[j], row, 0, 1, 2, Qt::AlignVCenter);
         row++;
     }
 
@@ -389,7 +390,7 @@ void ApplicationWindow::createCurves(VrbUiClient *vrb)
         vrb->myLabels[j * 2 + 1] = text;
         curve->setClient(vrb);
         curve->setLabel(text);
-        grid[j + 1]->addWidget(curve, currRow + 1, 0, 1, 2, 0);
+        grid[j + 1]->addWidget(curve, currRow + 1, 0, 1, 2, Qt::AlignVCenter);
         curve->run();
     }
 
