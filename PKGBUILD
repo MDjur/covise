@@ -5,10 +5,10 @@
 
 # Maintainer: Test <youremail@domain.com>
 pkgname=hlrs-covise-git
-pkgver=1.0.r6997.e405402ac
+pkgver=1.0
 pkgrel=1
 epoch=
-pkgdesc="HLRS Visualization Software Tools for VR/AR"
+pkgdesc="COVISE - COllaborative Visualization and Simulation Environment - HLRS"
 arch=(x86_64)
 url="https://github.com/hlrs-vis/covise"
 license=('LGPL')
