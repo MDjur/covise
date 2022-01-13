@@ -5,7 +5,7 @@
 
 # Maintainer: Test <youremail@domain.com>
 pkgname=hlrs-covise-git
-pkgver=1.0.r6983.7706e2f37
+pkgver=1.0.r6984.8509c3bd7
 pkgrel=1
 epoch=
 pkgdesc="HLRS Visualization Software Tools for VR/AR"
@@ -110,7 +110,6 @@ build() {
     source .covise.sh
     mkdir -p build.covise
     cd build.covise
-    export CEF_ROOT=/opt/cef
     cmake -DCOVISE_BUILD_DRIVINGSIM=off ..
 	make -j$(nproc)
 }
@@ -124,5 +123,5 @@ package() {
     cd covise/build.covise
     mkdir -p ${pkgdir}/opt/${pkgname}
     cp -rf * ${pkgdir}/opt/${pkgname}
-    make install -j$(nproc) PREFIX=/usr DESTDIR="${pkgdir}"
+    make install -j$(nproc)
 }
