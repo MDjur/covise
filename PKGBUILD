@@ -5,7 +5,7 @@
 
 # Maintainer: Test <youremail@domain.com>
 pkgname=hlrs-covise-git
-pkgver=1.0.r6982.8529aac23
+pkgver=1.0.r6983.7706e2f37
 pkgrel=1
 epoch=
 pkgdesc="HLRS Visualization Software Tools for VR/AR"
@@ -14,7 +14,6 @@ url="https://github.com/hlrs-vis/covise"
 license=('LGPL')
 groups=()
 depends=(
-    cef-standard
     xerces-c
     qt5-base
     qt5-tools
@@ -62,6 +61,7 @@ depends=(
     netcdf-openmpi
     netcdf-cxx
     cgns
+    freealut
     freetype2
     libarchive
     libzip
