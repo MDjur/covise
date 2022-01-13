@@ -76,6 +76,7 @@ depends=(
     hidapi
     sdl
     sdl2
+    blas
     libvncserver
 )
 makedepends=(git cmake make)
