@@ -1,6 +1,6 @@
 pkgbase = hlrs-covise-git
-	pkgdesc = HLRS Visualization Software Tools for VR/AR
-	pkgver = 1.0.r6984.8509c3bd7
+	pkgdesc = COVISE - COllaborative Visualization and Simulation Environment - HLRS
+	pkgver = 1.0
 	pkgrel = 1
 	url = https://github.com/hlrs-vis/covise
 	arch = x86_64
@@ -70,6 +70,7 @@ pkgbase = hlrs-covise-git
 	depends = hidapi
 	depends = sdl
 	depends = sdl2
+	depends = blas
 	depends = libvncserver
 	provides = covise
 	provides = COVER
