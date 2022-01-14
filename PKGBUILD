@@ -3,7 +3,7 @@
 # NOTE: Please fill out the license field for your package! If it is unknown,
 # then please put 'unknown'.
 
-# Maintainer: Test <youremail@domain.com>
+# Maintainer: mdjur <hpcmdjur@hlrs.de>
 pkgname=hlrs-covise-git
 pkgver=1.0
 pkgrel=1
@@ -94,11 +94,6 @@ noextract=()
 md5sums=('SKIP')
 validpgpkeys=()
 
-# prepare() {
-# 	cd "$pkgname-$pkgver"
-# 	patch -p1 -i "$srcdir/$pkgname-$pkgver.patch"
-# }
-
 pkgver() {
     cd "${_pkgname}"
     printf "1.0.r%s.%s" "$( git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
@@ -114,11 +109,6 @@ build() {
     cmake -DCOVISE_BUILD_DRIVINGSIM=off -DCMAKE_INSTALL_PREFIX=/usr ..
 	make -j$(nproc)
 }
-
-# check() {
-# 	cd "$pkgname-$pkgver"
-# 	make -k check
-# }
 
 package() {
     cd covise/build.covise
