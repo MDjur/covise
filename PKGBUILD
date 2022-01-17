@@ -2,7 +2,7 @@
 
 _pkgname=covise
 pkgname=$_pkgname-git
-pkgver=1.0.r6992.6039c387d
+pkgver=1.0
 pkgrel=1
 epoch=
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment - HLRS"
