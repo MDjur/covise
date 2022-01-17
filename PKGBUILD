@@ -1,13 +1,14 @@
 # Maintainer: Marko Djuric <hpcmdjur@hlrs.de>
 
 _pkgname=covise
+_gitRep=https://github.com/hlrs-vis/covise.git
 pkgname=$_pkgname-git
 pkgver=1.0
 pkgrel=1
 epoch=
-pkgdesc="COVISE - COllaborative Visualization and Simulation Environment - HLRS"
+pkgdesc="COVISE - COllaborative Visualization and Simulation Environment for VR/AR - HLRS"
 arch=(x86_64)
-url="https://github.com/hlrs-vis/covise"
+url="https://www.hlrs.de/covise/"
 license=('LGPL')
 groups=()
 depends=(
@@ -76,7 +77,6 @@ depends=(
     blas
     libvncserver
 )
-# makedepends=(git cmake make)
 makedepends=(git cmake ninja)
 checkdepends=()
 optdepends=()
@@ -87,17 +87,14 @@ backup=()
 options=()
 install=
 changelog=
-source=("git+$url")
+source=("git+$_gitRep")
 noextract=()
 md5sums=('SKIP')
 validpgpkeys=()
 
 pkgver() {
-    # cd "${_pkgname}"
-    # printf "1.0.r%s.%s" "$( git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
     cd "$srcdir/$_pkgname"
     printf "1.0.r%s.%s" "$( git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
-    # git describe --long | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
 }
 
 prepare() {
@@ -109,13 +106,6 @@ prepare() {
 }
 
 build() {
-    # cd covise
-    # git submodule sync
-    # git submodule update --init --recursive
-    # source .covise.sh
-    # mkdir -p linux64opt/build.covise
-    # cd linux64opt/build.covise
-	# make -j$(nproc)
     cd build
     cmake ../$_pkgname \
         -DCMAKE_BUILD_TYPE=Release \
@@ -127,8 +117,6 @@ build() {
 }
 
 package() {
-    # cd covise/build.covise
-    # make install DESTDIR="$pkgdir/"
     cd build
     DESTDIR="$pkgdir/" ninja install
 }
