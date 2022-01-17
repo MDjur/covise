@@ -1,6 +1,8 @@
-# Maintainer: mdjur <hpcmdjur@hlrs.de>
-pkgname=hlrs-covise-git
-pkgver=1.0
+# Maintainer: Marko Djuric <hpcmdjur@hlrs.de>
+
+_pkgname=covise
+pkgname=$_pkgname-git
+pkgver=1.0.r6992.6039c387d
 pkgrel=1
 epoch=
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment - HLRS"
@@ -72,11 +74,10 @@ depends=(
     sdl
     sdl2
     blas
-    bullet
-    vtk
     libvncserver
 )
-makedepends=(git cmake make)
+# makedepends=(git cmake make)
+makedepends=(git cmake ninja)
 checkdepends=()
 optdepends=()
 provides=(covise COVER opencover)
@@ -92,22 +93,42 @@ md5sums=('SKIP')
 validpgpkeys=()
 
 pkgver() {
-    cd "${_pkgname}"
+    # cd "${_pkgname}"
+    # printf "1.0.r%s.%s" "$( git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
+    cd "$srcdir/$_pkgname"
     printf "1.0.r%s.%s" "$( git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
+    # git describe --long | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
 }
 
-build() {
-    cd covise
+prepare() {
+    mkdir -p build
+    cd "$_pkgname"
     git submodule sync
     git submodule update --init --recursive
     source .covise.sh
-    mkdir -p build.covise
-    cd build.covise
-    cmake -DCOVISE_BUILD_DRIVINGSIM=off -DCMAKE_INSTALL_PREFIX=/usr ..
-	make -j$(nproc)
+}
+
+build() {
+    # cd covise
+    # git submodule sync
+    # git submodule update --init --recursive
+    # source .covise.sh
+    # mkdir -p linux64opt/build.covise
+    # cd linux64opt/build.covise
+	# make -j$(nproc)
+    cd build
+    cmake ../$_pkgname \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCOVISE_BUILD_DRIVINGSIM=off \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -GNinja
+
+    ninja ${MAKEFLAGS}
 }
 
 package() {
-    cd covise/build.covise
-    make install DESTDIR="$pkgdir/"
+    # cd covise/build.covise
+    # make install DESTDIR="$pkgdir/"
+    cd build
+    DESTDIR="$pkgdir/" ninja install
 }
