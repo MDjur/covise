@@ -1,9 +1,11 @@
 # Maintainer: Marko Djuric <hpcmdjur@hlrs.de>
 
 _pkgname=covise
+_pkgBuildDir=build.covise
+_installDir=/usr
 _gitRep=https://github.com/hlrs-vis/covise.git
 pkgname=$_pkgname-git
-pkgver=1.0
+pkgver=1.0.r6997.4d689e2d9
 pkgrel=1
 epoch=
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment for VR/AR - HLRS"
@@ -37,7 +39,6 @@ depends=(
     qt5-wayland
     qt5-webchannel
     qt5-webengine
-    qt5-webglplugin
     qt5-webkit
     qt5-websockets
     qt5-webview
@@ -46,7 +47,6 @@ depends=(
     boost
     boost-libs
     glew
-    lib32-glew
     libjpeg-turbo
     libtiff
     openmpi
@@ -94,11 +94,10 @@ validpgpkeys=()
 
 pkgver() {
     cd "$srcdir/$_pkgname"
-    printf "1.0.r%s.%s" "$( git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
+    printf "1.0.r%s.%s" "$(git rev-list --count HEAD )" "$(git rev-parse --short HEAD)"
 }
 
 prepare() {
-    mkdir -p build
     cd "$_pkgname"
     git submodule sync
     git submodule update --init --recursive
@@ -106,17 +105,15 @@ prepare() {
 }
 
 build() {
-    cd build
-    cmake ../$_pkgname \
+    cmake -B "$_pkgBuildDir" -S "$_pkgname" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCOVISE_BUILD_DRIVINGSIM=off \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -GNinja
-
-    ninja ${MAKEFLAGS}
+        -DCMAKE_INSTALL_PREFIX="$_installDir" \
+        -G Ninja \
+        -Wno-dev
+    ninja -C "$_pkgBuildDir" ${MAKEFLAGS} 
 }
 
 package() {
-    cd build
-    DESTDIR="$pkgdir/" ninja install
+    DESTDIR="${pkgdir}" ninja -C "$_pkgBuildDir" install
 }
