@@ -1,9 +1,0 @@
-SET(HEADERS
-)
-SET(SOURCES
-  ReadMap.cpp
-)
-ADD_COVISE_MODULE(IO ReadMap ${EXTRASOURCES})
-covise_wnoerror(ReadMap)
-TARGET_LINK_LIBRARIES(ReadMap coApi coAppl coCore)
-COVISE_INSTALL_TARGET(ReadMap)

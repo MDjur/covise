@@ -1,2 +1,0 @@
-net/tutorial/\*
-share/covise/example-data/tutorial/\*

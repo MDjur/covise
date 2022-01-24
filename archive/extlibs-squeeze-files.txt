@@ -1,3 +1,0 @@
-CFX-11
-Cg
-pcan

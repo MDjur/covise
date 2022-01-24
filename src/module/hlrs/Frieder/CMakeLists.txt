@@ -1,8 +1,0 @@
-SET(HEADERS
-)
-SET(SOURCES
-  Frieder.cpp
-)
-ADD_COVISE_MODULE(Simulation Frieder ${EXTRASOURCES})
-TARGET_LINK_LIBRARIES(Frieder coApi coAppl coCore)
-COVISE_INSTALL_TARGET(Frieder)

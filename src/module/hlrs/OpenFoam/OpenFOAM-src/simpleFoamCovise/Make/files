@@ -1,5 +1,0 @@
-simpleFoamCovise.C
-../coviseToFoam/coviseToFoam.C
-../coviseToFoam/coSimClient.C
-
-EXE = $(FOAM_APPBIN)/simpleFoamCovise

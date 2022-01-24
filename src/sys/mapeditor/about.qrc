@@ -1,5 +1,0 @@
-<RCC>
-  <qresource prefix="aboutData" >
-    <file>../../../README-3rd-party.txt</file>
-  </qresource>
-</RCC>

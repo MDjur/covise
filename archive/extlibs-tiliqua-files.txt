@@ -1,5 +1,0 @@
-ARToolKit
-Cg 
-ffmpeg
-OpenInventor
-xerces

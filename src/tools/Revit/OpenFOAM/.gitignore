@@ -1,8 +1,0 @@
-# gitignore for OpenFOAM-Exporter project
-/.vs/
-/BIM/bin
-/BIM/OpenFOAMExport.addin
-/BIM/obj
-/Source/
-/out/
-/build/

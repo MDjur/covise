@@ -1,2 +1,0 @@
-net/examples/\*
-share/covise/example-data/[A-Z]\*
