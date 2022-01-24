@@ -7,12 +7,10 @@ _gitRep=https://github.com/hlrs-vis/covise.git
 pkgname=$_pkgname-git
 pkgver=1.0.r6997.4d689e2d9
 pkgrel=1
-epoch=
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment for VR/AR - HLRS"
 arch=(x86_64)
 url="https://www.hlrs.de/covise/"
 license=('LGPL')
-groups=()
 depends=(
     xerces-c
     qt5-base
@@ -78,19 +76,10 @@ depends=(
     libvncserver
 )
 makedepends=(git cmake ninja)
-checkdepends=()
-optdepends=()
 provides=(covise COVER opencover)
 conflicts=(covise COVER opencover)
-replaces=()
-backup=()
-options=()
-install=
-changelog=
 source=("git+$_gitRep")
-noextract=()
 md5sums=('SKIP')
-validpgpkeys=()
 
 pkgver() {
     cd "$srcdir/$_pkgname"
