@@ -284,3 +284,7 @@
 /leopardopt
 /lion
 /lionopt
+/covise
+/pkg
+/src
+/*.tar.zst
