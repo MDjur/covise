@@ -1,18 +1,20 @@
-#version 120
-#extension GL_EXT_geometry_shader4 : enable
+#version 330 compatibility
 #extension GL_ARB_texture_rectangle : enable
 
+layout (points) in;
+layout (triangle_strip, max_vertices = 4) out;
+
 uniform sampler2DRect heightTex;
-uniform bool dataValid;
 uniform sampler2DRect dataTex;
+uniform bool dataValid;
 uniform vec2 size;
 uniform vec2 dist;
 uniform vec4 origin;
 uniform vec2 patchSize;
 
-varying out vec3 N;
-varying out vec3 V;
-varying out float data;
+out vec3 N;
+out vec3 V;
+out float data;
 
 #define CACHE 1
 
@@ -103,7 +105,7 @@ void createVertex(vec2 xy, int idx)
 
 void main()
 {
-    vec2 xy = gl_PositionIn[0].xy;
+    vec2 xy = gl_in[0].gl_Position.xy;
 
     createVertex(xy + vec2(0, 0), -1);
     createVertex(xy + vec2(1, 0), 0);
