@@ -2,7 +2,7 @@
 #extension GL_ARB_texture_rectangle : enable
 
 layout (points) in;
-layout (triangle_strip, max_vertices = 4) out;
+layout (triangle_strip, max_vertices = 24) out;
 
 uniform sampler2DRect heightTex;
 uniform sampler2DRect dataTex;
