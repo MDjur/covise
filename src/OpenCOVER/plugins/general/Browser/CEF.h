@@ -47,13 +47,14 @@ namespace opencover
 using namespace vrui;
 using namespace opencover;
 class CEF;
+class CEF_client;
 
-class CEF_client : public CefClient, public CefRenderHandler, public CefContextMenuHandler, public vrui::vruiCollabInterface, public vrui::coAction
+class CEF_client : public CefClient, public CefRenderHandler, public CefLifeSpanHandler, public CefContextMenuHandler, public vrui::vruiCollabInterface, public vrui::coAction
 {
 private:
     int width = 1024;
     int height = 1024;
-    CEF* cef;
+    CEF *cef = nullptr;
     vrui::coCombinedButtonInteraction* interactionA; ///< interaction for first button
     vrui::coCombinedButtonInteraction* interactionB; ///< interaction for second button
     vrui::coCombinedButtonInteraction* interactionC; ///< interaction for third button
@@ -62,10 +63,13 @@ private:
 
 public:
     CEF_client(CEF *c);
-    ~CEF_client();
+    virtual ~CEF_client();
 
     CefRefPtr<CefRenderHandler> GetRenderHandler() override;
+    CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
     CefRefPtr<CefContextMenuHandler> GetContextMenuHandler() override;
+
+    bool DoClose(CefRefPtr<CefBrowser> browser) override;
 
     // hit is called whenever the button
     // with this action is intersected
@@ -83,23 +87,18 @@ public:
     void hide();
 
 #ifdef _WIN32
-    void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
     void OnBeforeContextMenu(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefContextMenuParams> params, CefRefPtr<CefMenuModel> model) override;
     bool OnContextMenuCommand(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefContextMenuParams> params, int command_id, EventFlags event_flags) override;
-#else
-#ifdef __APPLE__
+#endif
     void GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
-#else
-    bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) override;
-#endif
-#endif
     void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const RectList& dirtyRects, const void* buffer, int width, int height) override;
+
     void resize(int resolution, float aspect);
 
 private:
 
     unsigned char*imageBuffer=nullptr;
-    coPopupHandle* popupHandle;
+    coPopupHandle *popupHandle = nullptr;
     coTexturedBackground* videoTexture;
     bool bufferChanged = false;
 
@@ -152,7 +151,6 @@ class CEF : public coVRPlugin, public coMenuListener, public CefApp, public CefB
         void reload();
         const std::string &getURL();
         void resize();
-        opencover::coCOIM* coim;
         virtual void key(int type, int keySym, int mod) override;
 
         IMPLEMENT_REFCOUNTING(CEF);

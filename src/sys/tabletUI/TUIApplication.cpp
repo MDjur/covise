@@ -109,6 +109,7 @@
 #include <cassert>
 #ifdef HAVE_WIRINGPI
 #include "Thyssen.h"
+#include "ThyssenButton.h"
 #endif
 
 
@@ -168,6 +169,10 @@ TUIMainWindow::TUIMainWindow(QWidget *parent, QTabWidget *mainFolder)
     // timer.....waits for disconneting vrb clients
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(timerDone()));
+#ifdef HAVE_WIRINGPI
+    thyssenTimer = new QTimer(this);
+    connect(thyssenTimer, SIGNAL(timeout()), this, SLOT(thyssenTimerDone()));
+#endif
 
     resize(500, 200);
 }
@@ -190,6 +195,7 @@ TUIMainWindow::TUIMainWindow(QWidget *parent, QTabWidget *mainFolder)
 
 #ifdef HAVE_WIRINGPI
     thyssenPanel = new ThyssenPanel();
+    thyssenTimer.start(100);
     thyssenPanel->led->setLED(0,true);
 #endif
 
@@ -205,6 +211,10 @@ TUIMainWindow::TUIMainWindow(QWidget *parent, QTabWidget *mainFolder)
 
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(timerDone()));
+#ifdef HAVE_WIRINGPI
+    thyssenTimer = new QTimer(this);
+    connect(thyssenTimer, SIGNAL(timeout()), this, SLOT(thyssenTimerDone()));
+#endif
 
 // create the menus and toolbar buttons
 //createMenubar();
@@ -275,6 +285,13 @@ void TUIMainWindow::timerDone()
 {
     timer->stop();
 }
+
+#ifdef HAVE_WIRINGPI
+void TUIMainWindow::thyssenTimerDone()
+{
+    thyssenPannel->update();
+}
+#endif
 
 //------------------------------------------------------------------------
 void TUIMainWindow::closeServer()
@@ -497,6 +514,12 @@ TUIElement *TUIMainWindow::createElement(int id, TabletObjectType type, QWidget 
     case TABLET_TEXT_FIELD:
         return new TUILabel(id, type, w, parent, name);
     case TABLET_BUTTON:
+#ifdef HAVE_WIRINGPI
+        if(subString(name,0,7) == "thyssen")
+        {
+              return new ThyssenButton(id,type,w,parent,name);
+        }
+#endif
         return new TUIButton(id, type, w, parent, name);
     case TABLET_FILEBROWSER_BUTTON:
         return new TUIFileBrowserButton(id, type, w, parent, name);

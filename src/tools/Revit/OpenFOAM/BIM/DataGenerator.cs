@@ -31,14 +31,10 @@ namespace OpenFOAMInterface.BIM
     using RunManagerBlueCFD = OpenFOAM.RunManagerBlueCFD;
     using RunManagerSSH = OpenFOAM.RunManagerSSH;
     using RunManagerWSL = OpenFOAM.RunManagerWSL;
+    using Enums;
+
     public readonly ref struct FOAMFileData
     {
-        public List<string> Param { get; }
-        public List<string> Wall { get; }
-        public List<string> Inlet { get; }
-        public List<string> Outlet { get; }
-        public List<string> Slip { get; }
-
         public FOAMFileData(in List<string> param, in List<string> wall, in List<string> inlet, in List<string> outlet, in List<string> slip)
         {
             Param = param;
@@ -47,6 +43,11 @@ namespace OpenFOAMInterface.BIM
             Outlet = outlet;
             Slip = slip;
         }
+        public List<string> Param { get; }
+        public List<string> Wall { get; }
+        public List<string> Inlet { get; }
+        public List<string> Outlet { get; }
+        public List<string> Slip { get; }
     }
 
     /// <summary>
@@ -288,7 +289,7 @@ namespace OpenFOAMInterface.BIM
                 commands.Add("surfaceFeatureExtract");
                 commands.Add("snappyHexMesh");
                 commands.Add("rm -r processor*");
-                commands.Add(Exporter.Instance.settings.AppSolverControlDict.ToString());
+                commands.Add(Exporter.Instance.settings.ControlDictParameters.AppControlDictSolver.ToString());
                 commands.Add("rm -r processor*");
             }
 
