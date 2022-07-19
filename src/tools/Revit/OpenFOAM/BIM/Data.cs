@@ -78,7 +78,7 @@ namespace OpenFOAMInterface.BIM
         public List<Element> m_InletElements; // elements can be both in Inlet and outlet list
 
         /// <summary>
-        /// Elements with Inlet faces
+        /// Elements with Outlet faces
         /// </summary>
         public List<Element> m_OutletElements; // elements can be both in Inlet and outlet list
 
@@ -229,7 +229,7 @@ namespace OpenFOAMInterface.BIM
         //CfMesh
 
         //g
-        private double m_GValue;
+        private const double m_GValue = -9.81;
 
         //transportProperties
         private TransportModel m_TransportModel;
@@ -300,6 +300,7 @@ namespace OpenFOAMInterface.BIM
 
         //Getter-Setter-SSH
         // public SSH SSH { get => m_SSH; set => m_SSH = value; }
+        //Currently only getter is included
         public SSH SSH { get => m_SSH; }
 
         //Getter for Outlets.
@@ -324,153 +325,51 @@ namespace OpenFOAMInterface.BIM
         /// <summary>
         /// Binary or ASCII STL file.
         /// </summary>
-        public SaveFormat SaveFormat
-        {
-            get
-            {
-                return m_SaveFormat;
-            }
-            set
-            {
-                m_SaveFormat = value;
-            }
-        }
+        public SaveFormat SaveFormat { get => m_SaveFormat; set => m_SaveFormat = value; }
 
-        public List<Element> DuctTerminals
-        {
-            get
-            {
-                return m_DuctTerminals;
-            }
-            set
-            {
-                m_DuctTerminals = value;
-            }
-        }
-        public List<ElementId> InletOutletMaterials
-        {
-            get
-            {
-                return m_InletOutletMaterials;
-            }
-            set
-            {
-                m_InletOutletMaterials = value;
-            }
-        }
-
+        public List<Element> DuctTerminals { get => m_DuctTerminals; set => m_DuctTerminals = value; }
+        
+        public List<ElementId> InletOutletMaterials { get => m_InletOutletMaterials; set => m_InletOutletMaterials = value; }
 
         /// <summary>
         /// The range of elements to be exported.
         /// </summary>
-        public ElementsExportRange ExportRange
-        {
-            get
-            {
-                return m_ExportRange;
-            }
-            set
-            {
-                m_ExportRange = value;
-            }
-        }
+        public ElementsExportRange ExportRange { get => m_ExportRange; set => m_ExportRange = value; }
 
         /// <summary>
         /// SnappyHexMesh or cfMesh.
         /// </summary>
-        public MeshType Mesh
-        {
-            get
-            {
-                return m_Mesh;
-            }
-        }
+        public MeshType Mesh { get => m_Mesh; set => m_Mesh = value; }
 
         /// <summary>
         /// Include linked models.
         /// </summary>
-        public bool FoamToEnsight
-        {
-            get
-            {
-                return m_foamToEnsight;
-            }
-            set
-            {
-                m_foamToEnsight = value;
-            }
-        }
+        public bool FoamToEnsight { get => m_foamToEnsight; set => m_foamToEnsight = value; }
 
         /// <summary>
         /// Include linked models.
         /// </summary>
-        public bool IncludeLinkedModels
-        {
-            get
-            {
-                return m_IncludeLinkedModels;
-            }
-            set
-            {
-                m_IncludeLinkedModels = value;
-            }
-        }
+        public bool IncludeLinkedModels { get => m_IncludeLinkedModels; set => m_IncludeLinkedModels = value; }
 
         /// <summary>
         /// Export Color.
         /// </summary>
-        public bool ExportColor
-        {
-            get
-            {
-                return m_exportColor;
-            }
-            set
-            {
-                m_exportColor = value;
-            }
-        }
+        public bool ExportColor { get => m_exportColor; set => m_exportColor = value; }
 
         /// <summary>
         /// Export point in shared coordinates.
         /// </summary>
-        public bool ExportSharedCoordinates
-        {
-            get
-            {
-                return m_exportSharedCoordinates;
-            }
-            set
-            {
-                m_exportSharedCoordinates = value;
-            }
-        }
+        public bool ExportSharedCoordinates { get => m_exportSharedCoordinates; set => m_exportSharedCoordinates = value; }
 
         /// <summary>
         /// Include selected categories.
         /// </summary>
-        public List<Category> SelectedCategories
-        {
-            get
-            {
-                return m_SelectedCategories;
-            }
-            set
-            {
-                m_SelectedCategories = value;
-            }
-        }
+        public List<Category> SelectedCategories { get => m_SelectedCategories; set => m_SelectedCategories = value; }
 
         /// <summary>
         /// Get dicitionionary with default values.
         /// </summary>
-        public Dictionary<string, object> SimulationDefault
-        {
-            get
-            {
-                return m_SimulationDefaultList;
-            }
-        }
+        public Dictionary<string, object> SimulationDefault { get => m_SimulationDefaultList; }
 
         /// <summary>
         /// This method extract entries from a vector that is given as string, convert them to double and 
@@ -662,8 +561,9 @@ namespace OpenFOAMInterface.BIM
             //SnappyHexMesh-General
             InitSnappyHexMesh();
 
+            //TODO: remove provided the transition to const value does not cause an issue
             //g
-            m_GValue = -9.81;
+            //m_GValue = -9.81; 
 
             //TransportProperties
             InitTransportProtperties();
@@ -716,10 +616,10 @@ namespace OpenFOAMInterface.BIM
         }
 
         /// <summary>
-        /// Get face are from given face.
+        /// Get total face area from given list of faces.
         /// </summary>
-        /// <param name="face">Face object.</param>
-        /// <returns>Area of the face as double.</returns>
+        /// <param name="List<Face>">Face object.</param>
+        /// <returns>Sum of the areas of the faces as double.</returns>
         private double GetFaceArea(/*Face*/List<Face> faces)
         {
             double area = 0;
@@ -739,7 +639,7 @@ namespace OpenFOAMInterface.BIM
             foreach (Face face in faces)
             {
                 var edges = face.EdgeLoops;
-                if (!edges.IsEmpty && edges != null)
+                if (edges != null && !edges.IsEmpty)
                     foreach (Edge edge in edges.get_Item(0))
                         boundary += Math.Round(UnitUtils.ConvertFromInternalUnits(edge.ApproximateLength, UnitTypeId.Meters), 2);
             }
@@ -750,7 +650,7 @@ namespace OpenFOAMInterface.BIM
         /// Checks if the given parameter fulfills the given lambda-equation and return the converted parameter as T.
         /// </summary>
         /// <param name="param">Parameter object.</param>
-        /// <param name="type">DisplayUnitType to convert.</param
+        /// <param name="type">DisplayUnitType to convert (ForgeTypeId).</param>
         /// <param name="lambda">Lambda expression.</param>
         /// <param name="convertFunc">Convert-function Func<Parameter, DisplayUnitType, T>.</param>
         /// <returns>Converted Parameter as T.</returns>
@@ -806,6 +706,7 @@ namespace OpenFOAMInterface.BIM
             m_MergeTolerance = 1e-6;
 
             //SnappyHexMesh-CastellatedMeshControls
+            //TODO: are any of the magic constants test file specific or are they all more generally applicable?
             m_MaxLocalCells = 100000;
             m_MaxGlobalCells = 1000000;
             m_MinRefinementCalls = 10;
@@ -1451,26 +1352,16 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         private void InitFvSolutionRelaxationFactors()
         {
-            if (ControlDictParameters.AppControlDictSolver == SolverControlDict.buoyantBoussinesqSimpleFoam)
-            {
-                m_RelaxationFactors = new Dictionary<string, object>
-                {
-                    { "k", 0.7 },
-                    { "U", 0.7 },
-                    { "epsilon", 0.7 },
-                    { "p_rgh", 0.3 },
-                    { "T", 0.5 }
-                };
-            }
-            else
-            {
-                m_RelaxationFactors = new Dictionary<string, object>
+            m_RelaxationFactors = new Dictionary<string, object>
                 {
                     { "k", 0.7 },
                     { "U", 0.7 },
                     { "epsilon", 0.7 },
                     { "p", 0.3 }
                 };
+            if (ControlDictParameters.AppControlDictSolver == SolverControlDict.buoyantBoussinesqSimpleFoam)
+            {
+                m_RelaxationFactors.Add("p_rgh", 0.3);
             }
         }
 
@@ -2012,7 +1903,7 @@ namespace OpenFOAMInterface.BIM
             {
                 case SimulationType.laminar:
                     {
-                        //not implemented yet!
+                        //TODO: not implemented yet!
                         break;
                     }
                 case SimulationType.RAS:
@@ -2372,24 +2263,13 @@ namespace OpenFOAMInterface.BIM
                             {
                                 var properties = (DuctProperties)inlet.Value;
                                 object v = default;
-                                if (param.Name.Equals(InitialFOAMParameter.k.ToString()))
+                                if (param.Name.Equals(InitialFOAMParameter.k.ToString()) || param.Name.Equals(InitialFOAMParameter.epsilon.ToString()))
                                 {
                                     v = 0.1;
                                     type = "fixedValue";
                                     _inlet = new FOAMParameterPatch<dynamic>(type, uniform, v, pType);
                                 }
-                                else if (param.Name.Equals(InitialFOAMParameter.epsilon.ToString()))
-                                {
-                                    v = 0.1;
-                                    type = "fixedValue";
-                                    _inlet = new FOAMParameterPatch<dynamic>(type, uniform, v, pType);
-                                }
-                                else if (param.Name.Equals(InitialFOAMParameter.alphat.ToString()))
-                                {
-                                    type = "calculated";
-                                    _inlet = new FOAMParameterPatch<dynamic>(type, uniform, 0, pType);
-                                }
-                                else if (param.Name.Equals(InitialFOAMParameter.nut.ToString()))
+                                else if (param.Name.Equals(InitialFOAMParameter.alphat.ToString()) || param.Name.Equals(InitialFOAMParameter.nut.ToString()))
                                 {
                                     type = "calculated";
                                     _inlet = new FOAMParameterPatch<dynamic>(type, uniform, 0, pType);
@@ -2477,12 +2357,7 @@ namespace OpenFOAMInterface.BIM
                                     type = "zeroGradient";
                                     _outlet = new FOAMParameterPatch<dynamic>(type, uniform, "", pType);
                                 }
-                                else if (param.Name.Equals(InitialFOAMParameter.nut.ToString()))
-                                {
-                                    type = "calculated";
-                                    _outlet = new FOAMParameterPatch<dynamic>(type, uniform, 0, pType);
-                                }
-                                else if (param.Name.Equals(InitialFOAMParameter.alphat.ToString()))
+                                else if (param.Name.Equals(InitialFOAMParameter.nut.ToString()) || param.Name.Equals(InitialFOAMParameter.alphat.ToString()))
                                 {
                                     type = "calculated";
                                     _outlet = new FOAMParameterPatch<dynamic>(type, uniform, 0, pType);
@@ -2506,27 +2381,10 @@ namespace OpenFOAMInterface.BIM
                                         _outlet = new FOAMParameterPatch<dynamic>(type, uniform, v, pType);
                                     }
                                 }
-                                else if (param.Name.Equals(InitialFOAMParameter.p.ToString()))
+                                else if (param.Name.Equals(InitialFOAMParameter.p.ToString()) || param.Name.Equals(InitialFOAMParameter.p_rgh.ToString()))
                                 {
                                     //density of air at 20 degree and 1 bar in kg/m� = 1.204
                                     //rho-normalized pressure
-                                    OpenFOAM.OpenFOAMCalculator calculator = new();
-                                    if (properties.ExternalPressure != 0)
-                                    {
-                                        v = -calculator.CalculateRhoNormalizedPressure(properties.ExternalPressure, 1.204);
-                                    }
-                                    else
-                                    {
-                                        v = value;
-                                    }
-                                    v = 0;
-                                    type = "fixedValue";
-                                    if (m_windAroundBuildings)
-                                        type = "totalPressure";
-                                    _outlet = new FOAMParameterPatch<dynamic>(type, uniform, v, pType);
-                                }
-                                else if (param.Name.Equals(InitialFOAMParameter.p_rgh.ToString()))
-                                {
                                     //p_rgh = p - rho*g*h => not implemented h => TO-DO: GET H 
                                     OpenFOAM.OpenFOAMCalculator calculator = new();
                                     if (properties.ExternalPressure != 0)
@@ -2537,10 +2395,10 @@ namespace OpenFOAMInterface.BIM
                                     {
                                         v = value;
                                     }
+                                    v = 0;
                                     type = "fixedValue";
                                     if (m_windAroundBuildings)
                                         type = "totalPressure";
-                                    v = 0;
                                     _outlet = new FOAMParameterPatch<dynamic>(type, uniform, v, pType);
                                 }
                                 else
@@ -2585,21 +2443,11 @@ namespace OpenFOAMInterface.BIM
 
                                 param.Patches.Add("upperWall", _sky);
                             }
-                            else if (param.Name.Equals(InitialFOAMParameter.epsilon.ToString()))
+                            else if (param.Name.Equals(InitialFOAMParameter.epsilon.ToString()) || param.Name.Equals(InitialFOAMParameter.k.ToString()) || param.Name.Equals(InitialFOAMParameter.p.ToString()))
                             {
                                 FOAMParameterPatch<dynamic> wall = new FOAMParameterPatch<dynamic>("zeroGradient", "", "", PatchType.sky);
                                 param.Patches.Add("upperWall", wall);
 
-                            }
-                            else if (param.Name.Equals(InitialFOAMParameter.k.ToString()))
-                            {
-                                FOAMParameterPatch<dynamic> wall = new FOAMParameterPatch<dynamic>("zeroGradient", "", "", PatchType.sky);
-                                param.Patches.Add("upperWall", wall);
-                            }
-                            else if (param.Name.Equals(InitialFOAMParameter.p.ToString()))
-                            {
-                                FOAMParameterPatch<dynamic> wall = new FOAMParameterPatch<dynamic>("zeroGradient", "", "", PatchType.sky);
-                                param.Patches.Add("upperWall", wall);
                             }
                             else if (param.Name.Equals(InitialFOAMParameter.nut.ToString()))
                             {
