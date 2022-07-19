@@ -38,7 +38,7 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         /// <param name="doc">The document to find the view.</param>
         /// <param name="activeViewName">The view name.</param>
-        /// <returns>The element id of the view found.</returns>
+        /// <returns>The view found.</returns>
         public RevitView FindView(Document doc, string activeViewName)
         {
             FilteredElementCollector collector = new(doc);
