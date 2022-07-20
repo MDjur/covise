@@ -327,9 +327,13 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         public SaveFormat SaveFormat { get => m_SaveFormat; set => m_SaveFormat = value; }
 
+        /* 0 references - might not be necessary to include
         public List<Element> DuctTerminals { get => m_DuctTerminals; set => m_DuctTerminals = value; }
+        */
         
+        /*  0 references - might not be necessary to include
         public List<ElementId> InletOutletMaterials { get => m_InletOutletMaterials; set => m_InletOutletMaterials = value; }
+        */
 
         /// <summary>
         /// The range of elements to be exported.
@@ -566,7 +570,7 @@ namespace OpenFOAMInterface.BIM
             //m_GValue = -9.81; 
 
             //TransportProperties
-            InitTransportProtperties();
+            InitTransportProperties();
 
             //TurbulenceProperties
             RASModel rasModel = RASModel.RNGkEpsilon;
@@ -679,7 +683,7 @@ namespace OpenFOAMInterface.BIM
         /// <summary>
         /// Initialize transportProperties default attributes.
         /// </summary>
-        private void InitTransportProtperties()
+        private void InitTransportProperties()
         {
             TransportModel transportModel = TransportModel.Newtonian;
 
@@ -888,17 +892,19 @@ namespace OpenFOAMInterface.BIM
                 m_controlDictParam.WriteFormat = WriteFormat.binary;
         }
 
+        /* TODO: Remove provided there are no errors without this method
         private void setTemp(in FamilyInstance instance, out double settingTempVar, in string tempVarName)
         {
             double temp = GetDouble(instance, tempVarName);
             settingTempVar = temp;
         }
+        */
 
         private void InitTemp(in FamilyInstance instance)
         {
-            setTemp(instance, out m_TempInlet, "inletTemp");
-            setTemp(instance, out m_TempWall, "wallTemp");
-            setTemp(instance, out m_TempInternalField, "internalTemp");
+            m_TempInlet = GetDouble(instance, "inletTemp");
+            m_TempWall = GetDouble(instance, "wallTemp");
+            m_TempInternalField = GetDouble(instance, "internalTemp");
         }
 
         private void InitSnappy(in FamilyInstance instance)
@@ -957,6 +963,7 @@ namespace OpenFOAMInterface.BIM
             m_controlDictParam.PurgeWrite = purgeWrite;
         }
 
+        /* NOTE: Not needed so long as the method below is not implemented
         private RASModel switchTurbulenceModel(in string turbulenceStr)
         {
             return turbulenceStr switch
@@ -965,6 +972,7 @@ namespace OpenFOAMInterface.BIM
                 _ => RASModel.RNGkEpsilon,
             };
         }
+        */
 
         // private void InitTurbulenceModel(in FamilyInstance instance)
         // {
@@ -977,10 +985,12 @@ namespace OpenFOAMInterface.BIM
         //     m_turbulenceIntesity = turbulenceIntensity;
         // }
 
+        /* TODO: delete provided no errors are created by removing it
         private void InitWindAroundBuildings(in FamilyInstance instance)
         {
             m_windAroundBuildings = GetBool(instance, "windAroundBuildings");
         }
+        */
 
         private void InitOpenFOAM(in FilteredElementCollector collector)
         {
@@ -1000,7 +1010,7 @@ namespace OpenFOAMInterface.BIM
                 // InitTurbulenceModel(instance);
 
                 //windaroundBuildings
-                InitWindAroundBuildings(instance);
+                m_windAroundBuildings = GetBool(instance, "windAroundBuildings");
 
                 //Solver
                 InitSolver(instance);
@@ -1427,10 +1437,12 @@ namespace OpenFOAMInterface.BIM
             InitFvSol_Parameter("T", 0.1, 1e-6, 1, solverT, smootherT);
         }
 
+        /* TODO: delete provided replacing it does not cause any errors
         private void InitFvSol_SimpleFOAM(in SolverFV solver, in Agglomerator agglomerator, in CacheAgglomeration cacheAgglomeration)
         {
             InitFvSol_P(solver, agglomerator, cacheAgglomeration);
         }
+        */
 
         private void InitFvSol_Parameter(in string name, in double relTol, in double tolerance, int nSweeps, in SolverFV solver, in Smoother smoother)
         {
@@ -1470,7 +1482,7 @@ namespace OpenFOAMInterface.BIM
             if (ControlDictParameters.AppControlDictSolver == SolverControlDict.buoyantBoussinesqSimpleFoam)
                 InitFvSol_BuoyantBoussinesq(solverP_RGH, solverT, smootherT);
             else
-                InitFvSol_SimpleFOAM(solverP, agglomerator, cacheAgglomeration);
+                InitFvSol_P(solverP, agglomerator, cacheAgglomeration);
 
             //U-FvSolution-Solver
             InitFvSol_Parameter("U", 0.1, 1e-6, 1, solverU, smootherU);
@@ -1495,6 +1507,7 @@ namespace OpenFOAMInterface.BIM
         /// <summary>
         /// Update settings.
         /// </summary>
+        /* TODO: delete if doing so causes no errors - 0 references
         public void Update()
         {
             m_SimulationDefaultList = new Dictionary<string, object>();
@@ -1510,6 +1523,7 @@ namespace OpenFOAMInterface.BIM
 
             InitOpenFOAMFolderDictionaries();
         }
+        */
 
         /// <summary>
         /// Initialize system dicitonary and add it to simulationDefaultList.
@@ -1541,9 +1555,12 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         private void InitConstantDictionary()
         {
+            //Create Gravity Dictionary
             CreateGDicitionary();
+            //Create Transport Properties Dictionary
             CreateTransportPropertiesDictionary();
-            CreateTurbulencePropertiesDictionary();
+            //Create Turbulence Properties Dictionary
+            m_Constant.Add("turbulenceProperties", m_TurbulenceParameter.ToDictionary());
 
             m_SimulationDefaultList.Add("constant", m_Constant);
         }
@@ -1797,8 +1814,12 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         private void CreateFoamParametersDictionaries()
         {
+            //create Foam Parameter List
             var initialParameters = new List<NullParameter>();
-            CreateFOAMParamterList(initialParameters);
+            //CreateFOAMParamterList(initialParameters); -- replaced by the two lines below
+            AddParametersBasedOnSimulationType(initialParameters, AddParametersBasedOnSolverControlDict);
+            AddParametersBasedOnSimulationType(initialParameters, ParametersBasedOnTurbulenceModel);
+
             foreach (NullParameter initParam in initialParameters)
             {
                 var dict = new Dictionary<string, object>();
@@ -1817,11 +1838,13 @@ namespace OpenFOAMInterface.BIM
         /// Adds InitialParameter to the given list.
         /// </summary>
         /// <param name="initialParameters">List of initialParameters</param>
+        /* TODO: delete provided that transitioning the contents into the prior method does not cause any error
         private void CreateFOAMParamterList(List<NullParameter> initialParameters)
         {
             AddParametersBasedOnSimulationType(initialParameters, AddParametersBasedOnSolverControlDict);
             AddParametersBasedOnSimulationType(initialParameters, ParametersBasedOnTurbulenceModel);
         }
+        */
 
         /// <summary>
         /// Add initialparameter to initialParameterList based on solver in controlDict.
@@ -2582,15 +2605,18 @@ namespace OpenFOAMInterface.BIM
         /// <summary>
         /// Creates a Dictionary for turbulenceProperties and adds it to constant.
         /// </summary>
+        /* TODO: delete so long as transitioning the contents of this method to the calling method does not cause an issue
         private void CreateTurbulencePropertiesDictionary()
         {
             m_Constant.Add("turbulenceProperties", m_TurbulenceParameter.ToDictionary());
         }
+        */
 
         /// <summary>
         /// This method is in use to change the corresponding attribute of the value
         /// that is stored at the keypath in settings.
         /// </summary>
+        /* TODO: Check about deleting - 0 references attached
         public void UpdateDataEntry<T>(List<string> keyPath, T value)
         {
             Dictionary<string, object> att = SimulationDefault;
@@ -2614,6 +2640,7 @@ namespace OpenFOAMInterface.BIM
                 }
             }
         }
+        */
 
         struct NullParamPatchAttributes<TValue>
         {
