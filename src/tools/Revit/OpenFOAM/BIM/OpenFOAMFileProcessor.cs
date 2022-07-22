@@ -51,15 +51,15 @@ namespace OpenFOAMInterface.BIM
                 {
                     if (lines[idx].Contains("*/")) //remove all block comment text where block comment is in a single line
                         lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("/*")) + lines[idx].Substring(lines[idx].IndexOf("*/") + 2);
-                    else
+                    else //remove all block comment text across lines but preserve any writing in the first/last line before/after the block comment
                     {
-                        //remove the start of the block comment but preserve any text in the line before it begins
-                        if (idx + 1 >= lines.Length)
+                        lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("/*")); //remove the block comment text from the line but keep everything before it
+                        while (++idx < lines.Length && !lines[idx].Contains("*/"))
+                            lines[idx] = String.Empty; //remove comment text and advance to next line
+                        if (idx >= lines.Length)
                             throw new OpenFOAMFileFormatException("Multi-line comment is not closed properly in config file " + filename + ".");
-                        lines[idx++] = lines[idx].Substring(0, lines[idx].IndexOf("/*")); //move to the next line (as this line is already being treated to remove the comment)
-                        while (!lines[idx].Contains("*/"))
-                            lines[idx++] = String.Empty; //remove comment text and advance to next line
-                        lines[idx] = lines[idx].Substring(lines[idx].IndexOf("*/") + 2);
+                        else 
+                            lines[idx] = lines[idx].Substring(lines[idx].IndexOf("*/") + 2); //remove the block comment text from the line but keep everything after it
                     }
                 }
 
@@ -101,6 +101,7 @@ namespace OpenFOAMInterface.BIM
                     string[] currLine = lines[lineNum].Split('\t');
                     string currKey = String.Empty;
                     string currVal = String.Empty;
+                    Boolean missingSemicolon = true;
                     foreach (string section in currLine)
                     {
                         section.Trim(); //remove remaining whitespace on sections
@@ -109,14 +110,19 @@ namespace OpenFOAMInterface.BIM
                         else if (String.IsNullOrEmpty(currKey))
                             currKey = section; //first section of text in the line is the key
                         else if (String.IsNullOrEmpty(currVal))
-                            if (currVal.EndsWith(";")) //parsing information from correct syntax
-                                currVal = section.Substring(0, currVal.Length-1); //second section of text in the line is the value
-                            else //incorrect syntax
-                                throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + lineNum + ".");
+                            if (currVal.EndsWith(";")) //parsing information with attached semicolon
+                            {
+                                currVal = section.Substring(0, currVal.Length - 1); //second section of text in the line is the value
+                                missingSemicolon = false;
+                            }
+                            else //parsing information without a semicolon
+                                currVal = section;
+                        else if (missingSemicolon && section.Equals(";"))
+                            missingSemicolon = false;
                         else //additional text in the line indicates a syntax error
                             throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + lineNum + ".");
                     }
-                    if (String.IsNullOrEmpty(currKey) || String.IsNullOrEmpty(currVal))
+                    if (String.IsNullOrEmpty(currKey) || String.IsNullOrEmpty(currVal) || missingSemicolon)
                         throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + lineNum + ".");
                     fileData.Add(currKey.ToLower(), currVal); //key in lowercase to ensure compatibility with getter methods for specific information
                     lineNum++; //current line has been processed, so advance to the next line and continue
@@ -131,7 +137,7 @@ namespace OpenFOAMInterface.BIM
 
         private int processDictionaryEntry(int lineNum)
         {
-            string key = lines[lineNum++]; //identify the key and advance to determine value type
+            string key = lines[lineNum++]; 
             while (lineNum < lines.Length && String.IsNullOrEmpty(lines[lineNum]))
                 lineNum++; //skip any blank lines
             if (lineNum >= lines.Length || !lines[lineNum].Equals("{"))
@@ -146,6 +152,7 @@ namespace OpenFOAMInterface.BIM
                     string[] currLine = lines[lineNum].Split('\t');
                     string currKey = String.Empty;
                     string currVal = String.Empty;
+                    Boolean missingSemicolon = true;
                     foreach (string section in currLine)
                     {
                         section.Trim(); //remove remaining whitespace on sections
@@ -154,14 +161,19 @@ namespace OpenFOAMInterface.BIM
                         else if (String.IsNullOrEmpty(currKey))
                             currKey = section; //first section of text in the line is the key
                         else if (String.IsNullOrEmpty(currVal))
-                            if (currVal.EndsWith(";")) //parsing information from correct syntax
+                            if (currVal.EndsWith(";")) //parsing information with attached semicolon
+                            {
                                 currVal = section.Substring(0, currVal.Length - 1); //second section of text in the line is the value
-                            else //incorrect syntax
-                                throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + lineNum + ".");
+                                missingSemicolon = false;
+                            }
+                            else //parsing information without a semicolon
+                                currVal = section;
+                        else if (missingSemicolon && section.Equals(";"))
+                            missingSemicolon = false;
                         else //additional text in the line indicates a syntax error
                             throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + lineNum + ".");
                     }
-                    if (String.IsNullOrEmpty(currKey) || String.IsNullOrEmpty(currVal))
+                    if (String.IsNullOrEmpty(currKey) || String.IsNullOrEmpty(currVal) || missingSemicolon)
                         throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + lineNum + ".");
                     dict.Add(currKey, currVal);
                     lineNum++; //current line has been processed, so advance to the next line and continue
