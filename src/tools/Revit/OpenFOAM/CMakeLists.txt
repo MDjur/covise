@@ -7,6 +7,7 @@ add_library(OpenFOAMInterface SHARED
   BIM/AssemblyInfo.cs
   BIM/DataGenerator.cs
   BIM/OpenFOAMDialogManager.cs
+  BIM/OpenFOAMFileProcessor.cs
   BIM/OpenFOAMSimulateCommand.cs
   BIM/OpenFOAMInterfaceApp.cs
   BIM/OpenFOAMInterfaceResource.Designer.cs
