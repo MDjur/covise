@@ -217,6 +217,12 @@ namespace OpenFOAMInterface.BIM
         }
 
         /// <summary>
+        /// This is a public getter method for the name of the file (contained within private field filename).
+        /// </summary>
+        /// <returns>string indicating the file name</returns>
+        public string getFilename() => filename;
+
+        /// <summary>
         /// This is a public getter method for the version of the file (contained within fileData).
         /// </summary>
         /// <returns>string indicating the file version</returns>
@@ -228,12 +234,6 @@ namespace OpenFOAMInterface.BIM
             else
                 throw new OpenFOAMFileFormatException("Version information not initialized properly in config file " + filename + ".");
         }
-
-        /// <summary>
-        /// This is a public getter method for the name of the file (contained within private field filename).
-        /// </summary>
-        /// <returns>string indicating the file name</returns>
-        public string getFilename() => filename;
 
         /// <summary>
         /// This is a public getter method for the format of the file (contained within private field fileData).
