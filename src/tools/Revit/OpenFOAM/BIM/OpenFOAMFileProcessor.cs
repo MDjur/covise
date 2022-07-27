@@ -30,33 +30,33 @@ namespace OpenFOAMInterface.BIM
                     Console.WriteLine("... File processing completed ...");
                 } catch (OpenFOAMFileFormatException e)
                 {
-                    Console.WriteLine("File processing unsuccessful");
+                    Console.WriteLine("File processing unsuccessful.  " + e.Message);
                     continue; //skip file information access testing since file was not processed successfully
                 }
 
                 //file name access
                 try { Console.WriteLine("File Name: " + currTest.getFilename()); } 
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File name access failed."); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File name access failed.  " + e.Message); }
 
                 //file version access
                 try { Console.WriteLine("File Version: " + currTest.getFileVersion()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File version access failed."); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File version access failed.  " + e.Message); }
 
                 //file format access
                 try { Console.WriteLine("File Format: " + currTest.getFileFormat()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File format access failed."); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File format access failed.  " + e.Message); }
 
                 //file class access
                 try { Console.WriteLine("File Class: " + currTest.getFileClass()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File class access failed."); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File class access failed.  " + e.Message); }
 
                 //file location access
                 try { Console.WriteLine("File Location: " + currTest.getFileLocation()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File location access failed."); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File location access failed.  " + e.Message); }
 
                 //file object access
                 try { Console.WriteLine("File Object: " + currTest.getFileObject()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File object access failed."); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File object access failed.  " + e.Message); }
 
                 //file contents access
                 Dictionary<string, Dictionary<string, string>> fileContents = currTest.getFileContents();
