@@ -12,6 +12,66 @@ using System.Windows.Forms;
 
 namespace OpenFOAMInterface.BIM
 {
+    class MainClass
+    {
+        public static int Main()
+        {
+            DirectoryInfo testDirectory = new DirectoryInfo(@"C:\testInputs");
+            foreach (FileInfo testFile in testDirectory.GetFiles())
+            {
+                //test setup
+                Console.WriteLine("Current Test: " + testFile.Name);
+                OpenFOAMFileProcessor currTest = null; //initial assignment to be overwritten in test block
+                
+                //initial file processing
+                try
+                {
+                    currTest = new OpenFOAMFileProcessor(testFile.Name);
+                    Console.WriteLine("... File processing completed ...");
+                } catch (OpenFOAMFileFormatException e)
+                {
+                    Console.WriteLine("File processing unsuccessful");
+                    continue; //skip file information access testing since file was not processed successfully
+                }
+
+                //file name access
+                try { Console.WriteLine("File Name: " + currTest.getFilename()); } 
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File name access failed."); }
+
+                //file version access
+                try { Console.WriteLine("File Version: " + currTest.getFileVersion()); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File version access failed."); }
+
+                //file format access
+                try { Console.WriteLine("File Format: " + currTest.getFileFormat()); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File format access failed."); }
+
+                //file class access
+                try { Console.WriteLine("File Class: " + currTest.getFileClass()); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File class access failed."); }
+
+                //file location access
+                try { Console.WriteLine("File Location: " + currTest.getFileLocation()); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File location access failed."); }
+
+                //file object access
+                try { Console.WriteLine("File Object: " + currTest.getFileObject()); }
+                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File object access failed."); }
+
+                //file contents access
+                Dictionary<string, Dictionary<string, string>> fileContents = currTest.getFileContents();
+                Console.WriteLine("File Contents: ");
+                //TODO: figure out how to print the dictionary
+
+                //add space after a completed test
+                Console.WriteLine();
+                Console.WriteLine();
+            }
+
+            return 0;
+        }
+    }
+
 
     /// <summary>
     /// This class is designed to process config files written in the OpenFOAM syntax style and store the filename, file text (currently inaccessible outside of the class),
@@ -301,7 +361,7 @@ namespace OpenFOAMInterface.BIM
     /// </summary>
     [Serializable]
     public class OpenFOAMFileFormatException : Exception
-    {
+    { 
         /// <summary>
         /// This is the default constructor for the OpenFOAMFileFormatException, which simply relies on the base Excpetion constructor 
         /// </summary>
