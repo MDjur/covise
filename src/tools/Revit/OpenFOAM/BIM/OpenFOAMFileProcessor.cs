@@ -334,9 +334,11 @@ namespace OpenFOAMInterface.BIM
 
         /// <summary>
         /// This is the constructor for an OpenFOAMFileFormatException which makes it serializable.
+        /// NOTE: Serialization has not yet been utilized and is not implemented elsewhere in the file at this time.
         /// </summary>
         /// <param name="info">System.Runtime.Serialization.SerializationInfo necessary for serialization</param>
         /// <param name="context">System.Runtime.Serialization.StreamingContext necessary for serialization</param>
+        //TODO: implement serialization should that behavior be desired
         protected OpenFOAMFileFormatException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }
 }
