@@ -303,9 +303,14 @@ namespace OpenFOAMInterface.BIM
     public class OpenFOAMFileFormatException : Exception
     {
         /// <summary>
-        /// This is the default constructor for the OpenFOAMFileFormatException, which simply relies on the base Excpetion constructor to supply its message
+        /// This is the default constructor for the OpenFOAMFileFormatException, which simply relies on the base Excpetion constructor 
         /// </summary>
-        public OpenFOAMFileFormatException() : base() { }
+        public OpenFOAMFileFormatException() : base() 
+        {
+            String message = "An error occurred when processing a config file.  Please ensure all config files utilize standard OpenFOAM syntax conventions.";
+            MessageBox.Show(message, OpenFOAMInterfaceResource.MESSAGE_BOX_TITLE, MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+            return;
+        }
 
         /// <summary>
         /// This is the constructor for an OpenFOAMFileFormatException with a specific error message (provided via parameter) containing information regarding the type of syntax
