@@ -21,7 +21,7 @@ namespace OpenFOAMInterface.BIM
             {
                 //test setup
                 Console.WriteLine("Current Test: " + testFile.Name);
-                OpenFOAMFileProcessor currTest = null; //initial assignment to be overwritten in test block
+                OpenFOAMFileProcessor currTest; 
                 
                 //initial file processing
                 try
