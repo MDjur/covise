@@ -61,7 +61,14 @@ namespace OpenFOAMInterface.BIM
                 //file contents access
                 Dictionary<string, Dictionary<string, string>> fileContents = currTest.getFileContents();
                 Console.WriteLine("File Contents: ");
-                //TODO: figure out how to print the dictionary
+                foreach (KeyValuePair<string, Dictionary<string, string>> outerEntry in fileContents)
+                {
+                    Console.WriteLine("  " + outerEntry.Key + ":");
+                    foreach (KeyValuePair<string, string> innerEntry in outerEntry.Value)
+                    {
+                        Console.WriteLine("    " + innerEntry.Key + ": " + innerEntry.Value);
+                    }
+                }
 
                 //add space after a completed test
                 Console.WriteLine();
