@@ -16,63 +16,70 @@ namespace OpenFOAMInterface.BIM
     {
         public static int Main()
         {
-            DirectoryInfo testDirectory = new DirectoryInfo(@"C:\testInputs");
-            foreach (FileInfo testFile in testDirectory.GetFiles())
+            DirectoryInfo testDirectory = new DirectoryInfo(@"C:\testInputs\");
+            using (StreamWriter outputFile = new StreamWriter(@"C:\tmp\output.txt"))
             {
-                //test setup
-                Console.WriteLine("Current Test: " + testFile.Name);
-                OpenFOAMFileProcessor currTest; 
-                
-                //initial file processing
-                try
+                outputFile.WriteLine("... Beginning Testing ...");
+                foreach (FileInfo testFile in testDirectory.GetFiles())
                 {
-                    currTest = new OpenFOAMFileProcessor(testFile.Name);
-                    Console.WriteLine("... File processing completed ...");
-                } catch (OpenFOAMFileFormatException e)
-                {
-                    Console.WriteLine("File processing unsuccessful.  " + e.Message);
-                    continue; //skip file information access testing since file was not processed successfully
-                }
+                    //test setup
+                    outputFile.WriteLine("Current Test: " + testFile.Name);
+                    OpenFOAMFileProcessor currTest;
 
-                //file name access
-                try { Console.WriteLine("File Name: " + currTest.getFilename()); } 
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File name access failed.  " + e.Message); }
-
-                //file version access
-                try { Console.WriteLine("File Version: " + currTest.getFileVersion()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File version access failed.  " + e.Message); }
-
-                //file format access
-                try { Console.WriteLine("File Format: " + currTest.getFileFormat()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File format access failed.  " + e.Message); }
-
-                //file class access
-                try { Console.WriteLine("File Class: " + currTest.getFileClass()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File class access failed.  " + e.Message); }
-
-                //file location access
-                try { Console.WriteLine("File Location: " + currTest.getFileLocation()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File location access failed.  " + e.Message); }
-
-                //file object access
-                try { Console.WriteLine("File Object: " + currTest.getFileObject()); }
-                catch (OpenFOAMFileFormatException e) { Console.WriteLine("File object access failed.  " + e.Message); }
-
-                //file contents access
-                Dictionary<string, Dictionary<string, string>> fileContents = currTest.getFileContents();
-                Console.WriteLine("File Contents: ");
-                foreach (KeyValuePair<string, Dictionary<string, string>> outerEntry in fileContents)
-                {
-                    Console.WriteLine("  " + outerEntry.Key + ":");
-                    foreach (KeyValuePair<string, string> innerEntry in outerEntry.Value)
+                    //initial file processing
+                    try
                     {
-                        Console.WriteLine("    " + innerEntry.Key + ": " + innerEntry.Value);
+                        currTest = new OpenFOAMFileProcessor(testFile.FullName);
+                        outputFile.WriteLine("... File processing completed ...");
                     }
+                    catch (OpenFOAMFileFormatException e)
+                    {
+                        outputFile.WriteLine("File processing unsuccessful.  " + e.Message);
+                        continue; //skip file information access testing since file was not processed successfully
+                    }
+
+                    //file name access
+                    try { outputFile.WriteLine("File Name: " + currTest.getFilename()); }
+                    catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File name access failed.  " + e.Message); }
+
+                    //file version access
+                    try { outputFile.WriteLine("File Version: " + currTest.getFileVersion()); }
+                    catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File version access failed.  " + e.Message); }
+
+                    //file format access
+                    try { outputFile.WriteLine("File Format: " + currTest.getFileFormat()); }
+                    catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File format access failed.  " + e.Message); }
+
+                    //file class access
+                    try { outputFile.WriteLine("File Class: " + currTest.getFileClass()); }
+                    catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File class access failed.  " + e.Message); }
+
+                    //file location access
+                    try { outputFile.WriteLine("File Location: " + currTest.getFileLocation()); }
+                    catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File location access failed.  " + e.Message); }
+
+                    //file object access
+                    try { outputFile.WriteLine("File Object: " + currTest.getFileObject()); }
+                    catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File object access failed.  " + e.Message); }
+
+                    //file contents access
+                    Dictionary<string, Dictionary<string, string>> fileContents = currTest.getFileContents();
+                    outputFile.WriteLine("File Contents: ");
+                    foreach (KeyValuePair<string, Dictionary<string, string>> outerEntry in fileContents)
+                    {
+                        outputFile.WriteLine("  " + outerEntry.Key + ":");
+                        foreach (KeyValuePair<string, string> innerEntry in outerEntry.Value)
+                        {
+                            outputFile.WriteLine("    " + innerEntry.Key + ": " + innerEntry.Value);
+                        }
+                    }
+
+                    //add space after a completed test
+                    outputFile.WriteLine();
+                    outputFile.WriteLine();
                 }
 
-                //add space after a completed test
-                Console.WriteLine();
-                Console.WriteLine();
+                outputFile.WriteLine("... Testing Completed ...");
             }
 
             return 0;
@@ -116,7 +123,7 @@ namespace OpenFOAMInterface.BIM
         }
 
         /// <summary>
-        /// This is a private helper method for the constructor which performs preprocessing on the lines in the file to remove comments and leading and trailing whitespace
+        /// This is a private helper method for the constructor which performs preprocessing on the lines in the file to remove comments and leading and trailing whitespace.
         /// </summary>
         private void isolateFileData()
         {
@@ -157,10 +164,10 @@ namespace OpenFOAMInterface.BIM
             int lineNum = 0;
             while (lineNum < lines.Length)
             {
-                if (String.IsNullOrEmpty(lines[lineNum])) //skip any blank lines
+                if (String.IsNullOrWhiteSpace(lines[lineNum])) //skip any blank lines
                     lineNum++; 
                 else if (lineNum + 2 >= lines.Length) //this is a syntax error
-                    throw new OpenFOAMFileFormatException("Improper or incomplete data contained in config file " + filename + " beginning at line " + lineNum + ".");
+                    throw new OpenFOAMFileFormatException("Improper or incomplete data contained in config file " + filename + " beginning at line " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                 else if (lines[lineNum].ToLower().Equals("foamfile")) //this section contains the file data (lowercase to ensure correct text identification)
                     lineNum = processFileData(lineNum);
                 else //this section contains the file contents
@@ -177,7 +184,7 @@ namespace OpenFOAMInterface.BIM
         private int processFileData(int lineNum)
         {
             lineNum++; //skip file data header
-            while (lineNum < lines.Length && String.IsNullOrEmpty(lines[lineNum]))
+            while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
                 lineNum++; //skip any blank lines
             if (lineNum >= lines.Length || !lines[lineNum].Equals("{"))
                 throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + ".");
@@ -186,8 +193,11 @@ namespace OpenFOAMInterface.BIM
                 lineNum++; //skip opening brace
                 while (lineNum < lines.Length && !lines[lineNum].Equals("}"))
                 {
-                    if (String.IsNullOrEmpty(lines[lineNum]))
+                    if (String.IsNullOrWhiteSpace(lines[lineNum]))
+                    {
+                        lineNum++;
                         continue; //skip any blank lines
+                    }
                     string[] currLine = lines[lineNum].Split('\t');
                     string currKey = String.Empty;
                     string currVal = String.Empty;
@@ -195,14 +205,14 @@ namespace OpenFOAMInterface.BIM
                     foreach (string section in currLine)
                     {
                         section.Trim(); //remove remaining whitespace on sections
-                        if (String.IsNullOrEmpty(section))
+                        if (String.IsNullOrWhiteSpace(section))
                             continue; //skip any blank sections which only contained whitespace characters
-                        else if (String.IsNullOrEmpty(currKey))
+                        else if (String.IsNullOrWhiteSpace(currKey))
                             currKey = section; //first section of text in the line is the key
-                        else if (String.IsNullOrEmpty(currVal))
-                            if (currVal.EndsWith(";")) //parsing information with attached semicolon
+                        else if (String.IsNullOrWhiteSpace(currVal))
+                            if (section.EndsWith(";")) //parsing information with attached semicolon
                             {
-                                currVal = section.Substring(0, currVal.Length - 1); //second section of text in the line is the value
+                                currVal = section.Substring(0, section.Length - 1); //second section of text in the line is the value
                                 missingSemicolon = false;
                             }
                             else //parsing information without a semicolon
@@ -210,10 +220,10 @@ namespace OpenFOAMInterface.BIM
                         else if (missingSemicolon && section.Equals(";"))
                             missingSemicolon = false;
                         else //additional text in the line indicates a syntax error
-                            throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + lineNum + ".");
+                            throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                     }
-                    if (String.IsNullOrEmpty(currKey) || String.IsNullOrEmpty(currVal) || missingSemicolon)
-                        throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + lineNum + ".");
+                    if (String.IsNullOrWhiteSpace(currKey) || String.IsNullOrWhiteSpace(currVal) || missingSemicolon)
+                        throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                     fileData.Add(currKey.ToLower(), currVal); //key in lowercase to ensure compatibility with getter methods for specific information
                     lineNum++; //current line has been processed, so advance to the next line and continue
                 }
@@ -234,7 +244,7 @@ namespace OpenFOAMInterface.BIM
         private int processDictionaryEntry(int lineNum)
         {
             string key = lines[lineNum++]; 
-            while (lineNum < lines.Length && String.IsNullOrEmpty(lines[lineNum]))
+            while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
                 lineNum++; //skip any blank lines
             if (lineNum >= lines.Length || !lines[lineNum].Equals("{"))
                 throw new OpenFOAMFileFormatException("Improper dictionary syntax in config file " + filename + ".");
@@ -243,8 +253,11 @@ namespace OpenFOAMInterface.BIM
                 lineNum++; //skip opening brace
                 Dictionary<string, string> dict = new Dictionary<string, string>();
                 while (lineNum < lines.Length && !lines[lineNum].Equals("}")) {
-                    if (String.IsNullOrEmpty(lines[lineNum]))
+                    if (String.IsNullOrWhiteSpace(lines[lineNum]))
+                    {
+                        lineNum++;
                         continue; //skip any blank lines
+                    }
                     string[] currLine = lines[lineNum].Split('\t');
                     string currKey = String.Empty;
                     string currVal = String.Empty;
@@ -252,14 +265,14 @@ namespace OpenFOAMInterface.BIM
                     foreach (string section in currLine)
                     {
                         section.Trim(); //remove remaining whitespace on sections
-                        if (String.IsNullOrEmpty(section))
+                        if (String.IsNullOrWhiteSpace(section))
                             continue; //skip any blank sections which only contained whitespace characters
-                        else if (String.IsNullOrEmpty(currKey))
+                        else if (String.IsNullOrWhiteSpace(currKey))
                             currKey = section; //first section of text in the line is the key
-                        else if (String.IsNullOrEmpty(currVal))
-                            if (currVal.EndsWith(";")) //parsing information with attached semicolon
+                        else if (String.IsNullOrWhiteSpace(currVal))
+                            if (section.EndsWith(";")) //parsing information with attached semicolon
                             {
-                                currVal = section.Substring(0, currVal.Length - 1); //second section of text in the line is the value
+                                currVal = section.Substring(0, section.Length - 1); //second section of text in the line is the value
                                 missingSemicolon = false;
                             }
                             else //parsing information without a semicolon
@@ -267,10 +280,10 @@ namespace OpenFOAMInterface.BIM
                         else if (missingSemicolon && section.Equals(";"))
                             missingSemicolon = false;
                         else //additional text in the line indicates a syntax error
-                            throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + lineNum + ".");
+                            throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                     }
-                    if (String.IsNullOrEmpty(currKey) || String.IsNullOrEmpty(currVal) || missingSemicolon)
-                        throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + lineNum + ".");
+                    if (String.IsNullOrWhiteSpace(currKey) || String.IsNullOrWhiteSpace(currVal) || missingSemicolon)
+                        throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                     dict.Add(currKey, currVal);
                     lineNum++; //current line has been processed, so advance to the next line and continue
                 }
