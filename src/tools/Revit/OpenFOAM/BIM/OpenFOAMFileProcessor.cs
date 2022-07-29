@@ -12,6 +12,7 @@ using System.Windows.Forms;
 
 namespace OpenFOAMInterface.BIM
 {
+    //This class contains a driver for the purposes of testing the file processing functionalities
     class MainClass
     {
         public static int Main()
@@ -102,7 +103,6 @@ namespace OpenFOAMInterface.BIM
     public class OpenFOAMFileProcessor
     {
         private string filename; //name of the file being processed by the instance of the class
-        private string[] lines; //contents of the file broken into an array by occurences of newline characters
         private Dictionary<string, string> fileData; //background information about the file itself
         private Dictionary<string, Dictionary<string, string>> fileContents; //dictionary information stored in file
 
@@ -115,9 +115,11 @@ namespace OpenFOAMInterface.BIM
             this.filename = filename;
             this.fileData = new Dictionary<string, string>();
             this.fileContents = new Dictionary<string, Dictionary<string, string>>();
+
+            string[] lines;
             try //read file (with automatic file opening and closing as part of utilized method)
             {
-                this.lines = File.ReadAllLines(filename);
+                lines = File.ReadAllLines(filename);
             }
             catch (Exception e) //error reading file
             {
@@ -125,14 +127,14 @@ namespace OpenFOAMInterface.BIM
                 return;
             }
 
-            isolateFileData();
-            extractFileData();
+            isolateFileData(ref lines);
+            extractFileData(ref lines);
         }
 
         /// <summary>
         /// This is a private helper method for the constructor which performs preprocessing on the lines in the file to remove comments and leading and trailing whitespace.
         /// </summary>
-        private void isolateFileData()
+        private void isolateFileData(ref string[] lines)
         {
             for (int idx = 0; idx < lines.Length; idx++)
             {
@@ -166,7 +168,7 @@ namespace OpenFOAMInterface.BIM
         /// This is a private helper method for the constructor which parses data from the input file (after it has undergone preprocessing in isolateFileData() 
         /// in order to populate both the fileData and fileContents fields.
         /// </summary>
-        private void extractFileData()
+        private void extractFileData(ref string[] lines)
         {
             int lineNum = 0;
             while (lineNum < lines.Length)
@@ -176,9 +178,9 @@ namespace OpenFOAMInterface.BIM
                 else if (lineNum + 2 >= lines.Length) //this is a syntax error
                     throw new OpenFOAMFileFormatException("Improper or incomplete data contained in config file " + filename + " beginning at line " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                 else if (lines[lineNum].ToLower().Equals("foamfile")) //this section contains the file data (lowercase to ensure correct text identification)
-                    lineNum = processFileData(lineNum);
+                    lineNum = processFileData(lineNum, ref lines);
                 else //this section contains the file contents
-                    lineNum = processDictionaryEntry(lineNum);
+                    lineNum = processDictionaryEntry(lineNum, ref lines);
             }
         }
 
@@ -188,7 +190,7 @@ namespace OpenFOAMInterface.BIM
         /// <param name="lineNum">int indicating the current line that must be processed (in connection with any later lines related to it)</param>
         /// <returns>int indicating the new line number after processing all relevant information for the original line number</returns>
         /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
-        private int processFileData(int lineNum)
+        private int processFileData(int lineNum, ref string[] lines)
         {
             lineNum++; //skip file data header
             while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
@@ -248,7 +250,7 @@ namespace OpenFOAMInterface.BIM
         /// <param name="lineNum">int indicating the current line that must be processed (in connection with any later lines related to it)</param>
         /// <returns>int indicating the new line number after processing all relevant information for the original line number</returns>
         /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
-        private int processDictionaryEntry(int lineNum)
+        private int processDictionaryEntry(int lineNum, ref string[] lines)
         {
             string key = lines[lineNum++]; 
             while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
