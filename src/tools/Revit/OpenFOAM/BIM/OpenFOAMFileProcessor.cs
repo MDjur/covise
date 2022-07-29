@@ -20,6 +20,9 @@ namespace OpenFOAMInterface.BIM
             using (StreamWriter outputFile = new StreamWriter(@"C:\tmp\output.txt"))
             {
                 outputFile.WriteLine("... Beginning Testing ...");
+                outputFile.WriteLine();
+                outputFile.WriteLine();
+
                 foreach (FileInfo testFile in testDirectory.GetFiles())
                 {
                     //test setup
@@ -30,11 +33,13 @@ namespace OpenFOAMInterface.BIM
                     try
                     {
                         currTest = new OpenFOAMFileProcessor(testFile.FullName);
-                        outputFile.WriteLine("... File processing completed ...");
+                        outputFile.WriteLine("File processing completed.");
                     }
                     catch (OpenFOAMFileFormatException e)
                     {
                         outputFile.WriteLine("File processing unsuccessful.  " + e.Message);
+                        outputFile.WriteLine(); //spacing from the end will otherwise be skipped due to the continue
+                        outputFile.WriteLine();
                         continue; //skip file information access testing since file was not processed successfully
                     }
 
@@ -80,6 +85,8 @@ namespace OpenFOAMInterface.BIM
                 }
 
                 outputFile.WriteLine("... Testing Completed ...");
+                outputFile.WriteLine();
+                outputFile.WriteLine();
             }
 
             return 0;
@@ -202,9 +209,9 @@ namespace OpenFOAMInterface.BIM
                     string currKey = String.Empty;
                     string currVal = String.Empty;
                     Boolean missingSemicolon = true;
-                    foreach (string section in currLine)
+                    foreach (string segment in currLine)
                     {
-                        section.Trim(); //remove remaining whitespace on sections
+                        String section = segment.Trim(); //remove remaining whitespace on segment
                         if (String.IsNullOrWhiteSpace(section))
                             continue; //skip any blank sections which only contained whitespace characters
                         else if (String.IsNullOrWhiteSpace(currKey))
@@ -262,9 +269,9 @@ namespace OpenFOAMInterface.BIM
                     string currKey = String.Empty;
                     string currVal = String.Empty;
                     Boolean missingSemicolon = true;
-                    foreach (string section in currLine)
+                    foreach (string segment in currLine)
                     {
-                        section.Trim(); //remove remaining whitespace on sections
+                        String section = segment.Trim(); //remove remaining whitespace on segment
                         if (String.IsNullOrWhiteSpace(section))
                             continue; //skip any blank sections which only contained whitespace characters
                         else if (String.IsNullOrWhiteSpace(currKey))
