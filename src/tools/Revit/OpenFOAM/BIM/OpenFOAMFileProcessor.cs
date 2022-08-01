@@ -69,16 +69,9 @@ namespace OpenFOAMInterface.BIM
                     catch (OpenFOAMFileFormatException e) { outputFile.WriteLine("File object access failed.  " + e.Message); }
 
                     //file contents access
-                    Dictionary<string, Dictionary<string, string>> fileContents = currTest.getFileContents();
+                    Dictionary<string, object> fileContents = currTest.getFileContents();
                     outputFile.WriteLine("File Contents: ");
-                    foreach (KeyValuePair<string, Dictionary<string, string>> outerEntry in fileContents)
-                    {
-                        outputFile.WriteLine("  " + outerEntry.Key + ":");
-                        foreach (KeyValuePair<string, string> innerEntry in outerEntry.Value)
-                        {
-                            outputFile.WriteLine("    " + innerEntry.Key + ": " + innerEntry.Value);
-                        }
-                    }
+                    printDictionary(in fileContents, in outputFile, 1);
 
                     //add space after a completed test
                     outputFile.WriteLine();
@@ -92,6 +85,28 @@ namespace OpenFOAMInterface.BIM
 
             return 0;
         }
+
+        private static void printDictionary(in Dictionary<string, object> dict, in StreamWriter outputFile, int level)
+        {
+            foreach (KeyValuePair<string, object> outerEntry in dict)
+            {
+                string line = String.Empty;
+                for (int spaces = 0; spaces < level*2; spaces++)
+                {
+                    line += " ";
+                }
+                if (outerEntry.Value is Dictionary<string, object>)
+                {
+                    outputFile.WriteLine(line + outerEntry.Key + ":");
+                    printDictionary((Dictionary<string, object>)outerEntry.Value, outputFile, level + 1);
+                } 
+                else if (outerEntry.Value is string)
+                    outputFile.WriteLine(line + outerEntry.Key + ": " + outerEntry.Value);
+                else
+                    throw new OpenFOAMFileFormatException("Incorrect syntax in saved dictionary for key " + outerEntry.Key + ".");
+
+            }
+        }
     }
 
 
@@ -103,8 +118,8 @@ namespace OpenFOAMInterface.BIM
     public class OpenFOAMFileProcessor
     {
         private string filename; //name of the file being processed by the instance of the class
-        private Dictionary<string, string> fileData; //background information about the file itself
-        private Dictionary<string, Dictionary<string, string>> fileContents; //dictionary information stored in file
+        private Dictionary<string, object> fileData; //background information about the file itself
+        private Dictionary<string, object> fileContents; //dictionary information stored in file
 
         /// <summary>
         /// Constructor that creates a new file processor instance for the specific file provided (by filename) and parses the file to populate all class fields
@@ -113,8 +128,8 @@ namespace OpenFOAMInterface.BIM
         public OpenFOAMFileProcessor(in string filename)
         {
             this.filename = filename;
-            this.fileData = new Dictionary<string, string>();
-            this.fileContents = new Dictionary<string, Dictionary<string, string>>();
+            this.fileData = new Dictionary<string, object>();
+            this.fileContents = new Dictionary<string, object>();
 
             string[] lines;
             try //read file (with automatic file opening and closing as part of utilized method)
@@ -180,7 +195,7 @@ namespace OpenFOAMInterface.BIM
                 else if (lines[lineNum].ToLower().Equals("foamfile")) //this section contains the file data (lowercase to ensure correct text identification)
                     lineNum = processFileData(lineNum, ref lines);
                 else //this section contains the file contents
-                    lineNum = processDictionaryEntry(lineNum, ref lines);
+                    lineNum = processDictionaryEntry(lineNum, ref lines, ref fileContents);
             }
         }
 
@@ -250,7 +265,7 @@ namespace OpenFOAMInterface.BIM
         /// <param name="lineNum">int indicating the current line that must be processed (in connection with any later lines related to it)</param>
         /// <returns>int indicating the new line number after processing all relevant information for the original line number</returns>
         /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
-        private int processDictionaryEntry(int lineNum, ref string[] lines)
+        private int processDictionaryEntry(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict)
         {
             string key = lines[lineNum++]; 
             while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
@@ -260,14 +275,19 @@ namespace OpenFOAMInterface.BIM
             else
             {
                 lineNum++; //skip opening brace
-                Dictionary<string, string> dict = new Dictionary<string, string>();
+                Dictionary<string, object> dict = new Dictionary<string, object>();
                 while (lineNum < lines.Length && !lines[lineNum].Equals("}")) {
+                    //check for blank lines
                     if (String.IsNullOrWhiteSpace(lines[lineNum]))
                     {
                         lineNum++;
                         continue; //skip any blank lines
                     }
+
+                    //split line
                     string[] currLine = lines[lineNum].Split('\t');
+
+                    //check for data value entry
                     string currKey = String.Empty;
                     string currVal = String.Empty;
                     Boolean missingSemicolon = true;
@@ -291,16 +311,19 @@ namespace OpenFOAMInterface.BIM
                         else //additional text in the line indicates a syntax error
                             throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                     }
-                    if (String.IsNullOrWhiteSpace(currKey) || String.IsNullOrWhiteSpace(currVal) || missingSemicolon)
-                        throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
-                    dict.Add(currKey, currVal);
+                    if (String.IsNullOrWhiteSpace(currVal))
+                        lineNum = processDictionaryEntry(lineNum, ref lines, ref dict); //new nested dictionary
+                    else if (String.IsNullOrWhiteSpace(currKey) || missingSemicolon)
+                        throw new OpenFOAMFileFormatException("Improper dictionary entry syntax for data point in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
+                    else 
+                        dict.Add(currKey, currVal);
                     lineNum++; //current line has been processed, so advance to the next line and continue
                 }
                 if (lineNum >= lines.Length)
                     throw new OpenFOAMFileFormatException("Improper dictionary syntax in config file " + filename + ".");
                 else if (lines[lineNum].Equals("}"))
                     lineNum++; //skip closing brace
-                fileContents.Add(key, dict);
+                parentDict.Add(key, dict);
             }
             return lineNum;
         }
@@ -318,8 +341,8 @@ namespace OpenFOAMInterface.BIM
         /// <throws>OpenFOAMFileFormatException indicating that version was not intialized properly if the version data is missing from fileData</throws>
         public string getFileVersion()
         {
-            if (fileData.ContainsKey("version"))
-                return fileData["version"];
+            if (fileData.ContainsKey("version") && fileData["version"] is string)
+                return (string)fileData["version"];
             else
                 throw new OpenFOAMFileFormatException("Version information not initialized properly in config file " + filename + ".");
         }
@@ -331,8 +354,8 @@ namespace OpenFOAMInterface.BIM
         /// <throws>OpenFOAMFileFormatException indicating that format was not intialized properly if the format data is missing from fileData</throws>
         public string getFileFormat()
         {
-            if (fileData.ContainsKey("format"))
-                return fileData["format"];
+            if (fileData.ContainsKey("format") && fileData["format"] is string)
+                return (string)fileData["format"];
             else
                 throw new OpenFOAMFileFormatException("Format information not initialized properly in config file " + filename + ".");
         }
@@ -344,8 +367,8 @@ namespace OpenFOAMInterface.BIM
         /// <throws>OpenFOAMFileFormatException indicating that class was not intialized properly if the class data is missing from fileData</throws>
         public string getFileClass()
         {
-            if (fileData.ContainsKey("class"))
-                return fileData["class"];
+            if (fileData.ContainsKey("class") && fileData["class"] is string)
+                return (string)fileData["class"];
             else
                 throw new OpenFOAMFileFormatException("Class information not initialized properly in config file " + filename + ".");
         }
@@ -357,8 +380,8 @@ namespace OpenFOAMInterface.BIM
         /// <throws>OpenFOAMFileFormatException indicating that location was not intialized properly if the location data is missing from fileData</throws>
         public string getFileLocation()
         {
-            if (fileData.ContainsKey("location"))
-                return fileData["location"];
+            if (fileData.ContainsKey("location") && fileData["location"] is string)
+                return (string)fileData["location"];
             else
                 throw new OpenFOAMFileFormatException("Location information not initialized properly in config file " + filename + ".");
         }
@@ -370,8 +393,8 @@ namespace OpenFOAMInterface.BIM
         /// <throws>OpenFOAMFileFormatException indicating that object was not intialized properly if the object data is missing from fileData</throws>
         public string getFileObject()
         {
-            if (fileData.ContainsKey("object"))
-                return fileData["object"];
+            if (fileData.ContainsKey("object") && fileData["object"] is string)
+                return (string)fileData["object"];
             else
                 throw new OpenFOAMFileFormatException("Object information not initialized properly in config file " + filename + ".");
         }
@@ -380,7 +403,7 @@ namespace OpenFOAMInterface.BIM
         /// This is a public getter method for the contents of the file (or the entirety of the private field fileContents).
         /// </summary>
         /// <returns>Dictionary<string, Dictionary<string, string>> containing the contents of the parsed file</returns>
-        public Dictionary<string, Dictionary<string, string>> getFileContents() => fileContents;
+        public Dictionary<string, object> getFileContents() => fileContents;
     }
 
     /// <summary>
