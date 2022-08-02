@@ -71,7 +71,7 @@ namespace OpenFOAMInterface.BIM
                     //file contents access
                     Dictionary<string, object> fileContents = currTest.getFileContents();
                     outputFile.WriteLine("File Contents: ");
-                    printDictionary(in fileContents, in outputFile, 1);
+                    outputFile.Write(generateDictionaryPrintStatement(in fileContents, 1));
 
                     //add space after a completed test
                     outputFile.WriteLine();
@@ -86,8 +86,9 @@ namespace OpenFOAMInterface.BIM
             return 0;
         }
 
-        private static void printDictionary(in Dictionary<string, object> dict, in StreamWriter outputFile, int level)
+        private static string generateDictionaryPrintStatement(in Dictionary<string, object> dict, int level)
         {
+            string printText = String.Empty;
             foreach (KeyValuePair<string, object> outerEntry in dict)
             {
                 string line = String.Empty;
@@ -97,15 +98,51 @@ namespace OpenFOAMInterface.BIM
                 }
                 if (outerEntry.Value is Dictionary<string, object>)
                 {
-                    outputFile.WriteLine(line + outerEntry.Key + ":");
-                    printDictionary((Dictionary<string, object>)outerEntry.Value, outputFile, level + 1);
+                    printText += line + outerEntry.Key + ":\n";
+                    printText += generateDictionaryPrintStatement((Dictionary<string, object>)outerEntry.Value, level + 1);
                 } 
+                else if (outerEntry.Value is List<object>)
+                {
+                    printText += line + outerEntry.Key + ": ";
+                    List<object> list = (List<object>)outerEntry.Value;
+                    printText += generateListPrintStatement(ref list, level) + "\n";
+                }
                 else if (outerEntry.Value is string)
-                    outputFile.WriteLine(line + outerEntry.Key + ": " + outerEntry.Value);
+                    printText += line + outerEntry.Key + ": " + outerEntry.Value + "\n";
                 else
                     throw new OpenFOAMFileFormatException("Incorrect syntax in saved dictionary for key " + outerEntry.Key + ".");
 
             }
+            return printText;
+        }
+
+        private static string generateListPrintStatement(ref List<object> list, int level)
+        {
+            String printLine = "(";
+            foreach (object item in list)
+            {
+                if (item is string)
+                    printLine += item + ", ";
+                else if (item is List<object>)
+                {
+                    List<object> newList = (List<object>)item;
+                    printLine += generateListPrintStatement(ref newList, level) + ", ";
+                }
+                else if (item is Dictionary<string, object>)
+                {
+                    Dictionary<string, object> dict = (Dictionary<string, object>)item;
+                    printLine += "{" + generateDictionaryPrintStatement(dict, level);
+                    if (printLine.EndsWith("\n"))
+                        printLine = printLine.Substring(0, printLine.Length - 1);
+                    printLine += "}\n";
+                }
+                else
+                    throw new OpenFOAMFileFormatException("Incorrect syntax in saved list for item " + item + ".");
+            }
+            if (printLine.EndsWith(", "))
+                printLine = printLine.Substring(0, printLine.Length - 2);
+            printLine += ")";
+            return printLine;
         }
     }
 
@@ -189,13 +226,19 @@ namespace OpenFOAMInterface.BIM
             while (lineNum < lines.Length)
             {
                 if (String.IsNullOrWhiteSpace(lines[lineNum])) //skip any blank lines
-                    lineNum++; 
-                else if (lineNum + 2 >= lines.Length) //this is a syntax error
+                    lineNum++;
+                else if (lineNum >= lines.Length) //this is a syntax error
                     throw new OpenFOAMFileFormatException("Improper or incomplete data contained in config file " + filename + " beginning at line " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
                 else if (lines[lineNum].ToLower().Equals("foamfile")) //this section contains the file data (lowercase to ensure correct text identification)
-                    lineNum = processFileData(lineNum, ref lines);
-                else //this section contains the file contents
-                    lineNum = processDictionaryEntry(lineNum, ref lines, ref fileContents);
+                {
+                    lineNum = processFileData(lineNum, ref lines); //actually handles file data processing
+                    fileContents.Add(getFileObject(), new Dictionary<string, object>()); //sets up single master dictionary in order to process singletons
+                }
+                else //this section contains the file contents 
+                {
+                    Dictionary<string, object> mainDictionary = (Dictionary<string, object>) fileContents[getFileObject()];
+                    lineNum = processDictionaryEntry(lineNum, ref lines, ref mainDictionary);
+                }
             }
         }
 
@@ -212,7 +255,7 @@ namespace OpenFOAMInterface.BIM
                 lineNum++; //skip any blank lines
             if (lineNum >= lines.Length || !lines[lineNum].Equals("{"))
                 throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + ".");
-            else
+            else 
             {
                 lineNum++; //skip opening brace
                 while (lineNum < lines.Length && !lines[lineNum].Equals("}"))
@@ -267,65 +310,185 @@ namespace OpenFOAMInterface.BIM
         /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processDictionaryEntry(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict)
         {
-            string key = lines[lineNum++]; 
-            while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
-                lineNum++; //skip any blank lines
-            if (lineNum >= lines.Length || !lines[lineNum].Equals("{"))
-                throw new OpenFOAMFileFormatException("Improper dictionary syntax in config file " + filename + ".");
-            else
+            lines[lineNum] = lines[lineNum].Trim();
+            string[] currLine = lines[lineNum].Split('\t');
+            if (currLine.Length == 1) //dictionary header identified
             {
-                lineNum++; //skip opening brace
-                Dictionary<string, object> dict = new Dictionary<string, object>();
-                while (lineNum < lines.Length && !lines[lineNum].Equals("}")) {
-                    //check for blank lines
-                    if (String.IsNullOrWhiteSpace(lines[lineNum]))
-                    {
-                        lineNum++;
-                        continue; //skip any blank lines
-                    }
-
-                    //split line
-                    string[] currLine = lines[lineNum].Split('\t');
-
-                    //check for data value entry
-                    string currKey = String.Empty;
-                    string currVal = String.Empty;
-                    Boolean missingSemicolon = true;
-                    foreach (string segment in currLine)
-                    {
-                        String section = segment.Trim(); //remove remaining whitespace on segment
-                        if (String.IsNullOrWhiteSpace(section))
-                            continue; //skip any blank sections which only contained whitespace characters
-                        else if (String.IsNullOrWhiteSpace(currKey))
-                            currKey = section; //first section of text in the line is the key
-                        else if (String.IsNullOrWhiteSpace(currVal))
-                            if (section.EndsWith(";")) //parsing information with attached semicolon
-                            {
-                                currVal = section.Substring(0, section.Length - 1); //second section of text in the line is the value
-                                missingSemicolon = false;
-                            }
-                            else //parsing information without a semicolon
-                                currVal = section;
-                        else if (missingSemicolon && section.Equals(";"))
-                            missingSemicolon = false;
-                        else //additional text in the line indicates a syntax error
-                            throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
-                    }
-                    if (String.IsNullOrWhiteSpace(currVal))
-                        lineNum = processDictionaryEntry(lineNum, ref lines, ref dict); //new nested dictionary
-                    else if (String.IsNullOrWhiteSpace(currKey) || missingSemicolon)
-                        throw new OpenFOAMFileFormatException("Improper dictionary entry syntax for data point in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
-                    else 
-                        dict.Add(currKey, currVal);
-                    lineNum++; //current line has been processed, so advance to the next line and continue
-                }
-                if (lineNum >= lines.Length)
-                    throw new OpenFOAMFileFormatException("Improper dictionary syntax in config file " + filename + ".");
-                else if (lines[lineNum].Equals("}"))
-                    lineNum++; //skip closing brace
-                parentDict.Add(key, dict);
-            }
+                string key = lines[lineNum++];
+                while (lineNum < lines.Length && String.IsNullOrWhiteSpace(lines[lineNum]))
+                    lineNum++; //skip any blank lines
+                if (lineNum >= lines.Length) //improper syntax identified
+                    throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + ".");
+                else if (lines[lineNum].Equals("("))
+                    lineNum = processList(lineNum, ref lines, ref parentDict, key);
+                else if (lines[lineNum].Equals("{")) //dictionary is identified
+                    lineNum = processDictionary(lineNum, ref lines, ref parentDict, key);
+                else
+                    throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + ".");
+            } 
+            else //singleton entry identified
+                lineNum = processDataEntry(lineNum, ref lines, ref parentDict);
             return lineNum;
+        }
+
+        private int processDataEntry(int lineNum, ref string[] lines, ref Dictionary<string, object> dict)
+        {
+            //check for blank lines
+            if (String.IsNullOrWhiteSpace(lines[lineNum]))
+                return ++lineNum; //skip any blank lines
+
+            //split line
+            string[] currLine = lines[lineNum].Split('\t');
+
+            //check for data value entry
+            string currKey = String.Empty;
+            object currVal = String.Empty;
+            Boolean missingSemicolon = true;
+            foreach (string segment in currLine)
+            {
+                String section = segment.Trim(); //remove remaining whitespace on segment
+                if (String.IsNullOrWhiteSpace(section))
+                    continue; //skip any blank sections which only contained whitespace characters
+                else if (String.IsNullOrWhiteSpace(currKey))
+                    currKey = section; //first section of text in the line is the key
+                else if (String.IsNullOrWhiteSpace((string)currVal))
+                    if (section.EndsWith(";")) //parsing information with attached semicolon
+                    {
+                        currVal = section.Substring(0, section.Length - 1); //second section of text in the line is the value
+                        if (((string)currVal).StartsWith("(")) //if currVal should be a list
+                        {
+                            currVal = processSingleLineList((string)currVal, false);
+                        }
+                        missingSemicolon = false;
+                    }
+                    else //parsing information without a semicolon
+                        currVal = section;
+                else if (missingSemicolon && section.Equals(";"))
+                    missingSemicolon = false;
+                else //additional text in the line indicates a syntax error
+                    throw new OpenFOAMFileFormatException("Improper dictionary entry syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
+            }
+            if (currVal is string && String.IsNullOrWhiteSpace((string)currVal))
+                lineNum = processDictionaryEntry(lineNum, ref lines, ref dict); //new nested dictionary
+            else if (String.IsNullOrWhiteSpace(currKey) || missingSemicolon)
+                throw new OpenFOAMFileFormatException("Improper dictionary entry syntax for data point in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
+            else
+                dict.Add(currKey, currVal);
+            return ++lineNum; //current line has been processed, so advance to the next line before continuing
+        }
+
+        private List<object> processSingleLineList(string listText, Boolean closed)
+        {
+            string[] listContent = listText.Substring(1, listText.Length - 1).Split(); //remove open and close parens
+            List<object> list = new List<object>();
+            int idx = 0;
+            while (idx < listContent.Length && !listContent[idx].EndsWith(")"))
+            {
+                if (listContent[idx].StartsWith("("))
+                    list.Add(processSingleLineList(listContent[idx].Substring(1), false));
+                else if (listContent[idx].StartsWith("{"))
+                    throw new OpenFOAMFileFormatException("Dictionaries cannot be declared within lists with the notation <key  (list);>, but this type of format is present in config file " + filename + ".");
+                else
+                    list.Add(listContent[idx++]);
+            }
+            if (listContent[idx].EndsWith(")"))
+            {
+                if (listContent[idx].Length > 1)
+                    list.Add(listContent[idx].Substring(0, listContent[idx].Length - 1));
+                if (closed)
+                    throw new OpenFOAMFileFormatException("There are too many list closings without corresponding openings in cofig file " + filename + ".");
+                else
+                    closed = true;
+            }
+            if (closed)
+                return list;
+            else
+                throw new OpenFOAMFileFormatException("There are insufficient list closings for the number of openings in config file " + filename + ".");
+        }
+
+        private int processDictionary(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict, string key)
+        {
+            lineNum++; //skip opening brace
+            Dictionary<string, object> dict = new Dictionary<string, object>();
+            while (lineNum < lines.Length && !lines[lineNum].Equals("}"))
+                lineNum = processDataEntry(lineNum, ref lines, ref dict);
+            if (lineNum >= lines.Length)
+                throw new OpenFOAMFileFormatException("Improper dictionary syntax in config file " + filename + ".");
+            else if (lines[lineNum].Equals("}"))
+                lineNum++; //skip closing brace
+            parentDict.Add(key, dict);
+            return lineNum;
+        }
+
+        private int processDictionary(int lineNum, ref string[] lines, ref List<object> parentList)
+        {
+            lineNum++; //skip opening brace
+            Dictionary<string, object> dict = new Dictionary<string, object>();
+            while (lineNum < lines.Length && !lines[lineNum].Equals("}"))
+                lineNum = processDataEntry(lineNum, ref lines, ref dict);
+            if (lineNum >= lines.Length)
+                throw new OpenFOAMFileFormatException("Improper dictionary syntax in config file " + filename + ".");
+            else if (lines[lineNum].Equals("}"))
+                lineNum++; //skip closing brace
+            parentList.Add(dict);
+            return lineNum;
+        }
+
+        private int processList(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict, string key)
+        { 
+            lineNum++; //skip opening brace
+            List<object> list = new List<object>();
+            while (lineNum < lines.Length && !lines[lineNum].StartsWith(")"))
+                lineNum = processListEntry(lineNum, ref lines, ref list);
+            if (lineNum >= lines.Length)
+                throw new OpenFOAMFileFormatException("Improper list syntax in config file " + filename + ".");
+            else if (!lines[lineNum].EndsWith(";"))
+                throw new OpenFOAMFileFormatException("Improper list syntax in config file " + filename + " due to missing ending semicolon.");
+            else
+                lineNum++; //skip closing brace
+            parentDict.Add(key, list);
+            return lineNum;
+        }
+
+        private int processList(int lineNum, ref string[] lines, ref List<object> parentList)
+        {
+            lineNum++; //skip opening brace
+            List<object> list = new List<object>();
+            while (lineNum < lines.Length && !lines[lineNum].Equals(")") && !lines[lineNum].Equals(");"))
+                lineNum = processListEntry(lineNum, ref lines, ref list);
+            if (lineNum >= lines.Length)
+                throw new OpenFOAMFileFormatException("Improper list syntax in config file " + filename + ".");
+            else if (lines[lineNum].Equals(")"))
+                lineNum++; //skip closing brace
+            parentList.Add(list);
+            return lineNum;
+        }
+
+        private int processListEntry(int lineNum, ref string[] lines, ref List<object> list)
+        {
+            //check for blank lines
+            if (String.IsNullOrWhiteSpace(lines[lineNum]))
+                return ++lineNum; //skip any blank lines
+
+            //split line
+            string[] currLine = lines[lineNum].Split('\t');
+
+            //check for list value entry (or entries)
+            foreach (string segment in currLine)
+            {
+                String section = segment.Trim(); //remove remaining whitespace on segment
+                if (String.IsNullOrWhiteSpace(section))
+                    continue; //skip any blank sections which only contained whitespace characters
+                else if (section.Equals("(")) //multi-line list identified
+                    lineNum = processList(lineNum, ref lines, ref list);
+                else if (section.StartsWith("(")) //single-line list identified
+                    list.Add(processSingleLineList(section, false));
+                else if (section.Equals("{"))
+                    lineNum = processDictionary(lineNum, ref lines, ref list);
+                else 
+                    list.Add(section);
+            }
+            return ++lineNum; //current line has been processed, so advance to the next line before continuing
         }
 
         /// <summary>
