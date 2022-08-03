@@ -71,7 +71,7 @@ namespace OpenFOAMInterface.BIM
                     //file contents access
                     Dictionary<string, object> fileContents = currTest.getFileContents();
                     outputFile.WriteLine("File Contents: ");
-                    outputFile.Write(generateDictionaryPrintStatement(in fileContents, 1));
+                    outputFile.Write(generateDictionaryPrintStatement(in fileContents, 1, false));
 
                     //add space after a completed test
                     outputFile.WriteLine();
@@ -86,29 +86,37 @@ namespace OpenFOAMInterface.BIM
             return 0;
         }
 
-        private static string generateDictionaryPrintStatement(in Dictionary<string, object> dict, int level)
+        private static string generateDictionaryPrintStatement(in Dictionary<string, object> dict, int level, bool inList)
         {
             string printText = String.Empty;
             foreach (KeyValuePair<string, object> outerEntry in dict)
             {
                 string line = String.Empty;
-                for (int spaces = 0; spaces < level*2; spaces++)
-                {
-                    line += " ";
-                }
+                if (!inList)
+                    for (int spaces = 0; spaces < level * 2; spaces++)
+                        line += " ";
                 if (outerEntry.Value is Dictionary<string, object>)
                 {
-                    printText += line + outerEntry.Key + ":\n";
-                    printText += generateDictionaryPrintStatement((Dictionary<string, object>)outerEntry.Value, level + 1);
+                    if (!inList)
+                        printText += line + outerEntry.Key + ":\n";
+                    else
+                        printText += outerEntry.Key;
+                    printText += generateDictionaryPrintStatement((Dictionary<string, object>)outerEntry.Value, level + 1, inList);
                 } 
                 else if (outerEntry.Value is List<object>)
                 {
                     printText += line + outerEntry.Key + ": ";
                     List<object> list = (List<object>)outerEntry.Value;
-                    printText += generateListPrintStatement(ref list, level) + "\n";
+                    if (!inList)
+                        printText += generateListPrintStatement(ref list, level, true) + "\n";
+                    else
+                        printText += generateListPrintStatement(ref list, level, true);
                 }
                 else if (outerEntry.Value is string)
-                    printText += line + outerEntry.Key + ": " + outerEntry.Value + "\n";
+                    if (!inList)
+                        printText += line + outerEntry.Key + ": " + outerEntry.Value + "\n";
+                    else
+                        printText += outerEntry.Key + ": " + outerEntry.Value;
                 else
                     throw new OpenFOAMFileFormatException("Incorrect syntax in saved dictionary for key " + outerEntry.Key + ".");
 
@@ -116,7 +124,7 @@ namespace OpenFOAMInterface.BIM
             return printText;
         }
 
-        private static string generateListPrintStatement(ref List<object> list, int level)
+        private static string generateListPrintStatement(ref List<object> list, int level, bool inList)
         {
             String printLine = "(";
             foreach (object item in list)
@@ -126,15 +134,15 @@ namespace OpenFOAMInterface.BIM
                 else if (item is List<object>)
                 {
                     List<object> newList = (List<object>)item;
-                    printLine += generateListPrintStatement(ref newList, level) + ", ";
+                    printLine += generateListPrintStatement(ref newList, level, true) + ", ";
                 }
                 else if (item is Dictionary<string, object>)
                 {
                     Dictionary<string, object> dict = (Dictionary<string, object>)item;
-                    printLine += "{" + generateDictionaryPrintStatement(dict, level);
+                    printLine += "{" + generateDictionaryPrintStatement(dict, level, true);
                     if (printLine.EndsWith("\n"))
                         printLine = printLine.Substring(0, printLine.Length - 1);
-                    printLine += "}\n";
+                    printLine += "}";
                 }
                 else
                     throw new OpenFOAMFileFormatException("Incorrect syntax in saved list for item " + item + ".");
@@ -268,7 +276,7 @@ namespace OpenFOAMInterface.BIM
                     string[] currLine = lines[lineNum].Split('\t');
                     string currKey = String.Empty;
                     string currVal = String.Empty;
-                    Boolean missingSemicolon = true;
+                    bool missingSemicolon = true;
                     foreach (string segment in currLine)
                     {
                         String section = segment.Trim(); //remove remaining whitespace on segment
@@ -343,7 +351,7 @@ namespace OpenFOAMInterface.BIM
             //check for data value entry
             string currKey = String.Empty;
             object currVal = String.Empty;
-            Boolean missingSemicolon = true;
+            bool missingSemicolon = true;
             foreach (string segment in currLine)
             {
                 String section = segment.Trim(); //remove remaining whitespace on segment
@@ -377,7 +385,7 @@ namespace OpenFOAMInterface.BIM
             return ++lineNum; //current line has been processed, so advance to the next line before continuing
         }
 
-        private List<object> processSingleLineList(string listText, Boolean closed)
+        private List<object> processSingleLineList(string listText, bool closed)
         {
             string[] listContent = listText.Substring(1, listText.Length - 1).Split(); //remove open and close parens
             List<object> list = new List<object>();
@@ -483,9 +491,9 @@ namespace OpenFOAMInterface.BIM
                     lineNum = processList(lineNum, ref lines, ref list);
                 else if (section.StartsWith("(")) //single-line list identified
                     list.Add(processSingleLineList(section, false));
-                else if (section.Equals("{"))
-                    lineNum = processDictionary(lineNum, ref lines, ref list);
-                else 
+                else if (section.Equals("{")) //dictionary identified
+                    lineNum = processDictionary(lineNum, ref lines, ref list) - 1; //closing brace already skipped, so we must return to closing brace so it can be reskipped at the end of this method
+                else
                     list.Add(section);
             }
             return ++lineNum; //current line has been processed, so advance to the next line before continuing
