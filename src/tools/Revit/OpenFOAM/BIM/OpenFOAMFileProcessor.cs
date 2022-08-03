@@ -86,6 +86,7 @@ namespace OpenFOAMInterface.BIM
             return 0;
         }
 
+        //this method generates a string representation of a dictionary for use in debug printing
         private static string generateDictionaryPrintStatement(in Dictionary<string, object> dict, int level, bool inList)
         {
             string printText = String.Empty;
@@ -116,7 +117,7 @@ namespace OpenFOAMInterface.BIM
                     if (!inList)
                         printText += line + outerEntry.Key + ": " + outerEntry.Value + "\n";
                     else
-                        printText += outerEntry.Key + ": " + outerEntry.Value;
+                        printText += outerEntry.Key + ": " + outerEntry.Value + ", ";
                 else
                     throw new OpenFOAMFileFormatException("Incorrect syntax in saved dictionary for key " + outerEntry.Key + ".");
 
@@ -124,6 +125,7 @@ namespace OpenFOAMInterface.BIM
             return printText;
         }
 
+        //this method generates a string representation of a dictionary for use in debug printing
         private static string generateListPrintStatement(ref List<object> list, int level, bool inList)
         {
             String printLine = "(";
@@ -142,6 +144,8 @@ namespace OpenFOAMInterface.BIM
                     printLine += "{" + generateDictionaryPrintStatement(dict, level, true);
                     if (printLine.EndsWith("\n"))
                         printLine = printLine.Substring(0, printLine.Length - 1);
+                    if (printLine.EndsWith(", "))
+                        printLine = printLine.Substring(0, printLine.Length - 2);
                     printLine += "}, ";
                 }
                 else
@@ -194,28 +198,30 @@ namespace OpenFOAMInterface.BIM
         /// <summary>
         /// This is a private helper method for the constructor which performs preprocessing on the lines in the file to remove comments and leading and trailing whitespace.
         /// </summary>
+        /// <paramref name="lines">string[] containing the content being processed for file data</paramref>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private void isolateFileData(ref string[] lines)
         {
             for (int idx = 0; idx < lines.Length; idx++)
             {
                 //remove single line comments
                 if (lines[idx].Contains("//"))
-                    lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("//"));
+                    lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("//")).Trim();
 
                 //remove block (multi-line) comments
                 if (lines[idx].Contains("/*"))
                 {
                     if (lines[idx].Contains("*/")) //remove all block comment text where block comment is in a single line
-                        lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("/*")) + lines[idx].Substring(lines[idx].IndexOf("*/") + 2);
+                        lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("/*")).Trim() + lines[idx].Substring(lines[idx].IndexOf("*/") + 2).Trim();
                     else //remove all block comment text across lines but preserve any writing in the first/last line before/after the block comment
                     {
-                        lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("/*")); //remove the block comment text from the line but keep everything before it
+                        lines[idx] = lines[idx].Substring(0, lines[idx].IndexOf("/*")).Trim(); //remove the block comment text from the line but keep everything before it
                         while (++idx < lines.Length && !lines[idx].Contains("*/"))
                             lines[idx] = String.Empty; //remove comment text and advance to next line
                         if (idx >= lines.Length)
                             throw new OpenFOAMFileFormatException("Multi-line comment is not closed properly in config file " + filename + ".");
                         else 
-                            lines[idx] = lines[idx].Substring(lines[idx].IndexOf("*/") + 2); //remove the block comment text from the line but keep everything after it
+                            lines[idx] = lines[idx].Substring(lines[idx].IndexOf("*/") + 2).Trim(); //remove the block comment text from the line but keep everything after it
                     }
                 }
 
@@ -228,6 +234,8 @@ namespace OpenFOAMInterface.BIM
         /// This is a private helper method for the constructor which parses data from the input file (after it has undergone preprocessing in isolateFileData() 
         /// in order to populate both the fileData and fileContents fields.
         /// </summary>
+        /// <paramref name="lines">string[] containing the content being processed for file data</paramref>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private void extractFileData(ref string[] lines)
         {
             int lineNum = 0;
@@ -254,6 +262,7 @@ namespace OpenFOAMInterface.BIM
         /// This is a private helper method for the extractFileData method, which takes in line number expected to contain information about the file and processes it accordingly.
         /// </summary>
         /// <param name="lineNum">int indicating the current line that must be processed (in connection with any later lines related to it)</param>
+        /// <paramref name="lines">string[] containing the content being processed for file data</paramref>
         /// <returns>int indicating the new line number after processing all relevant information for the original line number</returns>
         /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processFileData(int lineNum, ref string[] lines)
@@ -287,7 +296,7 @@ namespace OpenFOAMInterface.BIM
                         else if (String.IsNullOrWhiteSpace(currVal))
                             if (section.EndsWith(";")) //parsing information with attached semicolon
                             {
-                                currVal = section.Substring(0, section.Length - 1); //second section of text in the line is the value
+                                currVal = section.Substring(0, section.Length - 1).Trim(); //second section of text in the line is the value
                                 missingSemicolon = false;
                             }
                             else //parsing information without a semicolon
@@ -299,7 +308,7 @@ namespace OpenFOAMInterface.BIM
                     }
                     if (String.IsNullOrWhiteSpace(currKey) || String.IsNullOrWhiteSpace(currVal) || missingSemicolon)
                         throw new OpenFOAMFileFormatException("Improper file information syntax in config file " + filename + " at line number " + ++lineNum + "."); //0 indexed array vs 1 indexed line numbers in file
-                    fileData.Add(currKey.ToLower(), currVal); //key in lowercase to ensure compatibility with getter methods for specific information
+                    fileData.Add(currKey.ToLower().Trim(), currVal.Trim()); //key in lowercase to ensure compatibility with getter methods for specific information
                     lineNum++; //current line has been processed, so advance to the next line and continue
                 }
                 if (lineNum >= lines.Length)
@@ -314,6 +323,8 @@ namespace OpenFOAMInterface.BIM
         /// This is a private helper method for the extractFileData method, which takes in line number expected to contain file contents and proceses it accordingly.
         /// </summary>
         /// <param name="lineNum">int indicating the current line that must be processed (in connection with any later lines related to it)</param>
+        /// <paramref name="lines">string[] containing the content being processed for file data</paramref>
+        /// <paramref name="parentDict">Dictionary<string, object> into which the current dictionary entry being processed should be added</paramref>
         /// <returns>int indicating the new line number after processing all relevant information for the original line number</returns>
         /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processDictionaryEntry(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict)
@@ -339,6 +350,16 @@ namespace OpenFOAMInterface.BIM
             return lineNum;
         }
 
+        /// <summary>
+        /// This method parses and processes a single line entry in a dictionary.  For this method to be called, it must already be known that the text is meant to be a 
+        /// dictionary entry, as it relies on dictionary entry syntax, and it will throw an exception if the format is not correct for a dictionary entry. It can also handle
+        /// lists stored as values in a dictionary, as long as they are in the correct syntax.
+        /// </summary>
+        /// <param name="lineNum">int indicating the current line being processed in the lines array</param>
+        /// <paramref name="lines">string[] providing the content being parsed</paramref>
+        /// <paramref name="dict">Dictionary<string, object> into which the current data entry belongs</paramref>
+        /// <returns>int indicating the line number for processing in the line array after completion of the method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processDataEntry(int lineNum, ref string[] lines, ref Dictionary<string, object> dict)
         {
             //check for blank lines
@@ -347,7 +368,7 @@ namespace OpenFOAMInterface.BIM
 
             //split line
             string[] currLine = lines[lineNum].Split('\t');
-
+            
             //check for data value entry
             string currKey = String.Empty;
             object currVal = String.Empty;
@@ -362,7 +383,7 @@ namespace OpenFOAMInterface.BIM
                 else if (String.IsNullOrWhiteSpace((string)currVal))
                     if (section.EndsWith(";")) //parsing information with attached semicolon
                     {
-                        currVal = section.Substring(0, section.Length - 1); //second section of text in the line is the value
+                        currVal = section.Substring(0, section.Length - 1).Trim(); //second section of text in the line is the value
                         if (((string)currVal).StartsWith("(")) //if currVal should be a list
                         {
                             currVal = processSingleLineList((string)currVal, false);
@@ -385,15 +406,24 @@ namespace OpenFOAMInterface.BIM
             return ++lineNum; //current line has been processed, so advance to the next line before continuing
         }
 
+        /// <summary>
+        /// This method parses and processes a single line entry in a list.  For this method to be called, it must already be known that the text is meant to be a 
+        /// list entry, as it relies on list entry syntax, and it will throw an exception if the format is not correct for a list entry, including that nested lists 
+        /// can exist in single line list entries but dictionaries cannot.
+        /// </summary>
+        /// <param name="listText">string containing the content for the single-line list, including the opening and closing parens around it</param>
+        /// <param name="closed">bool indicating whether or not the list has already been closed and is no longer in need of a closing paren</param>
+        /// <returns>List<object> containing the contents of the list processed in this method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private List<object> processSingleLineList(string listText, bool closed)
         {
-            string[] listContent = listText.Substring(1, listText.Length - 1).Split(); //remove open and close parens
+            string[] listContent = listText.Substring(1, listText.Length - 1).Trim().Split(); //remove open and close parens
             List<object> list = new List<object>();
             int idx = 0;
             while (idx < listContent.Length && !listContent[idx].EndsWith(")"))
             {
                 if (listContent[idx].StartsWith("("))
-                    list.Add(processSingleLineList(listContent[idx].Substring(1), false));
+                    list.Add(processSingleLineList(listContent[idx].Substring(1).Trim(), false));
                 else if (listContent[idx].StartsWith("{"))
                     throw new OpenFOAMFileFormatException("Dictionaries cannot be declared within lists with the notation <key  (list);>, but this type of format is present in config file " + filename + ".");
                 else
@@ -402,7 +432,7 @@ namespace OpenFOAMInterface.BIM
             if (listContent[idx].EndsWith(")"))
             {
                 if (listContent[idx].Length > 1)
-                    list.Add(listContent[idx].Substring(0, listContent[idx].Length - 1));
+                    list.Add(listContent[idx].Substring(0, listContent[idx].Length - 1).Trim());
                 if (closed)
                     throw new OpenFOAMFileFormatException("There are too many list closings without corresponding openings in cofig file " + filename + ".");
                 else
@@ -414,6 +444,16 @@ namespace OpenFOAMInterface.BIM
                 throw new OpenFOAMFileFormatException("There are insufficient list closings for the number of openings in config file " + filename + ".");
         }
 
+        /// <summary>
+        /// This method parses and processes a dictionary line by line with the help of a helper method.  It is an overloaded method; this version is used in cases where the 
+        /// dictionary is nested within a parent dictionary (while the other version is used for dictionaries nested within a list).
+        /// </summary>
+        /// <param name="lineNum">int indicating the current line being processed in the lines array</param>
+        /// <paramref name="lines">string[] providing the content being parsed</paramref>
+        /// <paramref name="parentDict">Dictionary<string, object> into which the new dictionary being processed will be added as a value (paired with its key)</paramref>
+        /// <param name="key">string representing the key that should be paired with the dictionary being processed (as its value) and entered into the parentDict</param>
+        /// <returns>int indicating the line number for processing in the line array after completion of the method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processDictionary(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict, string key)
         {
             lineNum++; //skip opening brace
@@ -428,6 +468,15 @@ namespace OpenFOAMInterface.BIM
             return lineNum;
         }
 
+        /// <summary>
+        /// This method parses and processes a dictionary line by line with the help of a helper method.  It is an overloaded method; this version is used in cases where the 
+        /// dictionary is nested within a list (while the other version is used for dictionaries nested within a parent dictionary).
+        /// </summary>
+        /// <param name="lineNum">int indicating the current line being processed in the lines array</param>
+        /// <paramref name="lines">string[] providing the content being parsed</paramref>
+        /// <paramref name="parentList">List<object> into which the new dictionary being processed will be added</paramref>
+        /// <returns>int indicating the line number for processing in the line array after completion of the method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processDictionary(int lineNum, ref string[] lines, ref List<object> parentList)
         {
             lineNum++; //skip opening brace
@@ -442,6 +491,16 @@ namespace OpenFOAMInterface.BIM
             return lineNum;
         }
 
+        /// <summary>
+        /// This method parses and processes a multi-line list line by line with the help of a helper method.  It is an overloaded method; this version is used in cases where the 
+        /// list is nested within a parent dictionary (while the other version is used for lists nested within a list).
+        /// </summary>
+        /// <param name="lineNum">int indicating the current line being processed in the lines array</param>
+        /// <paramref name="lines">string[] providing the content being parsed</paramref>
+        /// <paramref name="parentDict">Dictionary<string, object> into which the new list being processed will be added as a value (paired with its key)</paramref>
+        /// <param name="key">string representing the key that should be paired with the list being processed (as its value) and entered into the parentDict</param>
+        /// <returns>int indicating the line number for processing in the line array after completion of the method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processList(int lineNum, ref string[] lines, ref Dictionary<string, object> parentDict, string key)
         { 
             lineNum++; //skip opening brace
@@ -458,6 +517,15 @@ namespace OpenFOAMInterface.BIM
             return lineNum;
         }
 
+        /// <summary>
+        /// This method parses and processes a multi-line list line by line with the help of a helper method.  It is an overloaded method; this version is used in cases where the 
+        /// list is nested within another list (while the other version is used for lists nested within a parent dictionary).
+        /// </summary>
+        /// <param name="lineNum">int indicating the current line being processed in the lines array</param>
+        /// <paramref name="lines">string[] providing the content being parsed</paramref>
+        /// <paramref name="parentList">List<object> into which the new list being processed will be added</paramref>
+        /// <returns>int indicating the line number for processing in the line array after completion of the method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processList(int lineNum, ref string[] lines, ref List<object> parentList)
         {
             lineNum++; //skip opening brace
@@ -472,6 +540,16 @@ namespace OpenFOAMInterface.BIM
             return lineNum;
         }
 
+        /// <summary>
+        /// This method parses and processes a single line entry in a list.  For this method to be called, it must already be known that the text is meant to be a 
+        /// list entry, as it relies on list entry syntax, and it will throw an exception if the format is not correct for a list entry. It can also handle
+        /// lists stored as values in a list, as long as they are in the correct syntax.
+        /// </summary>
+        /// <param name="lineNum">int indicating the current line being processed in the lines array</param>
+        /// <paramref name="lines">string[] providing the content being parsed</paramref>
+        /// <paramref name="list">List<object> into which the current list entry belongs</paramref>
+        /// <returns>int indicating the line number for processing in the line array after completion of the method</returns>
+        /// <throws>OpenFOAMFileFormatException indicating that there is a syntax error in the file being processed if the information is not presented as expected</throws>
         private int processListEntry(int lineNum, ref string[] lines, ref List<object> list)
         {
             //check for blank lines
@@ -488,11 +566,13 @@ namespace OpenFOAMInterface.BIM
                 if (String.IsNullOrWhiteSpace(section))
                     continue; //skip any blank sections which only contained whitespace characters
                 else if (section.Equals("(")) //multi-line list identified
-                    lineNum = processList(lineNum, ref lines, ref list);
+                    lineNum = processList(lineNum, ref lines, ref list) - 1;
+                    //NOTE: the closing paren was already skipped (in processDictionary), so we must return back to the closing paren line so it can be skipped again at the end of this method
                 else if (section.StartsWith("(")) //single-line list identified
                     list.Add(processSingleLineList(section, false));
                 else if (section.Equals("{")) //dictionary identified
-                    lineNum = processDictionary(lineNum, ref lines, ref list) - 1; //closing brace already skipped, so we must return to closing brace so it can be reskipped at the end of this method
+                    lineNum = processDictionary(lineNum, ref lines, ref list) - 1;
+                    //NOTE: the closing brace was already skipped (in processDictionary), so we must return back to the closing brace line so it can be skipped again at the end of this method
                 else
                     list.Add(section);
             }
