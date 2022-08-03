@@ -142,7 +142,7 @@ namespace OpenFOAMInterface.BIM
                     printLine += "{" + generateDictionaryPrintStatement(dict, level, true);
                     if (printLine.EndsWith("\n"))
                         printLine = printLine.Substring(0, printLine.Length - 1);
-                    printLine += "}";
+                    printLine += "}, ";
                 }
                 else
                     throw new OpenFOAMFileFormatException("Incorrect syntax in saved list for item " + item + ".");
