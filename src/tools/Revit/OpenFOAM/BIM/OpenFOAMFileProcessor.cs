@@ -13,6 +13,7 @@ using System.Windows.Forms;
 namespace OpenFOAMInterface.BIM
 {
     //This class contains a driver for the purposes of testing the file processing functionalities
+    //THIS IS FOR TESTING ONLY!
     class MainClass
     {
         public static int Main()
@@ -87,6 +88,7 @@ namespace OpenFOAMInterface.BIM
         }
 
         //this method generates a string representation of a dictionary for use in debug printing
+        //THIS IS FOR TESTING ONLY!
         private static string generateDictionaryPrintStatement(in Dictionary<string, object> dict, int level, bool inList)
         {
             string printText = String.Empty;
@@ -126,6 +128,7 @@ namespace OpenFOAMInterface.BIM
         }
 
         //this method generates a string representation of a dictionary for use in debug printing
+        //THIS IS FOR TESTING ONLY!
         private static string generateListPrintStatement(ref List<object> list, int level, bool inList)
         {
             String printLine = "(";
