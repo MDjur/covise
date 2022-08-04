@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1612+                                |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+/* Revit-OpenFOAM-Addin 2.1.0.2                 *\
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+	
+	version		4.0;
+	format		ascii;
+	class		dictionary;
+	location		"system";
+	object		decomposeParDict;
+	
+}
+
+numberOfSubdomains		12;
+method		scotch;
+simpleCoeffs
+{
+	
+	n	(3 2 2);
+	delta		0.001;
+	
+}
+
+hierarchicalCoeefs
+{
+	
+	n	(3 2 2);
+	delta		0.001;
+	order		xyz;
+	
+}
+
+manualCoeffs
+{
+	
+	dataFile		cellDecomposition;
+	
+}
+

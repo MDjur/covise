@@ -1,0 +1,201 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v1612+                                |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+/* Revit-OpenFOAM-Addin 2.1.0.2                 *\
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+	
+	version		4.0;
+	format		ascii;
+	class		dictionary;
+	location		"system";
+	object		surfaceFeatureExtractDict;
+	
+}
+
+wallSTL.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_Drallauslass_Abluft_seitlich1_400_quadratisch_2_7236329.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_Drallauslass_Abluft_seitlich1_400_quadratisch_2_7236334.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_Drallauslass_Abluft_seitlich1_400_quadratisch_2_7236339.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_Drallauslass_Zuluft_seitlich1_400_quadratisch_2_7236347.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_Drallauslass_Zuluft_seitlich1_400_quadratisch_2_7236421.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_Drallauslass_Zuluft_seitlich1_400_quadratisch_2_7236472.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_M_Desk_1830_x_915mm_7284587.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_M_Desk_1830_x_915mm_7284589.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_PerseusRevit_Norm_7520305.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_PolarisFamily_Norm_7530437.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
+Terminal_optischObjects_optischObjects_7532727.stl
+{
+	
+	extractionMethod		extractFromSurface;
+	extractFromSurfaceCoeffs
+	{
+		
+		includedAngle		150;
+		
+	}
+	
+	writeObj		yes;
+	
+}
+
