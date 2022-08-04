@@ -657,7 +657,18 @@ namespace OpenFOAMInterface.BIM
         /// This is a public getter method for the contents of the file (or the entirety of the private field fileContents).
         /// </summary>
         /// <returns>Dictionary<string, Dictionary<string, string>> containing the contents of the parsed file</returns>
-        public Dictionary<string, object> getFileContents() => fileContents;
+        public Dictionary<string, object> getFileContents()
+        {
+            /*
+            //it might be easier (depending on the implementation in Data.cs to only extract the actual file contents itself and not the entire dictionary with a singluar key as the file object and the value as the contents of the file in a dictionary
+            //if that is preferable, the code should be as indicated below:
+            if (fileContents.ContainsKey(getFileObject()) && fileData[getFileObject()] is Dictionary<string, object>)
+                return (Dictionary<string, object>)fileData[getFileObject()];
+            else
+                throw new OpenFOAMFileFormatException("There is no data stored for the file object " + getFileObject() + " in the config file " + filename + ".");
+            */
+            return fileContents;
+        }
     }
 
     /// <summary>
