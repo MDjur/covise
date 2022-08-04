@@ -1298,6 +1298,16 @@ namespace OpenFOAMInterface.BIM
             m_interpolationSchemes = new KeyValuePair<string, string>("default", "linear");
             m_snGradSchemes = new KeyValuePair<string, string>("default", "limited corrected 0.333");
             m_fluxRequired = new KeyValuePair<string, string>("default", "no");
+
+            /*
+            //Notes for using the OpenFOAMFileProcessor class:
+            //Implementation question... is it easier to store this information in unique KeyValuePair objects or as a dictionary object that stores all this information
+            //to implement it currently, process the file, get the file data, and make assignments (casting values to strings since they are initially objects)
+            OpenFOAMFileProcessor fileProcessor = new OpenFOAMFileProcessor(@".\Resources\fvSchemes");
+            Dictionary<string, object> fileContents = fileProcessor.getFileContents();
+            //from here, the file contents dictionary has the file object (which is set in the config file) as its first key and a dictionary as its value
+            //in that dictionary are all the keys and their corresponding values
+            */
         }
 
         /// <summary>
