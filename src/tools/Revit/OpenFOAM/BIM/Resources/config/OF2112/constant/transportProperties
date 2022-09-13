@@ -14,34 +14,15 @@ FoamFile
 	version		4.0;
 	format		ascii;
 	class		dictionary;
-	location		"system";
-	object		decomposeParDict;
+	location		"constant";
+	object		transportProperties;
 	
 }
 
-numberOfSubdomains		12;
-method		scotch;
-simpleCoeffs
-{
-	
-	n	(3 2 2);
-	delta		0.001;
-	
-}
-
-hierarchicalCoeefs
-{
-	
-	n	(3 2 2);
-	delta		0.001;
-	order		xyz;
-	
-}
-
-manualCoeffs
-{
-	
-	dataFile		cellDecomposition;
-	
-}
-
+transportModel		Newtonian;
+nu nu		[ 0 2 -1 0 0 0 0] 1E-05;
+beta beta		[ 0 0 0 -1 0 0 0] 0.003;
+TRef TRef		[ 0 0 0 1 0 0 0] 300;
+Pr Pr		[ 0 0 0 0 0 0 0] 0.9;
+Prt Prt		[ 0 0 0 0 0 0 0] 0.7;
+Cp0		1000;
