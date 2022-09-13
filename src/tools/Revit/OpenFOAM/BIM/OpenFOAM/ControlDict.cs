@@ -40,9 +40,7 @@ namespace OpenFOAMInterface.BIM.OpenFOAM
         /// </summary>
         public override void InitAttributes()
         {
-            FoamFile.Attributes.Add("application", FOAMInterface.Singleton.Data.ControlDictParameters.AppControlDictSolver);
             base.InitAttributes();
-            FoamFile.Attributes.Add("functions", m_Functions);
         }
 
         /// <summary>
