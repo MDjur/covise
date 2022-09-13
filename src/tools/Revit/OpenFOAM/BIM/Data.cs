@@ -13,6 +13,7 @@ using System.Collections;
 using System.Windows;
 using System.Windows.Media.Media3D;
 using System.Windows.Forms;
+using System.IO;
 using System;
 using System.Linq;
 using utils;
@@ -42,9 +43,12 @@ namespace OpenFOAMInterface.BIM
     /// </summary>
     public class Data
     {
+        //General
         private Document document;
         private UIApplication m_Revit;
         private Dictionary<string, object> m_SimulationDefaultList;
+        private int m_OFAPI_Version = 2112;
+        private string m_cfgPath = @"C:\src\covise\src\tools\Revit\OpenFOAM\BIM\Resources\config";
 
         //Folder-Dict
         private Dictionary<string, object> m_System;
@@ -1273,32 +1277,29 @@ namespace OpenFOAMInterface.BIM
         }
 
         /// <summary>
+        /// Read config file with new OpenFOAMFileProcessor and add content to the dictionary outputDict.
+        /// <param name="outputDict"> Reference to output dictionary.</param>
+        /// <param name="cfgPath"> Config file path.</param>
+        /// </summary>
+        private void ReadDefaultCfg(ref Dictionary<string, object> outputDict, in string cfgpath)
+        {
+            var cfgName = Path.GetFileNameWithoutExtension(cfgpath);
+            OpenFOAMFileProcessor fileProcessor = new OpenFOAMFileProcessor(cfgpath);
+            Dictionary<string, object> fileContents = fileProcessor.getFileContents();
+            outputDict.Add(cfgName, fileContents[cfgName]);
+        }
+
+        /// <summary>
+        /// Read config file and add content to the dictionary m_System.
+        /// <param name="cfgPath"> Config file path.</param>
+        /// </summary>
+        private void ReadSystemCfg(string cfgPath) => ReadDefaultCfg(ref m_System, cfgPath);
+
+        /// <summary>
         /// Initialize FvSchemes default attributes.
         /// </summary>
         private void InitFvSchemes()
         {
-            //To-Do: Make it generic and responsive.
-            m_ddtSchemes = new KeyValuePair<string, string>("default", "steadyState");
-            m_gradSchemes = new KeyValuePair<string, string>("default", "cellLimited leastSquares 1");
-            m_divSchemes = new List<KeyValuePair<string, string>>
-            {
-                {new KeyValuePair<string, string>("default", "none") },
-                {new KeyValuePair<string, string>("div(phi,epsilon)", "bounded Gauss linearUpwind grad(epsilon)") },
-                {new KeyValuePair<string, string>("div(phi,U)", "bounded Gauss linearUpwindV grad(U)")},
-                {new KeyValuePair<string, string>("div((nuEff*dev2(T(grad(U)))))", "Gauss linear") },
-                {new KeyValuePair<string, string>("div(phi,k)", "bounded Gauss linearUpwind grad(k)")}
-            };
-
-            if (ControlDictParameters.AppControlDictSolver == SolverControlDict.buoyantBoussinesqSimpleFoam)
-            {
-                m_divSchemes.Add(new KeyValuePair<string, string>("div(phi,T)", "bounded Gauss linearUpwind default;"));
-            }
-
-            m_laplacianSchemes = new KeyValuePair<string, string>("default", "Gauss linear limited corrected 0.333");
-            m_interpolationSchemes = new KeyValuePair<string, string>("default", "linear");
-            m_snGradSchemes = new KeyValuePair<string, string>("default", "limited corrected 0.333");
-            m_fluxRequired = new KeyValuePair<string, string>("default", "no");
-
             /*
             //Notes for using the OpenFOAMFileProcessor class:
             //Implementation question... is it easier to store this information in unique KeyValuePair objects or as a dictionary object that stores all this information
@@ -1308,6 +1309,9 @@ namespace OpenFOAMInterface.BIM
             //from here, the file contents dictionary has the file object (which is set in the config file) as its first key and a dictionary as its value
             //in that dictionary are all the keys and their corresponding values
             */
+            ReadSystemCfg(m_cfgPath +
+                @"\OF" + m_OFAPI_Version.ToString() +
+                @"\system\fvSchemes.cfg");
         }
 
         /// <summary>
@@ -1354,12 +1358,12 @@ namespace OpenFOAMInterface.BIM
         private void InitFvSolutionRelaxationFactors()
         {
             m_RelaxationFactors = new Dictionary<string, object>
-                {
-                    { "k", 0.7 },
-                    { "U", 0.7 },
-                    { "epsilon", 0.7 },
-                    { "p", 0.3 }
-                };
+            {
+                { "k", 0.7 },
+                { "U", 0.7 },
+                { "epsilon", 0.7 },
+                { "p", 0.3 }
+            };
             if (ControlDictParameters.AppControlDictSolver == SolverControlDict.buoyantBoussinesqSimpleFoam)
             {
                 m_RelaxationFactors.Add("p_rgh", 0.3);
@@ -1497,7 +1501,7 @@ namespace OpenFOAMInterface.BIM
             CreateControlDictionary();
             CreateSurfaceFeatureExtractDictionary();
             CreateDecomposeParDictionary();
-            CreateFvSchemesDictionary();
+            //CreateFvSchemesDictionary();
             CreateFvSolutionDictionary();
             CreateSnappyDictionary();
 
@@ -1545,24 +1549,9 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         private void CreateControlDictionary()
         {
-            Dictionary<string, object> m_ControlDict = new();
-
-            m_ControlDict.Add("startFrom", ControlDictParameters.StartFrom);
-            m_ControlDict.Add("startTime", ControlDictParameters.StartTime);
-            m_ControlDict.Add("stopAt", ControlDictParameters.StopAt);
-            m_ControlDict.Add("endTime", ControlDictParameters.EndTime);
-            m_ControlDict.Add("deltaT", ControlDictParameters.DeltaT);
-            m_ControlDict.Add("writeControl", ControlDictParameters.WriteControl);
-            m_ControlDict.Add("writeInterval", ControlDictParameters.WriteInterval);
-            m_ControlDict.Add("purgeWrite", ControlDictParameters.PurgeWrite);
-            m_ControlDict.Add("writeFormat", ControlDictParameters.WriteFormat);
-            m_ControlDict.Add("writePrecision", ControlDictParameters.WritePrecision);
-            m_ControlDict.Add("writeCompression", ControlDictParameters.WriteCompression);
-            m_ControlDict.Add("timeFormat", ControlDictParameters.TimeFormat);
-            m_ControlDict.Add("timePrecision", ControlDictParameters.TimePrecision);
-            m_ControlDict.Add("runTimeModifiable", ControlDictParameters.RunTimeModifiable);
-
-            m_System.Add("controlDict", m_ControlDict);
+            ReadSystemCfg(m_cfgPath +
+                @"\OF" + m_OFAPI_Version.ToString() +
+                @"\system\controlDict.cfg");
         }
 
         /// <summary>
@@ -1570,6 +1559,9 @@ namespace OpenFOAMInterface.BIM
         /// </summary>
         private void CreateSurfaceFeatureExtractDictionary()
         {
+            // ReadSystemCfg(m_cfgPath +
+            //     @"\OF" + m_OFAPI_Version.ToString() +
+            //     @"\system\surfaceFeatureExtractDict.cfg");
             Dictionary<string, object> m_SurfaceFeatureExtractDict = new Dictionary<string, object>();
 
             m_ExtractFromSurfaceCoeffs = new Dictionary<string, object>()
