@@ -45,6 +45,7 @@ namespace OpenFOAMInterface.BIM
             m_Revit = commandData.Application;
             FOAMInterface.Singleton.Data.SetDocument(m_Revit);
             string fileName = "wallSTL.stl";
+            // MainClass.Main();
 
             // save Revit document's triangular data in a temporary file, generate openFOAM-casefolder and start simulation
             Directory.CreateDirectory(FOAMInterface.Singleton.Data.LocalCaseFolder);
