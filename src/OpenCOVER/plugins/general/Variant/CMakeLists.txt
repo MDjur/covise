@@ -5,12 +5,14 @@ SET(HEADERS
   Variant.h
   VariantPlugin.h
   VariantUI.h
+  VariantAR.h
   VrmlNodeVariant.h
 )
 
 SET(SOURCES
   coVRBoxOfInterest.cpp
   Variant.cpp
+  VariantAR.cpp
   VariantPlugin.cpp
   VariantUI.cpp
   VrmlNodeVariant.cpp
