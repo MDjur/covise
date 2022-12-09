@@ -22,122 +22,105 @@
 #ifndef _VARIANTAR_H
 #define _VARIANTAR_H
 
+#include <OpenVRUI/coMenu.h>
+#include <cover/ARToolKit.h>
+#include <cover/coInteractor.h>
+#include <cover/coTabletUI.h>
+#include <cover/coVRLabel.h>
+#include <cover/coVRPlugin.h>
+#include <cover/coVRPluginSupport.h>
+#include <qdom.h>
+#include <util/DLinkList.h>
+
+#include <QtCore>
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <memory>
+#include <set>
+
 #include "Variant.h"
 #include "VariantUI.h"
 
-#include <cover/coVRPluginSupport.h>
-#include <cover/coVRPlugin.h>
-#include <cover/ARToolKit.h>
-#include <cover/coTabletUI.h>
-#include <cover/coInteractor.h>
-#include <cover/coVRLabel.h>
-#include <util/DLinkList.h>
-#include <OpenVRUI/coMenu.h>
-#include <QtCore>
-#include <qdom.h>
-#include <set>
+namespace vrui {
+class coRowMenu;
+class coSubMenuItem;
+class coCheckboxMenuItem;
+class coButtonMenuItem;
+class coPotiMenuItem;
+class coVRLabel;
+};  // namespace vrui
 
-#include <iostream>
-#include <algorithm>
-#include <array>
-#include <memory>
-
-namespace vrui
-{
-    class coRowMenu;
-    class coSubMenuItem;
-    class coCheckboxMenuItem;
-    class coButtonMenuItem;
-    class coPotiMenuItem;
-    class coVRLabel;
+namespace tracemodule {
+enum Axis {
+    X = 0,
+    Y = 1,
+    Z = 2,
+    NumAxis = 3
 };
-
-namespace tracemodule
-{
-    enum Axis
-    {
-        X = 0,
-        Y = 1,
-        Z = 2,
-        NumAxis = 3
-    };
 };
 
 using namespace vrui;
 using namespace opencover;
 
-class VariantAR : public Variant
-{
+class VariantAR : public Variant {
     class TraceModule : public coMenuListener,
-                        public coTUIListener
-    {
+                        public coTUIListener {
         friend class VariantAR;
 
-        class ModuleInteractorPoint
-        {
+        class ModuleInteractorPoint {
             friend class TraceModule;
 
             typedef tracemodule::Axis Axis;
             typedef std::array<std::shared_ptr<coTUIEditFloatField>, Axis::NumAxis> AxisFields;
 
-        public:
+           public:
             ModuleInteractorPoint() = default;
             ModuleInteractorPoint(float x, float y, float z, int plugID);
 
-            std::shared_ptr<coTUIEditFloatField> &X()
-            {
+            std::shared_ptr<coTUIEditFloatField> &X() {
                 return m_coord[Axis::X];
             }
 
-            std::shared_ptr<coTUIEditFloatField> &Y()
-            {
+            std::shared_ptr<coTUIEditFloatField> &Y() {
                 return m_coord[Axis::Y];
             }
 
-            std::shared_ptr<coTUIEditFloatField> &Z()
-            {
+            std::shared_ptr<coTUIEditFloatField> &Z() {
                 return m_coord[Axis::Z];
             }
 
-            const AxisFields &Coord()
-            {
+            const AxisFields &Coord() {
                 return m_coord;
             }
 
-            void setAxisValue(float val, Axis axis)
-            {
+            void setAxisValue(float val, Axis axis) {
                 m_coord[axis]->setValue(val);
             }
 
-            void setEventListener(TraceModule *listener)
-            {
-                std::for_each(m_coord.begin(), m_coord.end(), [&listener](auto &axis)
-                              { axis->setEventListener(listener); });
+            void setEventListener(TraceModule *listener) {
+                std::for_each(m_coord.begin(), m_coord.end(), [&listener](auto &axis) { axis->setEventListener(listener); });
             }
 
-            void setUIPos(int y)
-            {
+            void setUIPos(int y) {
                 int i = 0;
-                std::for_each(m_coord.begin(), m_coord.end(), [&](auto &axis) mutable
-                              { axis->setPos(i++, y); });
+                std::for_each(m_coord.begin(), m_coord.end(), [&](auto &axis) mutable { axis->setPos(i++, y); });
             }
 
-            void createAxis(std::string name, int pluginID, Axis axis)
-            {
+            void createAxis(std::string name, int pluginID, Axis axis) {
                 m_coord[axis].reset();
                 m_coord[axis] = std::make_shared<coTUIEditFloatField>(name, pluginID);
             }
 
-        private:
+           private:
             void setAxis(std::string name, int pluginID) {}
             AxisFields m_coord;
         };
 
-        class ModuleInteractor
-        {
+        class ModuleInteractor {
             friend class TraceModule;
 
-        public:
+           public:
             ModuleInteractor() = default;
             ModuleInteractor(std::shared_ptr<ModuleInteractorPoint> modInterPoint, int plugID, const osg::Vec3 &startPointOffset, const osg::Vec3 &startNormal, const osg::Vec3 &lastPos, const osg::Vec3 &curPos, const osg::Vec3 &curNormal)
                 : InteractorPoint(modInterPoint),
@@ -146,8 +129,7 @@ class VariantAR : public Variant
                   StartNormal(startNormal),
                   LastPosition(lastPos),
                   CurrentPosition(curPos),
-                  CurrentNormal(curNormal)
-            {
+                  CurrentNormal(curNormal) {
                 if (modInterPoint)
                     throw std::exception("Nullptr for ModuleInteractorPoint");
             }
@@ -162,7 +144,7 @@ class VariantAR : public Variant
             osg::Vec3 &currentPosition() { return CurrentPosition; }
             std::shared_ptr<ModuleInteractorPoint> &interactorPoint() { return InteractorPoint; }
 
-        private:
+           private:
             int PluginID;
             osg::Vec3 StartpointOffset;
             osg::Vec3 StartNormal;
@@ -172,7 +154,7 @@ class VariantAR : public Variant
             std::shared_ptr<ModuleInteractorPoint> InteractorPoint;
         };
 
-    public:
+       public:
         TraceModule(int ID, const std::string &name, int instanceID, const std::string &fbInfo, std::shared_ptr<coTUITab> plugin, std::shared_ptr<coInteractor> inter);
 
         virtual void tabletEvent(coTUIElement *tUIItem);
@@ -181,15 +163,13 @@ class VariantAR : public Variant
         bool calcPositionChanged();
         void menuEvent(coMenuItem *);
         void update();
-        void resetInteractorsLastPos()
-        {
-            std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [](auto &inter)
-                          { inter.resetLastPos(); });
+        void resetInteractorsLastPos() {
+            std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [](auto &inter) { inter.resetLastPos(); });
         }
         // template <typename... Args>
         // void for_each_modinteractor(std::function<void(Args...)> func, Args... args) { std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), func(args...)); }
 
-    private:
+       private:
         ModuleInteractor &firstModuleInteractor() { return m_ModInteractors[0]; }
         ModuleInteractor &secondModuleInteractor() { return m_ModInteractors[1]; }
 
@@ -221,13 +201,13 @@ class VariantAR : public Variant
     typedef TraceModule::ModuleInteractor ModuleInteractor;
     typedef TraceModule::ModuleInteractorPoint ModuleInteractorPoint;
 
-public:
+   public:
     VariantAR(std::string varName, osg::Node *node, osg::Node::ParentList parents,
               ui::Menu *VariantMenu, coTUITab *VariantPluginTab, int numVar,
               QDomDocument *qdomDoc, QDomElement *qdomElem, coVRBoxOfInterest *boxOfInterest, bool defaultState);
     ~VariantAR(){};
 
-private:
+   private:
     int ID;
     std::shared_ptr<ARToolKitMarker> m_timestepMarker;
     covise::DLinkList<TraceModule *> m_modules;

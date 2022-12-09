@@ -1,15 +1,16 @@
 #include "VariantAR.h"
+
+#include <OpenVRUI/coCheckboxMenuItem.h>
 #include <OpenVRUI/coRowMenu.h>
 #include <OpenVRUI/coSubMenuItem.h>
-#include <OpenVRUI/coCheckboxMenuItem.h>
-#include <cover/RenderObject.h>
-#include <cover/VRSceneGraph.h>
-#include <cover/coVRAnimationManager.h>
-#include <cover/coVRConfig.h>
-#include <cover/coInteractor.h>
-#include <cover/VRViewer.h>
 #include <OpenVRUI/osg/mathUtils.h>
 #include <cover/ARToolKit.h>
+#include <cover/RenderObject.h>
+#include <cover/VRSceneGraph.h>
+#include <cover/VRViewer.h>
+#include <cover/coInteractor.h>
+#include <cover/coVRAnimationManager.h>
+#include <cover/coVRConfig.h>
 
 #ifdef USE_COVISE
 #include <appl/RenderInterface.h>
@@ -18,8 +19,7 @@
 using namespace covise;
 
 VariantAR::VariantAR(std::string varName, osg::Node *node, osg::Node::ParentList parents, ui::Menu *VariantMenu, coTUITab *VariantPluginTab, int numVar, QDomDocument *qdomDoc, QDomElement *qdomElem, coVRBoxOfInterest *boxOfInterest, bool defaultState)
-    : Variant(varName, node, parents, VariantMenu, VariantPluginTab, numVar, qdomDoc, qdomElem, boxOfInterest, defaultState)
-{
+    : Variant(varName, node, parents, VariantMenu, VariantPluginTab, numVar, qdomDoc, qdomElem, boxOfInterest, defaultState) {
     variantClass = this;
 }
 
@@ -35,8 +35,7 @@ VariantAR::TraceModule::TraceModule(int ID, const std::string &name, int instanc
       m_oldVisibility(true),
       m_enabled(true),
       m_firstUpdate(true),
-      m_doUpdate(false)
-{
+      m_doUpdate(false) {
     firstModuleInteractor() = ModuleInteractor(
         std::make_shared<ModuleInteractorPoint>(0.0f, 0.0f, 0.1f, tab->getID()),
         tab->getID(),
@@ -84,8 +83,7 @@ VariantAR::TraceModule::TraceModule(int ID, const std::string &name, int instanc
     m_updateNow->setPos(0, 1 + ID * 5 + 2);
 
     int i = 3;
-    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&ID, &i, this](auto &inter) mutable
-                  {
+    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&ID, &i, this](auto &inter) mutable {
         auto &point = inter.interactorPoint();
         point->setEventListener(this);
         point->setUIPos(1 + ID * 5 + i++); });
@@ -93,45 +91,35 @@ VariantAR::TraceModule::TraceModule(int ID, const std::string &name, int instanc
     m_feedbackInfo = fbInfo.empty() ? "" : fbInfo;
 }
 
-void VariantAR::TraceModule::tabletPressEvent(coTUIElement *tUIItem)
-{
+void VariantAR::TraceModule::tabletPressEvent(coTUIElement *tUIItem) {
     if (tUIItem == m_updateNow.get())
         m_doUpdate = true;
 }
 
-void VariantAR::TraceModule::tabletEvent(coTUIElement *tUIItem)
-{
-    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&tUIItem](auto &inter)
-                  { inter.interactorEvent(tUIItem); });
+void VariantAR::TraceModule::tabletEvent(coTUIElement *tUIItem) {
+    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&tUIItem](auto &inter) { inter.interactorEvent(tUIItem); });
 }
 
-void VariantAR::TraceModule::menuEvent(coMenuItem *menuItem)
-{
+void VariantAR::TraceModule::menuEvent(coMenuItem *menuItem) {
     if (menuItem == m_enabledToggle.get())
-    {
         m_enabled = m_enabledToggle->getState();
-    }
 }
 
-bool VariantAR::TraceModule::calcPositionChanged()
-{
+bool VariantAR::TraceModule::calcPositionChanged() {
     auto diff1 = firstModuleInteractor().getDiff();
     auto diff2 = secondModuleInteractor().getDiff();
 
-    if ((diff1.length() > m_positionThreshold) || (diff2.length() > m_positionThreshold))
-    {
+    if ((diff1.length() > m_positionThreshold) || (diff2.length() > m_positionThreshold)) {
         resetInteractorsLastPos();
         return true;
     }
     return false;
 }
 
-void VariantAR::TraceModule::update()
-{
+void VariantAR::TraceModule::update() {
     if (m_marker)
         return;
-    if (m_firstUpdate)
-    {
+    if (m_firstUpdate) {
         m_firstUpdate = false;
         return;
     }
@@ -143,28 +131,22 @@ void VariantAR::TraceModule::update()
     const auto &MarkerPos = m_marker->getMarkerTrans();
     const auto vrviewer = VRViewer::instance();
     auto leftCameraTrans = vrviewer->getViewerMat();
-    if (coVRConfig::instance()->stereoState())
-    {
+    if (coVRConfig::instance()->stereoState()) {
         leftCameraTrans = osg::Matrix::translate(-(vrviewer->getSeparation() / 2.0), 0, 0) * vrviewer->getViewerMat();
     }
     const auto &MarkerInWorld = MarkerPos * leftCameraTrans;
     const auto &MarkerInLocalCoords = MarkerInWorld * cover->getInvBaseMat();
-    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&MarkerInLocalCoords](auto &inter)
-                  { 
+    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&MarkerInLocalCoords](auto &inter) { 
         inter.updateCurPos(MarkerInLocalCoords);
         inter.updateNormal(MarkerInLocalCoords); });
-    if (m_positionChanged)
-    {
+    if (m_positionChanged) {
         resetInteractorsLastPos();
-    }
-    else
-    {
+    } else {
         const auto &updateinterval = m_updateInterval->getValue();
         const auto &frameTimeDiff = cover->frameTime() - m_oldTime;
         const bool &visibilityStateUpdate = m_updateOnVisibilityChange->getState();
         const bool &validInterval = 0 < updateinterval < frameTimeDiff;
-        if (((visibilityStateUpdate && visibilityChanged) || m_doUpdate || (!visibilityStateUpdate && validInterval)) && m_marker->isVisible())
-        {
+        if (((visibilityStateUpdate && visibilityChanged) || m_doUpdate || (!visibilityStateUpdate && validInterval)) && m_marker->isVisible()) {
             // send
             m_doUpdate = false;
             m_oldTime = cover->frameTime();
@@ -308,24 +290,17 @@ void VariantAR::TraceModule::update()
     }
 }
 
-void VariantAR::TraceModule::ModuleInteractor::interactorEvent(coTUIElement *tuiItem)
-{
-    if (InteractorPoint->X().get() == tuiItem)
-    {
+void VariantAR::TraceModule::ModuleInteractor::interactorEvent(coTUIElement *tuiItem) {
+    if (InteractorPoint->X().get() == tuiItem) {
         StartpointOffset[0] = InteractorPoint->X()->getValue();
-    }
-    else if (InteractorPoint->Y().get() == tuiItem)
-    {
+    } else if (InteractorPoint->Y().get() == tuiItem) {
         StartpointOffset[1] = InteractorPoint->Y()->getValue();
-    }
-    else if (InteractorPoint->Z().get() == tuiItem)
-    {
+    } else if (InteractorPoint->Z().get() == tuiItem) {
         StartpointOffset[2] = InteractorPoint->Z()->getValue();
     }
 }
 
-VariantAR::TraceModule::ModuleInteractorPoint::ModuleInteractorPoint(float x, float y, float z, int plugID)
-{
+VariantAR::TraceModule::ModuleInteractorPoint::ModuleInteractorPoint(float x, float y, float z, int plugID) {
     int pluginID = plugID;
     createAxis("startPos X", pluginID, Axis::X);
     createAxis("startPos Y", pluginID, Axis::Y);
