@@ -83,10 +83,11 @@ VariantAR::TraceModule::TraceModule(int ID, const std::string &name, int instanc
     m_updateNow->setPos(0, 1 + ID * 5 + 2);
 
     int i = 3;
-    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&ID, &i, this](auto &inter) mutable {
+    for (auto &inter : m_ModInteractors) {
         auto &point = inter.interactorPoint();
         point->setEventListener(this);
-        point->setUIPos(1 + ID * 5 + i++); });
+        point->setUIPos(1 + ID * 5 + i++);
+    }
 
     m_feedbackInfo = fbInfo.empty() ? "" : fbInfo;
 }
@@ -97,7 +98,8 @@ void VariantAR::TraceModule::tabletPressEvent(coTUIElement *tUIItem) {
 }
 
 void VariantAR::TraceModule::tabletEvent(coTUIElement *tUIItem) {
-    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&tUIItem](auto &inter) { inter.interactorEvent(tUIItem); });
+    for (auto &inter : m_ModInteractors)
+        inter.interactorEvent(tUIItem);
 }
 
 void VariantAR::TraceModule::menuEvent(coMenuItem *menuItem) {
@@ -106,14 +108,11 @@ void VariantAR::TraceModule::menuEvent(coMenuItem *menuItem) {
 }
 
 bool VariantAR::TraceModule::calcPositionChanged() {
-    auto diff1 = firstModuleInteractor().getDiff();
-    auto diff2 = secondModuleInteractor().getDiff();
+    if (std::any_of(m_ModInteractors.begin(), m_ModInteractors.end(), [this](auto &inter) { return inter.getDiff().length() > m_positionThreshold; }))
+        return false;
 
-    if ((diff1.length() > m_positionThreshold) || (diff2.length() > m_positionThreshold)) {
-        resetInteractorsLastPos();
-        return true;
-    }
-    return false;
+    resetInteractorsLastPos();
+    return true;
 }
 
 void VariantAR::TraceModule::update() {
@@ -131,14 +130,15 @@ void VariantAR::TraceModule::update() {
     const auto &MarkerPos = m_marker->getMarkerTrans();
     const auto vrviewer = VRViewer::instance();
     auto leftCameraTrans = vrviewer->getViewerMat();
-    if (coVRConfig::instance()->stereoState()) {
+    if (coVRConfig::instance()->stereoState())
         leftCameraTrans = osg::Matrix::translate(-(vrviewer->getSeparation() / 2.0), 0, 0) * vrviewer->getViewerMat();
-    }
+
     const auto &MarkerInWorld = MarkerPos * leftCameraTrans;
     const auto &MarkerInLocalCoords = MarkerInWorld * cover->getInvBaseMat();
-    std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [&MarkerInLocalCoords](auto &inter) { 
+    for (auto &inter : m_ModInteractors) {
         inter.updateCurPos(MarkerInLocalCoords);
-        inter.updateNormal(MarkerInLocalCoords); });
+        inter.updateNormal(MarkerInLocalCoords);
+    }
     if (m_positionChanged) {
         resetInteractorsLastPos();
     } else {
