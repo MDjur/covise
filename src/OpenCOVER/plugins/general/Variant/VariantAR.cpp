@@ -291,12 +291,12 @@ void VariantAR::TraceModule::update() {
 }
 
 void VariantAR::TraceModule::ModuleInteractor::interactorEvent(coTUIElement *tuiItem) {
-    if (InteractorPoint->X().get() == tuiItem) {
-        StartpointOffset[0] = InteractorPoint->X()->getValue();
-    } else if (InteractorPoint->Y().get() == tuiItem) {
-        StartpointOffset[1] = InteractorPoint->Y()->getValue();
-    } else if (InteractorPoint->Z().get() == tuiItem) {
-        StartpointOffset[2] = InteractorPoint->Z()->getValue();
+    if (m_interactorPoint->X().get() == tuiItem) {
+        m_startpointOffset[0] = m_interactorPoint->X()->getValue();
+    } else if (m_interactorPoint->Y().get() == tuiItem) {
+        m_startpointOffset[1] = m_interactorPoint->Y()->getValue();
+    } else if (m_interactorPoint->Z().get() == tuiItem) {
+        m_startpointOffset[2] = m_interactorPoint->Z()->getValue();
     }
 }
 

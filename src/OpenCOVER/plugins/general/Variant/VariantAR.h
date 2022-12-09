@@ -123,35 +123,35 @@ class VariantAR : public Variant {
            public:
             ModuleInteractor() = default;
             ModuleInteractor(std::shared_ptr<ModuleInteractorPoint> modInterPoint, int plugID, const osg::Vec3 &startPointOffset, const osg::Vec3 &startNormal, const osg::Vec3 &lastPos, const osg::Vec3 &curPos, const osg::Vec3 &curNormal)
-                : InteractorPoint(modInterPoint),
+                : m_interactorPoint(modInterPoint),
                   PluginID(plugID),
-                  StartpointOffset(startPointOffset),
-                  StartNormal(startNormal),
-                  LastPosition(lastPos),
-                  CurrentPosition(curPos),
-                  CurrentNormal(curNormal) {
+                  m_startpointOffset(startPointOffset),
+                  m_startNormal(startNormal),
+                  m_lastPosition(lastPos),
+                  m_currentPosition(curPos),
+                  m_currentNormal(curNormal) {
                 if (modInterPoint)
                     throw std::exception("Nullptr for ModuleInteractorPoint");
             }
 
-            void resetLastPos() { LastPosition = CurrentPosition; }
-            void updateCurPos(const osg::Matrix &localMarkerCoords) { CurrentPosition = localMarkerCoords.preMult(StartpointOffset); }
-            void updateNormal(const osg::Matrix &localMarkerCoords) { CurrentNormal = osg::Matrix::transform3x3(localMarkerCoords, StartNormal); }
+            void resetLastPos() { m_lastPosition = m_currentPosition; }
+            void updateCurPos(const osg::Matrix &localMarkerCoords) { m_currentPosition = localMarkerCoords.preMult(m_startpointOffset); }
+            void updateNormal(const osg::Matrix &localMarkerCoords) { m_currentNormal = osg::Matrix::transform3x3(localMarkerCoords, m_startNormal); }
             void interactorEvent(coTUIElement *tuiItem);
             int pluginID() { return PluginID; }
-            osg::Vec3 getDiff() { return LastPosition - CurrentPosition; }
-            osg::Vec3 &currentNormal() { return CurrentNormal; }
-            osg::Vec3 &currentPosition() { return CurrentPosition; }
-            std::shared_ptr<ModuleInteractorPoint> &interactorPoint() { return InteractorPoint; }
+            osg::Vec3 getDiff() { return m_lastPosition - m_currentPosition; }
+            osg::Vec3 &currentNormal() { return m_currentNormal; }
+            osg::Vec3 &currentPosition() { return m_currentPosition; }
+            std::shared_ptr<ModuleInteractorPoint> &interactorPoint() { return m_interactorPoint; }
 
            private:
             int PluginID;
-            osg::Vec3 StartpointOffset;
-            osg::Vec3 StartNormal;
-            osg::Vec3 LastPosition;
-            osg::Vec3 CurrentPosition;
-            osg::Vec3 CurrentNormal;
-            std::shared_ptr<ModuleInteractorPoint> InteractorPoint;
+            osg::Vec3 m_startpointOffset;
+            osg::Vec3 m_startNormal;
+            osg::Vec3 m_lastPosition;
+            osg::Vec3 m_currentPosition;
+            osg::Vec3 m_currentNormal;
+            std::shared_ptr<ModuleInteractorPoint> m_interactorPoint;
         };
 
        public:
