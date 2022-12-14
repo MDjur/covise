@@ -11,6 +11,7 @@
 #include <cover/coInteractor.h>
 #include <cover/coVRAnimationManager.h>
 #include <cover/coVRConfig.h>
+#include <config/CoviseConfig.h>
 
 #ifdef USE_COVISE
 #include <appl/RenderInterface.h>
@@ -18,104 +19,56 @@
 
 using namespace covise;
 
-VariantAR::VariantAR(const coInteractorSet &interset, std::string varName, osg::Node *node, const osg::Node::ParentList &parents, ui::Menu *VariantMenu, coTUITab *VariantPluginTab, int numVar, QDomDocument *qdomDoc, QDomElement *qdomElem, coVRBoxOfInterest *boxOfInterest, bool defaultState)
-    : Variant(varName, node, parents, VariantMenu, VariantPluginTab, numVar, qdomDoc, qdomElem, boxOfInterest, defaultState),
-      m_interactors(interset) {
+// VariantAR::VariantAR(const coInteractorSet &interSet, const Variant &variant)
+VariantAR::VariantAR(coInteractor *interactor, const Variant &variant)
+    : Variant(variant) {
     variantClass = this;
-    std::shared_ptr<coTUITab> tab(VariantPluginTab);
-    m_traceModule = std::make_unique<TraceModule>(numVar, varName, numVar, "", tab, nullptr);
+    const std::string &varName = variant.getName();
+    m_traceModule = std::make_unique<TraceModule>(varName, std::shared_ptr<coInteractor>(interactor));
+
     auto combobox = ui->getTUIARCombobox();
-    for (auto inter : m_interactors)
-        combobox->addEntry(inter->getModuleName());
+    //TODO: extract this to VariantPlugin and pass through list of markres
+    for (const auto &entry: coCoviseConfig::getScopeEntries("COVER.Plugin.ARToolKit"))
+    {
+        auto entry_name = entry.first;
+        auto entry_val = entry.second;
+        if (entry_name.find("Marker") != std::string::npos) {
+            size_t pos = entry_name.find(":");
+            std::string name = entry_name.substr(pos + 1);
+            if (name.find("ObjectMarker") != std::string::npos)
+                continue;
+            
+            combobox->addEntry(name);
+        }
+    }
 }
 
-VariantAR::VariantAR(const coInteractorSet &interSet, const Variant &variant) : Variant(variant), m_interactors(interSet)
-{
-
-}
-
-VariantAR::TraceModule::TraceModule(int ID, const std::string &name, int instanceID, const std::string &fbInfo, std::shared_ptr<coTUITab> tab, std::shared_ptr<coInteractor> inter)
-    : m_id(ID),
-      m_interactor(inter),
-      m_tab(tab),
+VariantAR::TraceModule::TraceModule(const std::string &name, std::shared_ptr<coInteractor> inter)
+    : m_interactor(inter),
       m_moduleName(name),
-      m_modInstanceID(instanceID),
       m_oldTime(0.0),
       m_positionThreshold(3000.0),
       m_positionChanged(false),
       m_oldVisibility(true),
       m_enabled(true),
       m_firstUpdate(true),
-      m_doUpdate(false) {
-    firstModuleInteractor() = ModuleInteractor(
-        std::make_shared<ModuleInteractorPoint>(0.0f, 0.0f, 0.1f, tab->getID()),
-        tab->getID(),
-        osg::Vec3(0, 0, 0.1),
-        osg::Vec3(1, 0, 0),
-        osg::Vec3(0, 0, 0),
-        osg::Vec3(11110, 0, 0),
-        osg::Vec3(0, 0, 0));
-    secondModuleInteractor() = ModuleInteractor(
-        std::make_shared<ModuleInteractorPoint>(0.0f, 0.0f, 1.1f, tab->getID()),
-        tab->getID(),
-        osg::Vec3(0, 0, 100.1),
-        osg::Vec3(0, 1, 0),
-        osg::Vec3(0, 0, 0),
-        osg::Vec3(111110, 0, 0),
-        osg::Vec3(0, 0, 0));
-
-    int tabID = m_tab->getID();
-    m_updateOnVisibilityChange->setState(false);
-
-    std::string markerName = name + std::to_string(instanceID);
-    std::string label = markerName + ":";
-
-    m_marker = std::make_shared<ARToolKitMarker>(markerName.c_str());
-    m_arMenuEntry = std::make_shared<coSubMenuItem>(markerName.c_str());
-    // m_plugin->arMenu->add(m_arMenuEntry);
-    m_moduleMenu = std::make_shared<coRowMenu>(markerName.c_str());
-    m_enabledToggle = std::make_shared<coCheckboxMenuItem>("enabled", m_enabled);
-    m_TracerModuleLabel = std::make_shared<coTUILabel>(label, tabID);
-    m_updateOnVisibilityChange = std::make_shared<coTUIToggleButton>("updateOnVisibilityChange", tabID);
-    m_updateNow = std::make_shared<coTUIButton>("update", tabID);
-    m_updateInterval = std::make_shared<coTUIEditFloatField>("updateInterval", tabID);
-    m_arMenuEntry->setMenu(m_moduleMenu.get());
-    m_moduleMenu->add(m_enabledToggle.get());
-
-    m_enabledToggle->setMenuListener(this);
-    m_TracerModuleLabel->setEventListener(this);
-    m_updateOnVisibilityChange->setEventListener(this);
-    m_updateInterval->setEventListener(this);
-    m_updateNow->setEventListener(this);
-
-    m_TracerModuleLabel->setPos(0, 1 + ID * 5);
-    m_updateOnVisibilityChange->setPos(0, 1 + ID * 5 + 1);
-    m_updateInterval->setPos(1, 1 + ID * 5 + 1);
-    m_updateNow->setPos(0, 1 + ID * 5 + 2);
-
-    int i = 3;
-    for (auto &inter : m_ModInteractors) {
-        auto &point = inter.interactorPoint();
-        point->setEventListener(this);
-        point->setUIPos(1 + ID * 5 + i++);
-    }
-
-    m_feedbackInfo = fbInfo.empty() ? "" : fbInfo;
-}
-
-void VariantAR::TraceModule::tabletPressEvent(coTUIElement *tUIItem) {
-    if (tUIItem == m_updateNow.get())
-        m_doUpdate = true;
-}
-
-void VariantAR::TraceModule::tabletEvent(coTUIElement *tUIItem) {
-    for (auto &inter : m_ModInteractors)
-        inter.interactorEvent(tUIItem);
-}
-
-void VariantAR::TraceModule::menuEvent(coMenuItem *menuItem) {
-    if (menuItem == m_enabledToggle.get())
-        m_enabled = m_enabledToggle->getState();
+      m_doUpdate(false),
+      m_ModInteractors{
+          ModuleInteractor(
+              std::make_shared<ModuleInteractorPoint>(0.0f, 0.0f, 0.1f),
+              osg::Vec3(0, 0, 0.1),
+              osg::Vec3(1, 0, 0),
+              osg::Vec3(0, 0, 0),
+              osg::Vec3(11110, 0, 0),
+              osg::Vec3(0, 0, 0)),
+          ModuleInteractor(
+              std::make_shared<ModuleInteractorPoint>(0.0f, 0.0f, 1.1f),
+              osg::Vec3(0, 0, 100.1),
+              osg::Vec3(0, 1, 0),
+              osg::Vec3(0, 0, 0),
+              osg::Vec3(111110, 0, 0),
+              osg::Vec3(0, 0, 0))} {
+    m_marker = std::make_shared<ARToolKitMarker>(name.c_str());
 }
 
 bool VariantAR::TraceModule::calcPositionChanged() {
@@ -254,11 +207,9 @@ void VariantAR::TraceModule::update() {
     if (m_positionChanged) {
         resetInteractorsLastPos();
     } else {
-        const auto &updateinterval = m_updateInterval->getValue();
         const auto &frameTimeDiff = cover->frameTime() - m_oldTime;
-        const bool &visibilityStateUpdate = m_updateOnVisibilityChange->getState();
-        const bool &validInterval = 0 < updateinterval < frameTimeDiff;
-        if (((visibilityStateUpdate && visibilityChanged) || m_doUpdate || (!visibilityStateUpdate && validInterval)) && m_marker->isVisible()) {
+        const bool &validInterval = 0 < frameTimeDiff;
+        if ((visibilityChanged || m_doUpdate || validInterval) && m_oldVisibility) {
             // send
             m_doUpdate = false;
             m_oldTime = cover->frameTime();
@@ -278,28 +229,10 @@ void VariantAR::TraceModule::update() {
                     m_interactor->setVectorParam("startpoint2", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
                     m_interactor->executeModule();
                 }
-            } else if (!m_feedbackInfo.empty()) {
-                handleCOVISEFeedback(currentNormal, currentNormal2, currentPosition1, currentPosition2);
             }
+            // } else if (!m_feedbackInfo.empty()) {
+            //     handleCOVISEFeedback(currentNormal, currentNormal2, currentPosition1, currentPosition2);
+            // }
         }
     }
-}
-
-void VariantAR::TraceModule::ModuleInteractor::interactorEvent(coTUIElement *tuiItem) {
-    if (m_interactorPoint->X().get() == tuiItem) {
-        m_startpointOffset[0] = m_interactorPoint->X()->getValue();
-    } else if (m_interactorPoint->Y().get() == tuiItem) {
-        m_startpointOffset[1] = m_interactorPoint->Y()->getValue();
-    } else if (m_interactorPoint->Z().get() == tuiItem) {
-        m_startpointOffset[2] = m_interactorPoint->Z()->getValue();
-    }
-}
-
-VariantAR::TraceModule::ModuleInteractorPoint::ModuleInteractorPoint(float x, float y, float z, int tabID) {
-    createAxis("startPos X", tabID, Axis::X);
-    createAxis("startPos Y", tabID, Axis::Y);
-    createAxis("startPos Z", tabID, Axis::Z);
-    setAxisValue(x, Axis::X);
-    setAxisValue(y, Axis::Y);
-    setAxisValue(z, Axis::Z);
 }
