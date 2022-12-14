@@ -45,6 +45,7 @@ public:
     ~VariantUI();
 
     ui::Button *getVRUI_Item();
+    coTUIComboBox *getTUIARCombobox();
     coTUIToggleButton *getRadioTUI_Item();
     coTUIToggleButton *getTUI_Item();
     coTUIEditFloatField *getXTransItem();
@@ -58,6 +59,7 @@ private:
     ui::Button *Cb_item;
     coTUIToggleButton *VariantRadioButton;
     coTUIToggleButton *VariantPluginTUIItem;
+    coTUIComboBox *ARMarkerCombobox;
     coTUIEditFloatField *xTRansItem;
     coTUIEditFloatField *yTRansItem;
     coTUIEditFloatField *zTRansItem;

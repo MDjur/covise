@@ -7,6 +7,7 @@
 
 #include "VariantUI.h"
 #include "VariantPlugin.h"
+#include "VariantAR.h"
 #include "Variant.h"
 #include <net/tokenbuffer.h>
 #include <PluginUtil/PluginMessageTypes.h>
@@ -31,6 +32,11 @@ VariantUI::VariantUI(std::string varName, ui::Menu *Variant_menu, coTUITab *Vari
     //Cb_item->setMenuListener(Variant::variantClass);
     //Variant_menu->add(Cb_item);
 
+    //Creating choicebox for ARMarkers in TabletUI ("Variant"-Tab)
+    ARMarkerCombobox = new coTUIComboBox(varName.c_str(), VariantPluginTab->getID());
+    ARMarkerCombobox->setEventListener(VariantAR::variantClass);
+    ARMarkerCombobox->addEntry("None");
+
     //Creating the Checkbox for show/hide the variant in the TabletUI ("Variant"-Tab)
     VariantPluginTUIItem = new coTUIToggleButton(varName.c_str(), VariantPluginTab->getID()); //new Button for tabletUi
     VariantPluginTUIItem->setEventListener(Variant::variantClass);
@@ -38,7 +44,7 @@ VariantUI::VariantUI(std::string varName, ui::Menu *Variant_menu, coTUITab *Vari
     //Creating the Radiobutton for show/hide the variant in the TabletUI ("Variant"-Tab)
     VariantRadioButton = new coTUIToggleButton("X", VariantPluginTab->getID()); //new Button for tabletUi
     VariantRadioButton->setEventListener(Variant::variantClass);
-    VariantRadioButton->setState(true);
+    VariantRadioButton->setState(true);    
 
     xTRansItem = new coTUIEditFloatField("X_Trans", VariantPluginTab->getID(), 0);
     xTRansItem->setEventListener(Variant::variantClass);
@@ -54,6 +60,7 @@ VariantUI::VariantUI(std::string varName, ui::Menu *Variant_menu, coTUITab *Vari
 VariantUI::~VariantUI()
 {
     delete Cb_item;
+    delete ARMarkerCombobox;
     delete VariantPluginTUIItem;
     delete xTRansItem;
     delete yTRansItem;
@@ -82,6 +89,7 @@ void VariantUI::setPosTUIItems(int pos)
     xTRansItem->setPos(2, pos);
     yTRansItem->setPos(3, pos);
     zTRansItem->setPos(4, pos);
+    ARMarkerCombobox->setPos(5, pos);
 }
 
 osg::Vec3d VariantUI::getTransVec()
@@ -111,4 +119,9 @@ coTUIEditFloatField *VariantUI::getYTransItem()
 coTUIEditFloatField *VariantUI::getZTransItem()
 {
     return zTRansItem;
+}
+
+coTUIComboBox *VariantUI::getTUIARCombobox()
+{
+    return ARMarkerCombobox;
 }
