@@ -8,20 +8,26 @@
 /*********************************************************************************\
  **                                                            2009 HLRS         **
  **                                                                              **
- ** Description:  Show/Hide of VariantPlugins, defined in Collect Module               **
+ ** Description:  Show/Hide of VariantPlugins, defined in Collect Module         **
  **                                                                              **
  **                                                                              **
  ** Author: A.Gottlieb                                                           **
  **                                                                              **
  ** Jul-09  v1                                                                   **
+ ** Dez-22  add AR-Interface (Marko Djuric)                                      **
  **                                                                              **
  **                                                                              **
 \*********************************************************************************/
 
 #include "VariantPlugin.h"
+#include "VariantAR.h"
 #include <cover/coVRPluginSupport.h>
 #include <cover/RenderObject.h>
 #include <cover/VRSceneGraph.h>
+#include <cover/VRViewer.h>
+#include <cover/coVRConfig.h>
+#include <cover/coVRAnimationManager.h>
+#include <OpenVRUI/osg/mathUtils.h>
 #include <cover/coVRFileManager.h>
 #include <osg/CullStack>
 #include <iostream>
@@ -48,7 +54,9 @@ VariantPlugin *VariantPlugin::plugin = NULL;
 //------------------------------------------------------------------------------------------------------------------------------
 
 VariantPlugin::VariantPlugin()
-: ui::Owner("VariantPlugin", cover->ui)
+    : ui::Owner("VariantPlugin", cover->ui),
+      m_enableAR(false),
+      m_ARTimestepMarker(nullptr)
 {
     assert(plugin == NULL);
     plugin = this;
@@ -128,35 +136,45 @@ bool VariantPlugin::init()
     });
 
     coVRSelectionManager::instance()->addListener(this);
+
     //tuTab
     VariantPluginTab = new coTUITab("Variants", coVRTui::instance()->mainFolder->getID());
     VariantPluginTab->setPos(0, 0);
     coTUILabel *lbl_VariantPlugins = new coTUILabel("Variants", VariantPluginTab->getID());
     lbl_VariantPlugins->setPos(0, 0);
+    coTUILabel *space2 = new coTUILabel("                     ", VariantPluginTab->getID());
+    space2->setPos(1, 0);
     coTUIToggleButton *lbl_X = new coTUIToggleButton("X-trans", VariantPluginTab->getID());
-    lbl_X->setPos(1, 0);
+    lbl_X->setPos(2, 0);
     lbl_X->setEventListener(this);
     coTUIToggleButton *lbl_Y = new coTUIToggleButton("Y-trans", VariantPluginTab->getID());
-    lbl_Y->setPos(2, 0);
+    lbl_Y->setPos(3, 0);
     lbl_Y->setEventListener(this);
     coTUIToggleButton *lbl_Z = new coTUIToggleButton("Z-trans", VariantPluginTab->getID());
-    lbl_Z->setPos(3, 0);
+    lbl_Z->setPos(4, 0);
     lbl_Z->setEventListener(this);
+    coTUILabel *lbl_Marker = new coTUILabel("AR-Marker", VariantPluginTab->getID());
+    lbl_Marker->setPos(5, 0);
     coTUILabel *space = new coTUILabel("                     ", VariantPluginTab->getID());
-    space->setPos(4, 0);
+    space->setPos(6, 0);
     saveXML = new coTUIFileBrowserButton("Save", VariantPluginTab->getID());
-    saveXML->setPos(5, 0);
+    saveXML->setPos(7, 0);
     saveXML->setEventListener(this);
     saveXML->setFilterList("*.xml");
     readXML = new coTUIFileBrowserButton("Read", VariantPluginTab->getID());
-    readXML->setPos(5, 1);
+    readXML->setPos(8, 0);
     readXML->setEventListener(this);
     readXML->setFilterList("*.xml");
 
     tui_showLabel = new coTUIToggleButton("Show Labels", VariantPluginTab->getID());
-    tui_showLabel->setPos(6, 0);
+    tui_showLabel->setPos(7, 1);
     tui_showLabel->setState(false);
     tui_showLabel->setEventListener(this);
+
+    tui_enableAR = new coTUIToggleButton("AR", VariantPluginTab->getID());
+    tui_enableAR->setPos(8, 1);
+    tui_enableAR->setState(false);
+    tui_enableAR->setEventListener(this);
 
     tui_header_trans[lbl_X->getName()] = lbl_X;
     tui_header_trans[lbl_Y->getName()] = lbl_Y;
@@ -192,6 +210,7 @@ VariantPlugin::~VariantPlugin()
     delete options_menu;
     delete define_roi;
     delete roi_menue;
+    delete ar_menu;
     delete roi;
     delete variant_menu;
     delete button;
@@ -201,11 +220,118 @@ VariantPlugin::~VariantPlugin()
     delete options;
 #endif
 
+    delete m_ARTimestepMarker;
     delete VariantPluginTab;
     delete boi;
     plugin = nullptr;
 }
-//------------------------------------------------------------------------------------------------------------------------------
+
+void VariantPlugin::newInteractor(const RenderObject *, coInteractor *inter)
+{
+    std::stringstream ss;
+    ss << inter->getModuleName() << "_" << inter->getModuleInstance();
+    interactormap.insert(std::pair<std::string, coInteractor *>(ss.str(), inter));
+    inter->incRefCount();
+}
+
+// void VariantPlugin::addObject(const RenderObject *container, osg::Group *, const RenderObject *obj, const RenderObject *, const RenderObject *, const RenderObject *)
+// {
+// 	if (obj == nullptr) // todo: obj is null in vistle due to delayload
+// 		return;
+	
+//     const char *feedbackInfo = obj->getAttribute("FEEDBACK");
+//     if (feedbackInfo)
+//     {
+//         char tmp[200];
+//         strcpy(tmp, feedbackInfo + 1);
+//         unsigned int i = 0;
+//         for (; i < strlen(tmp); i++)
+//         {
+//             if (tmp[i] == '\n')
+//             {
+//                 tmp[i] = ' ';
+//                 break;
+//             }
+//         }
+//         for (; i < strlen(tmp); i++)
+//         {
+//             if (tmp[i] == '\n')
+//             {
+//                 tmp[i] = '\0';
+//                 break;
+//             }
+//         }
+
+//         int moduleInstance = 0;
+//         char moduleName[200];
+//         if (sscanf(tmp, "%s %d", moduleName, &moduleInstance) != 2)
+//             fprintf(stderr, "ARTracePlugin: sscanf for feedback info failed\n");
+
+//         // the module in the module listmodules.reset();
+//         modules.reset();
+//         while (modules.current())
+//         {
+//             if ((modules.current()->instance == moduleInstance) && (strcmp(modules.current()->moduleName, moduleName) == 0))
+//                 return; // we already have this module
+//             modules.next();
+//         }
+//         fprintf(stderr, "ARTracePlugin::new Trace Module %s %d\n", moduleName, moduleInstance);
+//         // module not found, create it;
+//         ID++;
+//         modules.append(new TraceModule(ID, moduleName, moduleInstance, feedbackInfo, this, NULL));
+//     }
+// }
+
+void VariantPlugin::removeObject(const char *, bool)
+{
+    fprintf(stderr, "VariantPlugin::removeObject\n");
+}
+
+void VariantPlugin::preFrameAR()
+{
+    if (m_ARTimestepMarker && m_ARTimestepMarker->isVisible())
+    {
+        // marker position in camera coordinate system
+        const auto &vrviewer = VRViewer::instance();
+        const auto &viewerSeparation = vrviewer->getSeparation() / 2.0;
+        const auto &vrconfig = coVRConfig::instance();
+        const auto &monoview = vrconfig->monoView();
+        osg::Matrix leftCameraTrans = vrviewer->getViewerMat();
+        if (vrconfig->stereoState() || (monoview == coVRConfig::MONO_LEFT))
+            leftCameraTrans.preMult(osg::Matrix::translate(-viewerSeparation, 0, 0));
+        else if (monoview == coVRConfig::MONO_RIGHT)
+            leftCameraTrans.preMult(osg::Matrix::translate(viewerSeparation, 0, 0));
+
+        osg::Matrix MarkerPos = m_ARTimestepMarker->getMarkerTrans();
+        osg::Matrix MarkerInWorld = MarkerPos * leftCameraTrans;
+        osg::Matrix MarkerInLocalCoords = MarkerInWorld * cover->getInvBaseMat();
+        coCoord coord = MarkerInLocalCoords;
+        if (coord.hpr[0] < 0)
+            coord.hpr[0] = 360.0 + coord.hpr[0];
+        if (coord.hpr[0] > 0)
+            coord.hpr[0] = coord.hpr[0] - 360.0;
+        cerr << "h: " << coord.hpr[0] << "p: " << coord.hpr[1] << "r: " << coord.hpr[2] << endl;
+
+        const auto &animationManager = coVRAnimationManager::instance();
+        int numTimesteps = animationManager->getNumTimesteps();
+        int newTimesteps = ((int)(coord.hpr[0] / 360.0 * numTimesteps)) % numTimesteps;
+        if (newTimesteps < 0)
+            newTimesteps = numTimesteps + newTimesteps;
+        if (newTimesteps > numTimesteps)
+            newTimesteps = newTimesteps - numTimesteps;
+        cerr << "newTimestep: " << newTimesteps << endl;
+
+        animationManager->requestAnimationFrame(newTimesteps);
+    }
+
+    //FIXME: preframe called after enabling AR => Variants in list are normal Variants
+    for (const auto var: varlist) {
+        const auto varAR = static_cast<VariantAR *>(var);
+        if (varAR)
+            if (varAR->traceModule())
+                varAR->traceModule()->update();
+    }
+}
 
 void
 VariantPlugin::preFrame()
@@ -215,12 +341,14 @@ VariantPlugin::preFrame()
     static osg::Matrix invStartHand;
     static osg::Matrix startPos;
 
-    //tmpVec = osg::Vec3(1,1,1);
-
     int state = cover->getPointerButton()->getState(); //Button States are defined in /covise/src/renderer/OpenCOVER/device/VRTracker.h
 
     if (_interactionA->isRunning())
     {
+        // update AR
+        if (m_enableAR)
+            preFrameAR();
+
         //if centersphere is selected, do translation
         if (boi->isSensorActiv("center"))
         {
@@ -433,7 +561,8 @@ void VariantPlugin::addNode(osg::Node *node, const RenderObject *render)
                     osg::Node::ParentList parents;
                     if (node)
                         parents = node->getParents();
-                    var = new Variant(var_att, node, parents, variant_menu, VariantPluginTab, varlist.size() + 1, xmlfile, &qDE_Variant, boi, set_default?default_state:true);
+
+                    var = new Variant(var_att, node, parents, variant_menu, VariantPluginTab, varlist.size() + 1, xmlfile, &qDE_Variant, boi, set_default ? default_state : true);
                     varlist.push_back(var);
                     var->AddToScenegraph();
                     var->hideVRLabel();
@@ -666,6 +795,8 @@ void VariantPlugin::tabletEvent(coTUIElement *elem)
             setQDomElemLabels(state);
             showHideLabels->setState(state);
         }
+        else if(t == tui_enableAR)
+            enableAR(t->getState());
     }
     coTUIFileBrowserButton *u = dynamic_cast<coTUIFileBrowserButton *>(elem);
     if (u == saveXML)
@@ -677,6 +808,31 @@ void VariantPlugin::tabletEvent(coTUIElement *elem)
         readXmlFile();
     }
 }
+
+void VariantPlugin::enableAR(bool state)
+{   
+    m_enableAR = state;
+    if (state) {
+        m_ARTimestepMarker = new ARToolKitMarker("TimestepMarker");
+        for (auto variant: varlist) {
+            //TODO: not exact name we are searching for.
+            auto variantAR = new VariantAR(interactormap[variant->getVarname()], *variant);
+            varARset.insert(variantAR);
+        }
+    } else {
+        const auto ar_instance = ARToolKit::instance();
+        ar_instance->markers.remove(m_ARTimestepMarker);
+        m_ARTimestepMarker = nullptr;
+        //TODO: adjust deleting
+        for (const auto &variantAR: varARset) {
+            ar_instance->markers.remove(variantAR->traceModule()->getMarker().get());
+            variantAR->resetCombobox();
+        }
+
+        varARset.clear();
+    }
+}
+
 //------------------------------------------------------------------------------------------------------------------------------
 
 void VariantPlugin::message(int toWhom, int type, int len, const void *buf)

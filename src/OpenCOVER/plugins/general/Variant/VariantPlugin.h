@@ -19,6 +19,7 @@
  **                                                                          **
  ** History:                                                                 **
  ** Jul-09  v1                                                               **
+ ** Dez-22  add AR-Interface (Marko Djuric)                                  **
  **                                                                          **
  **                                                                          **
 \****************************************************************************/
@@ -36,6 +37,7 @@
 #include <cover/ui/Owner.h>
 #include <cover/ui/Menu.h>
 #endif
+#include <cover/ARToolKit.h>
 #include <cover/coVRSelectionManager.h>
 #include <util/coExport.h>
 #include <cover/coTabletUI.h>
@@ -44,6 +46,7 @@
 
 #include <osg/NodeVisitor>
 #include "Variant.h"
+#include "VariantAR.h"
 #include <QtCore>
 #include <qdom.h>
 #include <QDir>
@@ -67,6 +70,7 @@ public:
 
     // this will be called in PreFrame
     void preFrame() override;
+    void preFrameAR();
     //this will be called by changing the selected object
     virtual bool selectionChanged() override;
     virtual bool pickedObjChanged() override;
@@ -81,6 +85,9 @@ public:
     void message(int toWhom, int type, int len, const void *buf) override;
     void setMenuItem(Variant *var, bool state);
     void tabletEvent(coTUIElement *) override;
+    void newInteractor(const RenderObject *container, coInteractor *i);
+    // void addObject(const RenderObject *container, osg::Group *root, const RenderObject *, const RenderObject *, const RenderObject *, const RenderObject *);
+    void removeObject(const char *objName, bool replace);
 
     void updateTUItemPos();
 
@@ -92,6 +99,7 @@ public:
     osg::Vec3d createTransVec(Variant *var, TRANS dir);
     void hideAllLabel();
     void showAllLabel();
+    void enableAR(bool state);
     int saveXmlFile();
     int readXmlFile();
     void setQDomElemState(Variant *var, bool state);
@@ -125,9 +133,12 @@ private:
     ui::Menu *options_menu=nullptr;
     ui::Button *showHideLabels=nullptr;
     ui::Menu *roi_menu=nullptr;
+    ui::Menu *ar_menu=nullptr;
     ui::Button *define_roi=nullptr;
     ui::Button *active_roi=nullptr;
 #endif
+
+    ARToolKitMarker *m_ARTimestepMarker;
 
     coTUITab *VariantPluginTab;
     coTUIToggleButton *VariantPluginTUIItem;
@@ -135,11 +146,14 @@ private:
     coTUIFileBrowserButton *saveXML;
     coTUIFileBrowserButton *readXML;
     coTUIToggleButton *tui_showLabel;
+    coTUIToggleButton *tui_enableAR;
 
     std::map<std::string, coTUIToggleButton *> tui_header_trans;
 
     std::list<Variant *> varlist;
     std::map<osg::Node *, Variant *> varmap;
+    std::map<std::string, coInteractor *> interactormap;
+    std::set<VariantAR *> varARset;
 
     osg::BoundingBox box;
 
@@ -154,6 +168,7 @@ private:
     osg::Vec3 tmpVec;
     float scale;
     bool firsttime;
+    bool m_enableAR;
 };
 //------------------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
