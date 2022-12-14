@@ -18,9 +18,20 @@
 
 using namespace covise;
 
-VariantAR::VariantAR(std::string varName, osg::Node *node, osg::Node::ParentList parents, ui::Menu *VariantMenu, coTUITab *VariantPluginTab, int numVar, QDomDocument *qdomDoc, QDomElement *qdomElem, coVRBoxOfInterest *boxOfInterest, bool defaultState)
-    : Variant(varName, node, parents, VariantMenu, VariantPluginTab, numVar, qdomDoc, qdomElem, boxOfInterest, defaultState) {
+VariantAR::VariantAR(const coInteractorSet &interset, std::string varName, osg::Node *node, const osg::Node::ParentList &parents, ui::Menu *VariantMenu, coTUITab *VariantPluginTab, int numVar, QDomDocument *qdomDoc, QDomElement *qdomElem, coVRBoxOfInterest *boxOfInterest, bool defaultState)
+    : Variant(varName, node, parents, VariantMenu, VariantPluginTab, numVar, qdomDoc, qdomElem, boxOfInterest, defaultState),
+      m_interactors(interset) {
     variantClass = this;
+    std::shared_ptr<coTUITab> tab(VariantPluginTab);
+    m_traceModule = std::make_unique<TraceModule>(numVar, varName, numVar, "", tab, nullptr);
+    auto combobox = ui->getTUIARCombobox();
+    for (auto inter : m_interactors)
+        combobox->addEntry(inter->getModuleName());
+}
+
+VariantAR::VariantAR(const coInteractorSet &interSet, const Variant &variant) : Variant(variant), m_interactors(interSet)
+{
+
 }
 
 VariantAR::TraceModule::TraceModule(int ID, const std::string &name, int instanceID, const std::string &fbInfo, std::shared_ptr<coTUITab> tab, std::shared_ptr<coInteractor> inter)
@@ -115,6 +126,107 @@ bool VariantAR::TraceModule::calcPositionChanged() {
     return true;
 }
 
+void VariantAR::TraceModule::handleCOVISEFeedback(const osg::Vec3 &currentNormal, const osg::Vec3 &currentNormal2, const osg::Vec3 &currentPosition1, const osg::Vec3 &currentPosition2) {
+    // #ifdef USE_COVISE
+    //     float c = currentPosition1 * currentNormal;
+    //     c /= currentNormal.length();
+    //     char ch;
+    //     char buf[10000];
+    //     CoviseRender::set_feedback_info(m_feedbackInfo.c_str());
+    //     auto sendFeedback = [&](const char *msgType) { CoviseRender::send_feedback_message(msgType, buf); };
+    //     auto sendParam = [&sendFeedback]() { sendFeedback("PARAM"); };
+    //     auto sendExec = [&sendFeedback]() { sendFeedback("EXEC"); };
+    //     switch (ch = CoviseRender::get_feedback_type()) {
+    //         case 'C':
+    //             /* button just pressed */
+    //             {
+    //                 fprintf(stdout, "\a");
+    //                 fflush(stdout);
+    //                 sprintf(buf, "vertex\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
+    //                 sendParam();
+    //                 sendParam();
+    //                 sprintf(buf, "scalar\nFloatScalar\n%f\n", c);
+    //                 sendParam();
+    //                 sendParam();
+    //                 buf[0] = '\0';
+    //                 sendExec();
+    //             }
+    //             break;
+    //         case 'G':  // CutGeometry with new parameter names
+    //         {
+    //             fprintf(stdout, "\a");
+    //             fflush(stdout);
+    //             sprintf(buf, "normal\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
+    //             sendParam();
+    //             sprintf(buf, "distance\nFloatScalar\n%f\n", c);
+    //             sendParam();
+    //             buf[0] = '\0';
+    //             sendExec();
+    //         } break;
+    //         case 'Z': {
+    //             fprintf(stdout, "\a");
+    //             fflush(stdout);
+    //             sprintf(buf, "vertex\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
+    //             sendParam();
+    //             sendExec();
+    //         } break;
+    //         case 'A': {
+    //             fprintf(stdout, "\a");
+    //             fflush(stdout);
+    //             sprintf(buf, "position\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
+    //             sendParam();
+    //             sprintf(buf, "normal\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
+    //             sendParam();
+    //             sprintf(buf, "normal2\nFloatVector\n%f %f %f\n", currentNormal2[0], currentNormal2[1], currentNormal2[2]);
+    //             sendParam();
+    //             buf[0] = '\0';
+    //             sendExec();
+    //         } break;
+    //         case 'T': {
+    //             fprintf(stdout, "\a");
+    //             fflush(stdout);
+    //             sprintf(buf, "startpoint1\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
+    //             sendParam();
+    //             sprintf(buf, "startpoint2\nFloatVector\n%f %f %f\n", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
+    //             sendParam();
+    //             buf[0] = '\0';
+    //             sendExec();
+    //         } break;
+    //         case 'P': {
+    //             fprintf(stdout, "\a");
+    //             fflush(stdout);
+    //             sprintf(buf, "startpoint1\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
+    //             sendParam();
+    //             sprintf(buf, "startpoint2\nFloatVector\n%f %f %f\n", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
+    //             sendParam();
+    //             // TracerUsg has no normal parameter (nor Tracer)...
+    //             /* && strcmp(currentFeedbackInfo+1,"Tracer")!= 0 */
+    //             if (strncmp(m_feedbackInfo.c_str() + 1, "Tracer", strlen("Tracer")) != 0) {
+    //                 sprintf(buf, "normal\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
+    //                 sendParam();
+    //             }
+    //             // ... but has direction
+    //             sprintf(buf, "direction\nFloatVector\n%f %f %f\n", currentNormal2[0], currentNormal2[1], currentNormal2[2]);
+    //             sendParam();
+    //             buf[0] = '\0';
+    //             sendExec();
+    //         } break;
+    //         case 'I': {
+    //             fprintf(stdout, "\a");
+    //             fflush(stdout);
+    //             sprintf(buf, "isopoint\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
+    //             sendParam();
+    //             buf[0] = '\0';
+    //             sendExec();
+    //         } break;
+    //         default:
+    //             printf("unknown feedback type %c\n", ch);
+    //     }
+    // #else
+    //     printf("Old style COVISE feedback not supported, recompile with -DUSE_COVISE\n");
+    // #endif
+}
+
 void VariantAR::TraceModule::update() {
     if (m_marker)
         return;
@@ -131,7 +243,7 @@ void VariantAR::TraceModule::update() {
     const auto vrviewer = VRViewer::instance();
     auto leftCameraTrans = vrviewer->getViewerMat();
     if (coVRConfig::instance()->stereoState())
-        leftCameraTrans = osg::Matrix::translate(-(vrviewer->getSeparation() / 2.0), 0, 0) * vrviewer->getViewerMat();
+        leftCameraTrans = osg::Matrix::translate(-(vrviewer->getSeparation() / 2.0), 0, 0) * leftCameraTrans;
 
     const auto &MarkerInWorld = MarkerPos * leftCameraTrans;
     const auto &MarkerInLocalCoords = MarkerInWorld * cover->getInvBaseMat();
@@ -156,136 +268,19 @@ void VariantAR::TraceModule::update() {
             auto &currentPosition1 = firstModuleInteractor().currentPosition();
             auto &currentPosition2 = secondModuleInteractor().currentPosition();
             currentNormal.normalize();
-            float c = currentPosition1 * currentNormal;
-            c /= currentNormal.length();
-            currentNormal.normalize();
+            // currentNormal.normalize();
             currentNormal2.normalize();
-            // char ch;
-            // char buf[10000];
-            // fprintf(stderr, "%s %f %f %f    %f %f %f\n", m_moduleName.c_str(), currentPosition1[0], currentPosition1[1], currentPosition1[2], currentNormal[0], currentNormal[1], currentNormal[2]);
+            fprintf(stderr, "%s %f %f %f    %f %f %f\n", m_moduleName.c_str(), currentPosition1[0], currentPosition1[1], currentPosition1[2], currentNormal[0], currentNormal[1], currentNormal[2]);
 
-            // if (m_interactor)
-            // {
-            //     if (strncmp(m_interactor->getPluginName(), "Tracer", 6) == 0)
-            //     {
-            //         m_interactor->setVectorParam("startpoint1", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
-            //         m_interactor->setVectorParam("startpoint2", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
-            //         m_interactor->executeModule();
-            //     }
-            // }
-            //             else if (!m_feedbackInfo.empty())
-            //             {
-            // #ifdef USE_COVISE
-            //                 CoviseRender::set_feedback_info(m_feedbackInfo.c_str());
-            //                 auto sendFeedback = [&buf](const char *msgType)
-            //                 { CoviseRender::send_feedback_message(msgType, buf); };
-            //                 auto sendParam = [&sendFeedback]()
-            //                 { sendFeedback("PARAM"); };
-            //                 auto sendExec = [&sendFeedback]()
-            //                 { sendFeedback("EXEC"); };
-            //                 switch (ch = CoviseRender::get_feedback_type())
-            //                 {
-            //                 case 'C':
-            //                     /* button just pressed */
-            //                     {
-            //                         fprintf(stdout, "\a");
-            //                         fflush(stdout);
-            //                         sprintf(buf, "vertex\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
-            //                         sendParam();
-            //                         sendParam();
-            //                         sprintf(buf, "scalar\nFloatScalar\n%f\n", c);
-            //                         sendParam();
-            //                         sendParam();
-            //                         buf[0] = '\0';
-            //                         sendExec();
-            //                     }
-            //                     break;
-            //                 case 'G': // CutGeometry with new parameter names
-            //                 {
-            //                     fprintf(stdout, "\a");
-            //                     fflush(stdout);
-            //                     sprintf(buf, "normal\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
-            //                     sendParam();
-            //                     sprintf(buf, "distance\nFloatScalar\n%f\n", c);
-            //                     sendParam();
-            //                     buf[0] = '\0';
-            //                     sendExec();
-            //                 }
-            //                 break;
-            //                 case 'Z':
-            //                 {
-            //                     fprintf(stdout, "\a");
-            //                     fflush(stdout);
-            //                     sprintf(buf, "vertex\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
-            //                     sendParam();
-            //                     sendExec();
-            //                 }
-            //                 break;
-            //                 case 'A':
-            //                 {
-            //                     fprintf(stdout, "\a");
-            //                     fflush(stdout);
-            //                     sprintf(buf, "position\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
-            //                     sendParam();
-            //                     sprintf(buf, "normal\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
-            //                     sendParam();
-            //                     sprintf(buf, "normal2\nFloatVector\n%f %f %f\n", currentNormal2[0], currentNormal2[1], currentNormal2[2]);
-            //                     sendParam();
-            //                     buf[0] = '\0';
-            //                     sendExec();
-            //                 }
-            //                 break;
-            //                 case 'T':
-            //                 {
-            //                     fprintf(stdout, "\a");
-            //                     fflush(stdout);
-            //                     sprintf(buf, "startpoint1\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
-            //                     sendParam();
-            //                     sprintf(buf, "startpoint2\nFloatVector\n%f %f %f\n", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
-            //                     sendParam();
-            //                     buf[0] = '\0';
-            //                     sendExec();
-            //                 }
-            //                 break;
-            //                 case 'P':
-            //                 {
-            //                     fprintf(stdout, "\a");
-            //                     fflush(stdout);
-            //                     sprintf(buf, "startpoint1\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
-            //                     sendParam();
-            //                     sprintf(buf, "startpoint2\nFloatVector\n%f %f %f\n", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
-            //                     sendParam();
-            //                     // TracerUsg has no normal parameter (nor Tracer)...
-            //                     /* && strcmp(currentFeedbackInfo+1,"Tracer")!= 0 */
-            //                     if (strncmp(m_feedbackInfo.c_str() + 1, "Tracer", strlen("Tracer")) != 0)
-            //                     {
-            //                         sprintf(buf, "normal\nFloatVector\n%f %f %f\n", currentNormal[0], currentNormal[1], currentNormal[2]);
-            //                         sendParam();
-            //                     }
-            //                     // ... but has direction
-            //                     sprintf(buf, "direction\nFloatVector\n%f %f %f\n", currentNormal2[0], currentNormal2[1], currentNormal2[2]);
-            //                     sendParam();
-            //                     buf[0] = '\0';
-            //                     sendExec();
-            //                 }
-            //                 break;
-            //                 case 'I':
-            //                 {
-            //                     fprintf(stdout, "\a");
-            //                     fflush(stdout);
-            //                     sprintf(buf, "isopoint\nFloatVector\n%f %f %f\n", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
-            //                     sendParam();
-            //                     buf[0] = '\0';
-            //                     sendExec();
-            //                 }
-            //                 break;
-            //                 default:
-            //                     printf("unknown feedback type %c\n", ch);
-            //                 }
-            // #else
-            //                 printf("Old style COVISE feedback not support, recompile with -DUSE_COVISE\n");
-            // #endif
-            //             }
+            if (m_interactor) {
+                if (strncmp(m_interactor->getPluginName(), "Tracer", 6) == 0) {
+                    m_interactor->setVectorParam("startpoint1", currentPosition1[0], currentPosition1[1], currentPosition1[2]);
+                    m_interactor->setVectorParam("startpoint2", currentPosition2[0], currentPosition2[1], currentPosition2[2]);
+                    m_interactor->executeModule();
+                }
+            } else if (!m_feedbackInfo.empty()) {
+                handleCOVISEFeedback(currentNormal, currentNormal2, currentPosition1, currentPosition2);
+            }
         }
     }
 }
@@ -300,11 +295,10 @@ void VariantAR::TraceModule::ModuleInteractor::interactorEvent(coTUIElement *tui
     }
 }
 
-VariantAR::TraceModule::ModuleInteractorPoint::ModuleInteractorPoint(float x, float y, float z, int plugID) {
-    int pluginID = plugID;
-    createAxis("startPos X", pluginID, Axis::X);
-    createAxis("startPos Y", pluginID, Axis::Y);
-    createAxis("startPos Z", pluginID, Axis::Z);
+VariantAR::TraceModule::ModuleInteractorPoint::ModuleInteractorPoint(float x, float y, float z, int tabID) {
+    createAxis("startPos X", tabID, Axis::X);
+    createAxis("startPos Y", tabID, Axis::Y);
+    createAxis("startPos Z", tabID, Axis::Z);
     setAxisValue(x, Axis::X);
     setAxisValue(y, Axis::Y);
     setAxisValue(z, Axis::Z);
