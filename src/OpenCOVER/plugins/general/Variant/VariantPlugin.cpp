@@ -324,9 +324,7 @@ void VariantPlugin::preFrameAR()
         animationManager->requestAnimationFrame(newTimesteps);
     }
 
-    //FIXME: preframe called after enabling AR => Variants in list are normal Variants
-    for (const auto var: varlist) {
-        const auto varAR = static_cast<VariantAR *>(var);
+    for (const auto varAR: varARset) {
         if (varAR)
             if (varAR->traceModule())
                 varAR->traceModule()->update();
@@ -343,12 +341,11 @@ VariantPlugin::preFrame()
 
     int state = cover->getPointerButton()->getState(); //Button States are defined in /covise/src/renderer/OpenCOVER/device/VRTracker.h
 
-    if (_interactionA->isRunning())
+    if (_interactionA->isRunning()) 
     {
         // update AR
         if (m_enableAR)
             preFrameAR();
-
         //if centersphere is selected, do translation
         if (boi->isSensorActiv("center"))
         {
@@ -815,18 +812,23 @@ void VariantPlugin::enableAR(bool state)
     if (state) {
         m_ARTimestepMarker = new ARToolKitMarker("TimestepMarker");
         for (auto variant: varlist) {
-            //TODO: not exact name we are searching for.
             auto variantAR = new VariantAR(interactormap[variant->getVarname()], *variant);
             varARset.insert(variantAR);
         }
+        varlist.clear();
+        for (Variant *varAR: varARset)
+            varlist.push_back(varAR);
+
     } else {
         const auto ar_instance = ARToolKit::instance();
         ar_instance->markers.remove(m_ARTimestepMarker);
         m_ARTimestepMarker = nullptr;
-        //TODO: adjust deleting
-        for (const auto &variantAR: varARset) {
+        varlist.clear();
+        for (auto variantAR: varARset) {
             ar_instance->markers.remove(variantAR->traceModule()->getMarker().get());
             variantAR->resetCombobox();
+            auto var = new Variant(static_cast<Variant>(*variantAR));
+            varlist.push_back(var);
         }
 
         varARset.clear();
