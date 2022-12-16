@@ -43,15 +43,6 @@
 #include "Variant.h"
 #include "VariantUI.h"
 
-namespace vrui {
-class coRowMenu;
-class coSubMenuItem;
-class coCheckboxMenuItem;
-class coButtonMenuItem;
-class coPotiMenuItem;
-// class coVRLabel;
-};  // namespace vrui
-
 namespace tracemodule {
 enum Axis {
     X = 0,
@@ -61,12 +52,10 @@ enum Axis {
 };
 };
 
-using namespace vrui;
 using namespace opencover;
 
 class VariantAR : public Variant {
-    class TraceModule : public coMenuListener,
-                        public coTUIListener {
+    class TraceModule {
         friend class VariantAR;
 
         struct ModuleInteractorPoint {
@@ -126,7 +115,7 @@ class VariantAR : public Variant {
 
        public:
         TraceModule() = delete;
-        TraceModule(const std::string &name, std::shared_ptr<coInteractor> inter);
+        TraceModule(const std::string &markerName, std::shared_ptr<coInteractor> inter);
         TraceModule(TraceModule &&) = delete;
         TraceModule(const TraceModule &) = delete;
         TraceModule &operator=(TraceModule &&) = delete;
@@ -151,7 +140,6 @@ class VariantAR : public Variant {
         bool m_doUpdate;
         float m_positionThreshold;
         float m_oldTime;
-        std::string m_moduleName;
 
         std::array<ModuleInteractor, 2> m_ModInteractors;
         std::shared_ptr<ARToolKitMarker> m_marker = nullptr;
@@ -167,6 +155,7 @@ class VariantAR : public Variant {
         resetCombobox();
     };
 
+    void tabletEvent(coTUIElement *item);
     std::unique_ptr<TraceModule> &traceModule() { return m_traceModule; }
     void resetCombobox() {
         auto comboBox = ui->getTUIARCombobox();

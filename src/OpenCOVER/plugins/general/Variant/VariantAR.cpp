@@ -4,6 +4,7 @@
 #include <OpenVRUI/coRowMenu.h>
 #include <OpenVRUI/coSubMenuItem.h>
 #include <OpenVRUI/osg/mathUtils.h>
+#include <config/CoviseConfig.h>
 #include <cover/ARToolKit.h>
 #include <cover/RenderObject.h>
 #include <cover/VRSceneGraph.h>
@@ -11,7 +12,6 @@
 #include <cover/coInteractor.h>
 #include <cover/coVRAnimationManager.h>
 #include <cover/coVRConfig.h>
-#include <config/CoviseConfig.h>
 
 #ifdef USE_COVISE
 #include <appl/RenderInterface.h>
@@ -19,17 +19,15 @@
 
 using namespace covise;
 
-// VariantAR::VariantAR(const coInteractorSet &interSet, const Variant &variant)
 VariantAR::VariantAR(coInteractor *interactor, const Variant &variant)
     : Variant(variant) {
     variantClass = this;
     const std::string &varName = variant.getName();
     m_traceModule = std::make_unique<TraceModule>(varName, std::shared_ptr<coInteractor>(interactor));
-
     auto combobox = ui->getTUIARCombobox();
-    //TODO: extract this to VariantPlugin and pass through list of markres
-    for (const auto &entry: coCoviseConfig::getScopeEntries("COVER.Plugin.ARToolKit"))
-    {
+
+    // TODO: extract this to VariantPlugin and pass through list of markres
+    for (const auto &entry : coCoviseConfig::getScopeEntries("COVER.Plugin.ARToolKit")) {
         auto entry_name = entry.first;
         auto entry_val = entry.second;
         if (entry_name.find("Marker") != std::string::npos) {
@@ -37,15 +35,14 @@ VariantAR::VariantAR(coInteractor *interactor, const Variant &variant)
             std::string name = entry_name.substr(pos + 1);
             if (name.find("ObjectMarker") != std::string::npos)
                 continue;
-            
             combobox->addEntry(name);
         }
     }
+    combobox->setEventListener(this);
 }
 
-VariantAR::TraceModule::TraceModule(const std::string &name, std::shared_ptr<coInteractor> inter)
+VariantAR::TraceModule::TraceModule(const std::string &markerName, std::shared_ptr<coInteractor> inter)
     : m_interactor(inter),
-      m_moduleName(name),
       m_oldTime(0.0),
       m_positionThreshold(3000.0),
       m_positionChanged(false),
@@ -68,7 +65,14 @@ VariantAR::TraceModule::TraceModule(const std::string &name, std::shared_ptr<coI
               osg::Vec3(0, 0, 0),
               osg::Vec3(111110, 0, 0),
               osg::Vec3(0, 0, 0))} {
-    m_marker = std::make_shared<ARToolKitMarker>(name.c_str());
+    //TODO: compare name with existing markers in ARToolkit
+    // bool valid = false;
+    // for (auto marker : ARToolKit::instance()->markers)
+    //     valid = markerName == marker->getName();
+
+    // if (valid)
+    if (!markerName.compare(""))
+        m_marker = std::make_shared<ARToolKitMarker>(markerName.c_str());
 }
 
 bool VariantAR::TraceModule::calcPositionChanged() {
@@ -219,9 +223,8 @@ void VariantAR::TraceModule::update() {
             auto &currentPosition1 = firstModuleInteractor().currentPosition();
             auto &currentPosition2 = secondModuleInteractor().currentPosition();
             currentNormal.normalize();
-            // currentNormal.normalize();
             currentNormal2.normalize();
-            fprintf(stderr, "%s %f %f %f    %f %f %f\n", m_moduleName.c_str(), currentPosition1[0], currentPosition1[1], currentPosition1[2], currentNormal[0], currentNormal[1], currentNormal[2]);
+            // fprintf(stderr, "%s %f %f %f    %f %f %f\n", m_moduleName.c_str(), currentPosition1[0], currentPosition1[1], currentPosition1[2], currentNormal[0], currentNormal[1], currentNormal[2]);
 
             if (m_interactor) {
                 if (strncmp(m_interactor->getPluginName(), "Tracer", 6) == 0) {
@@ -235,4 +238,17 @@ void VariantAR::TraceModule::update() {
             // }
         }
     }
+}
+
+void VariantAR::tabletEvent(coTUIElement *item) {
+    if (item == ui->getTUIARCombobox()) {
+        auto cb = dynamic_cast<coTUIComboBox *>(item);
+        auto &marker = m_traceModule->getMarker();
+        auto select = cb->getSelectedText();
+        if (select != "None") {
+            marker = std::make_shared<ARToolKitMarker>(select.c_str());
+            // m_traceModule->update();
+        }
+    }
+    Variant::tabletEvent(item);
 }
