@@ -85,9 +85,9 @@ public:
     void message(int toWhom, int type, int len, const void *buf) override;
     void setMenuItem(Variant *var, bool state);
     void tabletEvent(coTUIElement *) override;
-    void newInteractor(const RenderObject *container, coInteractor *i);
+    void newInteractor(const RenderObject *container, coInteractor *i) override;
     // void addObject(const RenderObject *container, osg::Group *root, const RenderObject *, const RenderObject *, const RenderObject *, const RenderObject *);
-    void removeObject(const char *objName, bool replace);
+    void removeObject(const char *objName, bool replace) override;
 
     void updateTUItemPos();
 

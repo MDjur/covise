@@ -42,6 +42,7 @@
 #include <iterator>
 #include <numeric>
 #include "VrmlNodeVariant.h"
+#include "cover/coVRPlugin.h"
 #include <vrml97/vrml/VrmlNamespace.h>
 
 using namespace covise;
@@ -226,19 +227,19 @@ VariantPlugin::~VariantPlugin()
     plugin = nullptr;
 }
 
-void VariantPlugin::newInteractor(const RenderObject *, coInteractor *inter)
+void VariantPlugin::newInteractor(const RenderObject *container, coInteractor *inter)
 {
     std::stringstream ss;
     ss << inter->getModuleName() << "_" << inter->getModuleInstance();
     interactormap.insert(std::pair<std::string, coInteractor *>(ss.str(), inter));
     inter->incRefCount();
+    coVRPlugin::newInteractor(container, inter);
 }
 
 // void VariantPlugin::addObject(const RenderObject *container, osg::Group *, const RenderObject *obj, const RenderObject *, const RenderObject *, const RenderObject *)
 // {
 // 	if (obj == nullptr) // todo: obj is null in vistle due to delayload
 // 		return;
-	
 //     const char *feedbackInfo = obj->getAttribute("FEEDBACK");
 //     if (feedbackInfo)
 //     {
@@ -282,9 +283,10 @@ void VariantPlugin::newInteractor(const RenderObject *, coInteractor *inter)
 //     }
 // }
 
-void VariantPlugin::removeObject(const char *, bool)
+void VariantPlugin::removeObject(const char *objName, bool replaceFlag)
 {
     fprintf(stderr, "VariantPlugin::removeObject\n");
+    coVRPlugin::removeObject(objName, replaceFlag);
 }
 
 void VariantPlugin::preFrameAR()
