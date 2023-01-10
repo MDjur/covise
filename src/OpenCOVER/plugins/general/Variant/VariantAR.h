@@ -88,8 +88,7 @@ class VariantAR : public Variant {
                   m_lastPosition(lastPos),
                   m_currentPosition(curPos),
                   m_currentNormal(curNormal) {
-                if (!modInterPoint)
-                    throw std::exception("Nullptr for ModuleInteractorPoint");
+                assert(("Nullptr for ModuleInteractorPoint", !modInterPoint));
             }
 
             void resetLastPos() { m_lastPosition = m_currentPosition; }
@@ -110,7 +109,7 @@ class VariantAR : public Variant {
             osg::Vec3 m_lastPosition;
             osg::Vec3 m_currentPosition;
             osg::Vec3 m_currentNormal;
-            std::shared_ptr<ModuleInteractorPoint> m_interactorPoint = nullptr;
+            std::shared_ptr<ModuleInteractorPoint> m_interactorPoint;
         };
 
        public:
