@@ -23,7 +23,7 @@ VariantAR::VariantAR(coInteractor *interactor, const Variant &variant)
     : Variant(variant) {
     variantClass = this;
     const std::string &varName = variant.getName();
-    m_traceModule = std::make_unique<TraceModule>(varName, std::shared_ptr<coInteractor>(interactor));
+    m_traceModule = std::make_shared<TraceModule>(varName, std::shared_ptr<coInteractor>(interactor));
     auto combobox = ui->getTUIARCombobox();
 
     // TODO: extract this to VariantPlugin and pass through list of markres
@@ -76,7 +76,7 @@ VariantAR::TraceModule::TraceModule(const std::string &markerName, std::shared_p
 }
 
 bool VariantAR::TraceModule::calcPositionChanged() {
-    if (std::any_of(m_ModInteractors.begin(), m_ModInteractors.end(), [this](auto &inter) { return inter.getDiff().length() > m_positionThreshold; }))
+    if (std::any_of(m_ModInteractors.begin(), m_ModInteractors.end(), [this](ModuleInteractor &inter) { return inter.getDiff().length() > m_positionThreshold; }))
         return false;
 
     resetInteractorsLastPos();

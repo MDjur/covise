@@ -82,12 +82,12 @@ class VariantAR : public Variant {
            public:
             ModuleInteractor() = delete;
             ModuleInteractor(std::shared_ptr<ModuleInteractorPoint> modInterPoint, const osg::Vec3 &startPointOffset, const osg::Vec3 &startNormal, const osg::Vec3 &lastPos, const osg::Vec3 &curPos, const osg::Vec3 &curNormal)
-                : m_interactorPoint(modInterPoint),
-                  m_startpointOffset(startPointOffset),
+                : m_startpointOffset(startPointOffset),
                   m_startNormal(startNormal),
                   m_lastPosition(lastPos),
                   m_currentPosition(curPos),
-                  m_currentNormal(curNormal) {
+                  m_currentNormal(curNormal),
+                  m_interactorPoint(modInterPoint) {
                 assert(("Nullptr for ModuleInteractorPoint", !modInterPoint));
             }
 
@@ -128,7 +128,7 @@ class VariantAR : public Variant {
         ModuleInteractor &secondModuleInteractor() { return m_ModInteractors[1]; }
         bool calcPositionChanged();
         void resetInteractorsLastPos() {
-            std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [](auto &inter) { inter.resetLastPos(); });
+            std::for_each(m_ModInteractors.begin(), m_ModInteractors.end(), [](ModuleInteractor &inter) { inter.resetLastPos(); });
         }
         void handleCOVISEFeedback(const osg::Vec3 &currentNormal, const osg::Vec3 &currentNormal2, const osg::Vec3 &currentPosition1, const osg::Vec3 &currentPosition2);
 
@@ -155,7 +155,7 @@ class VariantAR : public Variant {
     };
 
     void tabletEvent(coTUIElement *item);
-    std::unique_ptr<TraceModule> &traceModule() { return m_traceModule; }
+    std::shared_ptr<TraceModule> &traceModule() { return m_traceModule; }
     void resetCombobox() {
         auto comboBox = ui->getTUIARCombobox();
         comboBox->clear();
@@ -163,6 +163,6 @@ class VariantAR : public Variant {
     }
 
    private:
-    std::unique_ptr<TraceModule> m_traceModule = nullptr;
+    std::shared_ptr<TraceModule> m_traceModule = nullptr;
 };
 #endif
