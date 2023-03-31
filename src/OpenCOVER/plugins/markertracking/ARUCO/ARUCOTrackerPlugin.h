@@ -15,11 +15,13 @@
 #include <cover/ARToolKit.h>
 
 #include <cover/coTabletUI.h>
+#include <opencv2/core/mat.hpp>
 #include <util/coTabletUIMessages.h>
 
 #include <cover/coVRPlugin.h>
 
 #include <opencv2/videoio/videoio.hpp>
+#include <opencv2/video/tracking.hpp>
 #if( CV_VERSION_MAJOR == 4)
 #include <opencv2/objdetect/aruco_detector.hpp>
 #include <opencv2/objdetect/charuco_detector.hpp>
@@ -35,6 +37,8 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/Button.h>
 #include <cover/ui/Action.h>
+
+#include <chrono>
 
 using namespace covise;
 using namespace opencover;
@@ -66,6 +70,7 @@ protected:
     std::vector<std::vector<cv::Point2f>> rejected;
     std::vector<cv::Vec3d> rvecs[3];
     std::vector<cv::Vec3d> tvecs[3];
+    std::vector<cv::Vec6d> measurements[3]; // Kalman
     
     cv::aruco::Dictionary dictionary;
     cv::Ptr<cv::aruco::ArucoDetector> detector;
@@ -120,7 +125,7 @@ private:
     
     void estimatePoseSingleMarker(cv::InputArrayOfArrays _corners,
                                   cv::InputArray _cameraMatrix, cv::InputArray _distCoeffs,
-                                  cv::OutputArrayOfArrays _rvecs, cv::OutputArrayOfArrays _tvecs);
+                                  cv::OutputArrayOfArrays _rvecs, cv::OutputArrayOfArrays _tvecs, cv::OutputArrayOfArrays _measurements);
 
     std::mutex opencvMutex;
     std::thread opencvThread;
@@ -139,7 +144,9 @@ private:
     vector< vector< int > > allIds;
     vector< cv::Mat > allImgs;
     cv::Size imgSize;
-
+    
+    // Kalmanfilter
+    cv::KalmanFilter KF;
 
     bool doCalibrate;
     bool calibrated;
