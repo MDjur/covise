@@ -870,7 +870,6 @@ void ARUCOPlugin::opencvLoop()
                     }
                     else
                     {
-
                         // calibrate camera using charuco
                         repError =
                             aruco::calibrateCameraCharuco(allCharucoCorners, allCharucoIds, charucoboard, imgSize,
@@ -891,7 +890,6 @@ void ARUCOPlugin::opencvLoop()
                             cout << "Rep Error Aruco: " << arucoRepErr << endl;
                             cout << "Calibration saved to " << calibrationFilename << endl;
                         }
-                        /* cv::aruco::interpolateCornersCharuco(corners, ids[captureIdx], image[captureIdx], charucoboard, allCharucoCorners, allCharucoIds, cameraMatrix, distCoeffs); */
                     }
                     doCalibrate = false;
                     allImgs.clear();
@@ -1212,16 +1210,17 @@ private:
         cout << "rot: " << rvecs << endl;
         cout << "trans: " << tvecs << endl;
 
-        Mat measurements(6, 1, CV_64FC(6));
+        Mat measurements(6, 1, CV_64F);
         fillMeasurements(measurements, tvecs, rvecs);
         
         cout << "----------------Measurments-----------------------" << endl;
         cout << measurements << endl;
         cout << "---------------------------------------" << endl;
         
-        Mat translation_estimated(3, 1, CV_64FC1);
-        Mat rotation_estimated(3, 3, CV_64FC1);
+        Mat translation_estimated(3, 1, CV_64F);
+        Mat rotation_estimated(3, 3, CV_64F);
         updateKalmanFilter( KF, measurements,
+                            /* tvecs, rvecs); */
                             translation_estimated, rotation_estimated);
 
         rvecs = rot2euler(rotation_estimated);
@@ -1231,11 +1230,6 @@ private:
         cout << "Rot: " << rvecs << endl;
         cout << "---------------------------------------" << endl;
         cout << "Trans: " << tvecs << endl;
-        cout << "---------------------------------------" << endl;
-        cout << "---------------------------------------" << endl;
-        cout << "Rot: " << rotation_estimated << endl;
-        cout << "---------------------------------------" << endl;
-        cout << "Trans: " << translation_estimated << endl;
         cout << "---------------------------------------" << endl;
     }
     
