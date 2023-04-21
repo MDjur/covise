@@ -70,7 +70,6 @@ protected:
     std::vector<std::vector<cv::Point2f>> rejected;
     std::vector<cv::Vec3d> rvecs[3];
     std::vector<cv::Vec3d> tvecs[3];
-    std::vector<cv::Vec6d> measurements[3]; // Kalman
     
     cv::aruco::Dictionary dictionary;
     cv::Ptr<cv::aruco::ArucoDetector> detector;
@@ -125,7 +124,7 @@ private:
     
     void estimatePoseSingleMarker(cv::InputArrayOfArrays _corners,
                                   cv::InputArray _cameraMatrix, cv::InputArray _distCoeffs,
-                                  cv::OutputArrayOfArrays _rvecs, cv::OutputArrayOfArrays _tvecs, cv::OutputArrayOfArrays _measurements);
+                                  cv::OutputArrayOfArrays _rvecs, cv::OutputArrayOfArrays _tvecs);
 
     std::mutex opencvMutex;
     std::thread opencvThread;

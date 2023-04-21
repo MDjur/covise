@@ -767,7 +767,6 @@ void ARUCOPlugin::opencvLoop()
             rejected.clear();
             rvecs[captureIdx].clear();
             tvecs[captureIdx].clear();
-            measurements[captureIdx].clear();
 
             // detect markers and estimate pose
 
@@ -789,8 +788,7 @@ void ARUCOPlugin::opencvLoop()
                     //cv::aruco::estimatePoseSingleMarkers(corners, 49, matCameraMatrix,
                     //                                     matDistCoefs, rvecs[captureIdx], tvecs[captureIdx]);
                     estimatePoseSingleMarker(corners,  matCameraMatrix,
-                                            matDistCoefs, rvecs[captureIdx], tvecs[captureIdx], 
-                                            measurements[captureIdx]);
+                                            matDistCoefs, rvecs[captureIdx], tvecs[captureIdx]);
                 }
                 catch (cv::Exception &ex)
                 {
@@ -800,7 +798,6 @@ void ARUCOPlugin::opencvLoop()
             }
             if (doCalibrate)
             {
-                //cv::initFont(cv::FONT_HERSHEY_SIMPLEX, 1.0, 1.0, 0.0, 1, 8);
 
                 std::string text = "Valid Frames: " + std::to_string(allIds.size());
                 cv::putText(image[captureIdx], text, cv::Point(20, 20), cv::FONT_HERSHEY_SIMPLEX,1.0, cv::Scalar(255, 255, 255));
@@ -827,11 +824,6 @@ void ARUCOPlugin::opencvLoop()
                     vector< Mat > rvecs, tvecs;
                     double repError;
 
-                    /*if (calibrationFlags & CALIB_FIX_ASPECT_RATIO) {
-                        cameraMatrix = Mat::eye(3, 3, CV_64F);
-                        cameraMatrix.at< double >(0, 0) = aspectRatio;
-                    }*/
-
                     // prepare data for calibration
                     vector< vector< Point2f > > allCornersConcatenated;
                     vector< int > allIdsConcatenated;
@@ -846,12 +838,6 @@ void ARUCOPlugin::opencvLoop()
                     }
                     int calibrationFlags = 0;
                     float aspectRatio = 1;
-                   // if (parser.has("a")) {
-                   //     calibrationFlags |= CALIB_FIX_ASPECT_RATIO;
-                   //     aspectRatio = parser.get<float>("a");
-                   // }
-                   // if (parser.get<bool>("zt")) calibrationFlags |= CALIB_ZERO_TANGENT_DIST;
-                   // if (parser.get<bool>("pc")) calibrationFlags |= CALIB_FIX_PRINCIPAL_POINT;
 
                     // calibrate camera using aruco markers
                     double arucoRepErr;
@@ -932,69 +918,8 @@ void ARUCOPlugin::opencvLoop()
             }
 
             if (bDrawRejMarker && rejected.size() > 0)
-            {
                 aruco::drawDetectedMarkers(image[captureIdx], rejected, noArray(), Scalar(100, 0, 255));
-                /* aruco::drawDetectedMarkers(undistort_image, rejected, noArray(), Scalar(100, 0, 255)); */
-            }
-        /*    if (doCalibrate)
-            {
 
-                const int calibCountMax = 50;
-                const int calibRows = 6;
-                const int calibColumns = 9;
-                if (!calibrated)
-                {
-                    // If we have already collected enough data to make the calibration
-                    // - We are ready to end the capture loop
-                    // - Calibrate
-                    // - Save the calibration file
-                    if (calibCount >= calibCountMax)
-                    {
-                        std::cout << "Calibrating..." << endl;
-                        calibCount = 0;
-                        cam.Calibrate(projPoints);
-                        projPoints.Reset();
-                        cam.SaveCalib(calibrationFilename.c_str());
-                        std::cout << "Saving calibration: " << calibrationFilename << endl;
-                        adjustScreen();
-                        calibrated = true;
-                    }
-                    // If we are still collecting calibration data
-                    // - For every 1.5s add calibration data from detected 7*9 chessboard (and visualize it if true)
-                    else
-                    {
-                        static double lastTime = 0;
-                        double currentTime = cover->frameTime();
-                        if (currentTime > (lastTime + 0.5))
-                        {
-                            if (projPoints.AddPointsUsingChessboard(frame, 2.42, calibRows, calibColumns, true))
-                            {
-                                lastTime = currentTime;
-                                calibCount++;
-                                //cout<<calibCount<<"/"<<calibCountMax<<endl;
-                                char tmpText[100];
-                                sprintf(tmpText, "%d%%", (int)(((float)calibCount / (float)calibCountMax) * 100.0));
-                                calibrateLabel->setLabel(tmpText);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    if (projPoints.AddPointsUsingChessboard(frame, 2.5, calibRows, calibColumns, true))
-                    {
-                        alvar::Pose pose;
-                        cam.CalcExteriorOrientation(projPoints.object_points, projPoints.image_points, &pose);
-                        cam.ProjectPoints(projPoints.object_points, &pose, projPoints.image_points);
-                        for (size_t i = 0; i < projPoints.image_points.size(); i++)
-                        {
-                            cvCircle(frame, cvPoint((int)projPoints.image_points[i].x, (int)projPoints.image_points[i].y), 6, CV_RGB(0, 0, 255));
-                        }
-                        projPoints.Reset();
-                    }
-                }
-            }
-            */
             guard.lock();
             readyIdx = captureIdx;
             guard.unlock();
@@ -1236,9 +1161,9 @@ class SinglePoseEstimationParallel : public ParallelLoopBody
 public:
     SinglePoseEstimationParallel(std::vector<int> &_IDs, InputArrayOfArrays _corners,
                                  InputArray _cameraMatrix, InputArray _distCoeffs,
-                                 Mat& _rvecs, Mat& _tvecs, Mat& _measurements, KalmanFilter& _KF)
+                                 Mat& _rvecs, Mat& _tvecs, KalmanFilter& _KF)
         : IDs(_IDs), corners(_corners), cameraMatrix(_cameraMatrix),
-          distCoeffs(_distCoeffs), rvecs(_rvecs), tvecs(_tvecs), measurements(_measurements), KF(_KF){}
+          distCoeffs(_distCoeffs), rvecs(_rvecs), tvecs(_tvecs), KF(_KF){}
     
     void operator()(const Range &range) const
         {
@@ -1271,16 +1196,10 @@ public:
                 {
                     _getSingleMarkerObjectPoints(size, markerObjPoints);
 
-                    // RANSAC is better for noisy points
-                    cv::Mat inliers_idx;
-                    cv::solvePnPRansac(markerObjPoints, corners.getMat(i), cameraMatrix, distCoeffs,
-                                 rvecs.at<Vec3d>(0, i), tvecs.at<Vec3d>(0, i), false, 
-                                 iterationsCount, reprojectionError, confidence, inliers_idx, SOLVEPNP_IPPE_SQUARE);
-                    /* cv::solvePnP(markerObjPoints, corners.getMat(i), cameraMatrix, distCoeffs, */
-                    /*              rvecs.at<Vec3d>(0, i), tvecs.at<Vec3d>(0, i), false, SOLVEPNP_IPPE_SQUARE); */
+                    cv::solvePnP(markerObjPoints, corners.getMat(i), cameraMatrix, distCoeffs,
+                                 rvecs.at<Vec3d>(0, i), tvecs.at<Vec3d>(0, i), false, SOLVEPNP_IPPE_SQUARE);
 
-                    /* applyKalman(inliers_idx, tvecs.at<Vec3d>(0, i), rvecs.at<Vec3d>(0, i), measurements.at<Vec6d>(0, i)); */
-                    applyKalman(inliers_idx, tvecs.at<Vec3d>(0, i), rvecs.at<Vec3d>(0, i));
+                    applyKalman(tvecs.at<Vec3d>(0, i), rvecs.at<Vec3d>(0, i));
                 }
             }
         }
@@ -1288,16 +1207,13 @@ public:
 private:
     SinglePoseEstimationParallel &operator=(const SinglePoseEstimationParallel &); // to quiet MSVC
 
-    /* void applyKalman(const Mat &inliers_idx, cv::OutputArray _tvecs, cv::OutputArray _rvecs, cv::OutputArray &_measurements) const { */
-    void applyKalman(const Mat &inliers_idx, cv::OutputArray _tvecs, cv::OutputArray _rvecs) const {
-        /* auto rvecs = _rvecs.getMat(), tvecs = _tvecs.getMat(), measurements = _measurements.getMat(); */
+    void applyKalman(cv::OutputArray _tvecs, cv::OutputArray _rvecs) const {
         auto rvecs = _rvecs.getMat(), tvecs = _tvecs.getMat();
-        Mat measurements(6, 1, CV_64F);
         cout << "rot: " << rvecs << endl;
         cout << "trans: " << tvecs << endl;
-        cout << "inliers: " << inliers_idx << endl;
-        if( inliers_idx.rows >= minInliersKalman )
-            fillMeasurements(measurements, tvecs, rvecs);
+
+        Mat measurements(6, 1, CV_64FC(6));
+        fillMeasurements(measurements, tvecs, rvecs);
         
         cout << "----------------Measurments-----------------------" << endl;
         cout << measurements << endl;
@@ -1307,7 +1223,6 @@ private:
         Mat rotation_estimated(3, 3, CV_64FC1);
         updateKalmanFilter( KF, measurements,
                             translation_estimated, rotation_estimated);
-        
 
         rvecs = rot2euler(rotation_estimated);
         tvecs = translation_estimated;
@@ -1327,14 +1242,8 @@ private:
     InputArrayOfArrays corners;
     InputArray cameraMatrix, distCoeffs;
     std::vector<int> &IDs;
-    Mat& rvecs, tvecs, measurements;
+    Mat& rvecs, tvecs;
     KalmanFilter &KF;
-
-    // RANSAC
-    static constexpr float reprojectionError = 3.9056257287389688e+00;
-    static constexpr int iterationsCount = 500;
-    static constexpr double confidence = 0.99;
-    static constexpr int minInliersKalman = 4;
 };
 
 
@@ -1344,8 +1253,7 @@ void ARUCOPlugin::estimatePoseSingleMarker(InputArrayOfArrays _corners,
                                            InputArray _cameraMatrix,
                                            InputArray _distCoeffs,
                                            OutputArrayOfArrays _rvecs,
-                                           OutputArrayOfArrays _tvecs,
-                                           OutputArrayOfArrays _measurements)
+                                           OutputArrayOfArrays _tvecs)
 {
 #ifdef ARUCO_DEBUG
     std::cout << "ARUCOPlugin::estimatePoseSingleMarker()" << std::endl;
@@ -1355,13 +1263,11 @@ void ARUCOPlugin::estimatePoseSingleMarker(InputArrayOfArrays _corners,
     int nMarkers = (int)_corners.total();
     _rvecs.create(nMarkers, 1, CV_64FC3);
     _tvecs.create(nMarkers, 1, CV_64FC3);
-    if (_measurements.empty())
-        _measurements.create(nMarkers, 1, CV_64FC(6));
     
-    Mat rvecs = _rvecs.getMat(), tvecs = _tvecs.getMat(), measurements = _measurements.getMat();
+    Mat rvecs = _rvecs.getMat(), tvecs = _tvecs.getMat();
     parallel_for_(Range(0, nMarkers),
                   SinglePoseEstimationParallel(ids[captureIdx], _corners, _cameraMatrix,
-                                               _distCoeffs, rvecs, tvecs, measurements, KF));
+                                               _distCoeffs, rvecs, tvecs, KF));
 }
 
 
