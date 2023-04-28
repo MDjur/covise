@@ -32,6 +32,7 @@
 #include <covise/coTimer.h>
 #endif
 
+#include <OpenConfig/access.h>
 #include <config/CoviseConfig.h>
 #include <config/coConfigConstants.h>
 #include <cover/coCommandLine.h>
@@ -39,33 +40,9 @@
 #include <cover/OpenCOVER.h>
 #include <util/environment.h>
 
+#include <boost/algorithm/string.hpp>
 #ifdef HAS_MPI
 #include <mpi.h>
-#endif
-
-#ifdef WIN32
-static char *strcasestr(char *source, char *target)
-{
-    size_t i = 0, len = 0;
-    unsigned char after_space = 1;
-
-    len = strlen(target);
-    for (; source[i] != '\0'; i++)
-    {
-
-        if (!after_space && source[i] != ' ')
-            continue;
-        if (source[i] == ' ')
-        {
-            after_space = 1;
-            continue;
-        }
-        after_space = 0;
-        if (!strncasecmp((source + i), target, len))
-            return (source + i);
-    }
-    return NULL;
-}
 #endif
 
 int main(int argc, char *argv[])
@@ -101,8 +78,7 @@ int main(int argc, char *argv[])
             mastername = opencover::coCommandLine::argv(5);
         }
     }
-
-    if (strcasestr(argv[0], ".mpi") != 0)
+    if (boost::icontains(argv[0], ".mpi"))
     {
 #ifdef MPI_COVER
         MPI_Initialized(&mpiinit);
@@ -119,6 +95,11 @@ int main(int argc, char *argv[])
         std::cerr << "OpenCOVER: not compiled with MPI support" << std::endl;
         exit(1);
 #endif
+    }
+    opencover::config::Access config(my_hostname, mastername, myID);
+    if (auto covisedir = getenv("COVISEDIR"))
+    {
+        config.setPrefix(covisedir);
     }
     covise::coConfigConstants::setRank(myID);
     covise::coConfigConstants::setMaster(mastername);

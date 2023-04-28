@@ -25,6 +25,11 @@
 
 ApplicationWindow *mw;
 
+void printPort(unsigned short port)
+{
+    std::cout << port << std::endl << std::endl << std::flush;
+}
+
 int main(int argc, char **argv)
 {
     covise::setupEnvironment(argc, argv);
@@ -93,7 +98,7 @@ int main(int argc, char **argv)
         mw->show();
         a.connect(&a, SIGNAL(lastWindowClosed()), &a, SLOT(quit()));
         VRBServer server(gui);
-        if (server.openServer(printport) < 0)
+        if (!server.openServer(printport))
         {
             return -1;
         }
@@ -104,15 +109,18 @@ int main(int argc, char **argv)
         mw->setPort("Tcp", server.getPort());
         mw->setPort("Udp", server.getUdpPort());
         auto remover = placeSharedProcessInfo(server.getPort());
+        if (printport)
+        {
+            printPort(server.getPort());
+        }
         int exitcode = a.exec();
 
-        server.closeServer();
         return exitcode;
     }
     else
     {
         VRBServer server(gui);
-        if (server.openServer(printport) < 0)
+        if (!server.openServer(printport))
         {
             return -1;
         }
@@ -121,13 +129,16 @@ int main(int argc, char **argv)
             cerr << "failed to open udp socket" << endl;
         }
         auto remover = placeSharedProcessInfo(server.getPort());
+        if (printport)
+        {
+            printPort(server.getPort());
+        }
         if (!gui)
         {
             server.loop();
         }
         int exitcode = 0;
 
-        server.closeServer();
         return exitcode;
     }
 }

@@ -33,6 +33,8 @@
 #include <vrb/client/SharedState.h>
 #include <OpenVRUI/coUpdateManager.h>
 
+class SidecarConfigBridge;
+
 namespace osg
 {
 class Node;
@@ -128,10 +130,19 @@ public:
     bool makeRelativeToSharedDataLink(std::string &fileName);
 	//return true if fileName contains tmp path
 	bool isInTmpDir(const std::string& fileName);
-	//changes fileName to be relative to basePath
+
+    //return true if fineName is not in tmp dir and 
+    //not in the remoteFetchDir of remoteFetchDir is shared (from config)
+    bool isInSharedDir(const std::string &fileName);
+    void checkRemoteFetchDirShared();
+
+    //changes fileName to be relative to basePath
 	bool makeRelativePath(std::string& fileName, const std::string& basePath);
+    
+    std::string findFile(const std::string &fileName);
     //search file locally, in sharedData and then try to remote fetch the file(if activated) until a the file gets found. Return "" if no file found.
     //"where" can be set to the partner id that should provide the file 
+    
     std::string findOrGetFile(const std::string &fileName, int where = 0);
     // load a OSG or VRML97 or other (via plugin) file
     osg::Node *loadFile(const char *file, coTUIFileBrowserButton *fb = NULL, osg::Group *parent = NULL, const char *covise_key = "");
@@ -203,13 +214,15 @@ public:
     //send a requested File to vrb
     void sendFile(covise::TokenBuffer &tb);
 
-	///request the file from vrb -> file gets copied to tmp
+	///request the file from vrb -> file gets copied to configured dir
 	std::string remoteFetch(const std::string &filePath, int fileOwner = -1);
+    //download thie file from url to the same dir as remoteFetch
+    std::string httpFetch(const std::string &url);
     //parse obj file and request the used material files
     void fetchObjMaterials(const std::string & localPath, const std::string &remotePath, int fileOwner);
 
     ///compares the url with m_sharedFiles. If found returns its position in, else -1;
-	int getFileId(const char* url);
+	int getFileId(const std::string &url);
 
 	///get the filename + extension from a path: path/fileName -> fileName
 	std::string getFileName(const std::string& filePath);
@@ -219,8 +232,11 @@ private:
     int coLoadFontDefaultStyle();
 	//set in 'config/system/vrb/RemoteFetch value = "on" to enable remote fetch in local usr tmp directory. 
 	bool remoteFetchEnabled = false;
-	//set in 'config/system/vrb/RemoteFetch path="your path" to chose a differen directory to remote Fetch to. 
-	std::string remoteFetchPath;
+    bool remoteFetchHashPrefix = true;
+    // set in 'config/system/vrb/RemoteFetch path="your path" to chose a differen directory to remote Fetch to.
+    std::string remoteFetchPath, remoteFetchPathTmp;
+    bool remoteFetchDirExists = false;
+    bool remoteFetchPathShared = false;
     std::string viewPointFile;
     int m_loadCount = 0;
     std::unique_ptr<ui::Owner> m_owner;
@@ -279,20 +295,25 @@ private:
     ///removs non-aphanumeric characters
     std::string reduceToAlphanumeric(const std::string & str);
 
-	///writes content into a file unter tmp/OpenCOVER/fileName. Returns the path to the file or "" on failure
-	std::string writeFile(const std::string& fileName, const char* content, int size);
+	///writes content into a file unter remotefetchPath/hash/filename . Returns the path to the file or "" on failure
+	std::string writeRemoteFetchedFile(const std::string& filePath, const char* content, int size);
 	///compares the filePaths of m_sharedFiels wit filePath and returns the best matching fileOwner
 	int guessFileOwner(const std::string& filePath);
 	bool serializeFile(const std::string& fileName, covise::TokenBuffer& tb);
 	std::vector<std::unique_ptr<covise::Message>> m_sendFileMessages;
+    void createRemoteFetchDir();
 
-	//utility
+    //utility
     
     ///replaces all occurences of environmentvariables (%env$ on win or $env/ on unix) with the first entry (delimited by ';')
     static std::string resolveEnvs(const std::string& s);
     ///return the substring of s until the delimiter(delimiter is cut off)
     static std::string cutStringAt(const std::string &s, char delimiter);
     osg::ref_ptr<osgDB::ReaderWriter::Options> options;
+
+    std::string m_defaultFontFile;
+
+    std::unique_ptr<SidecarConfigBridge> m_settings;
 };
 }
 #endif

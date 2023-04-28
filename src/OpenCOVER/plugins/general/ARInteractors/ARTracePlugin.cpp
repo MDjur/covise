@@ -101,7 +101,6 @@ TraceModule::TraceModule(int ID, const char *n, int mInst, const char *fi, ARTra
     updateNow = new coTUIButton("update", plugin->arTraceTab->getID());
     updateInterval = new coTUIEditFloatField("updateInterval", plugin->arTraceTab->getID());
     p1X = new coTUIEditFloatField("startPos1 X", plugin->arTraceTab->getID());
-    p1X = new coTUIEditFloatField("startPos1 X", plugin->arTraceTab->getID());
     p1Y = new coTUIEditFloatField("startPos1 Y", plugin->arTraceTab->getID());
     p1Z = new coTUIEditFloatField("startPos1 Z", plugin->arTraceTab->getID());
     p2X = new coTUIEditFloatField("startPos2 X", plugin->arTraceTab->getID());
@@ -592,7 +591,10 @@ ARTracePlugin::preFrame()
             coord.hpr[0] = coord.hpr[0] - 360.0;
         cerr << "h: " << coord.hpr[0] << "p: " << coord.hpr[1] << "r: " << coord.hpr[2] << endl;
         int numTS = coVRAnimationManager::instance()->getNumTimesteps();
-        int newTS = ((int)(coord.hpr[0] / 360.0 * numTS)) % numTS;
+
+        int newTS = 0;
+        if(numTS > 0)
+            newTS = ((int)(coord.hpr[0] / 360.0 * numTS)) % numTS;
         if (newTS < 0)
             newTS = numTS + newTS;
         if (newTS > numTS)

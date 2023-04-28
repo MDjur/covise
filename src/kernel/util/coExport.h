@@ -403,3 +403,9 @@
 #define RSEXPORT COIMPORT
 #endif
 #endif
+
+#if defined(coFFmpegEncoder_EXPORTS)
+#define FFMPEGEXPORT COEXPORT
+#else
+#define FFMPEGEXPORT COIMPORT
+#endif

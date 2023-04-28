@@ -48,6 +48,8 @@
 #include <osg/BlendFunc>
 #include <osg/AlphaFunc>
 #include <osg/LineWidth>
+#include <OpenThreads/ScopedLock>
+#include <OpenThreads/Mutex>
 
 #include <OpenVRUI/coRowMenu.h>
 #include <OpenVRUI/coSubMenuItem.h>
@@ -280,7 +282,6 @@ void CALLBACK MidiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwP
 	case MIM_MOREDATA:
 	case MIM_DATA:
 	{
-		//printf("wMsg=MIM_DATA, dwInstance=%08x, dwParam1=%08x, dwParam2=%08x\n", dwInstance, dwParam1, dwParam2);
 		MIDIMessage md;
 		md.mTime = dwParam2;
 		md.mStatus = (UCHAR)(dwParam1 & 0xFF);
@@ -318,6 +319,48 @@ void CALLBACK MidiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwP
 			}
 
 		}
+	}
+	break;
+	case MIM_LONGDATA:
+		printf("wMsg=MIM_LONGDATA\n");
+		break;
+	case MIM_ERROR:
+		printf("wMsg=MIM_ERROR\n");
+		break;
+	case MIM_LONGERROR:
+		printf("wMsg=MIM_LONGERROR\n");
+		break;
+		printf("wMsg=MIM_MOREDATA\n");
+		break;
+	default:
+		printf("wMsg = unknown\n");
+		break;
+	}
+	return;
+}
+#endif
+
+#ifdef WIN32
+void CALLBACK FTPMidiInProc(HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2)
+{
+	switch (wMsg) {
+	case MIM_OPEN:
+		printf("wMsg=MIM_OPEN\n");
+		break;
+	case MIM_CLOSE:
+		printf("wMsg=MIM_CLOSE\n");
+		break;
+	case MIM_MOREDATA:
+	case MIM_DATA:
+	{
+		MIDIMessage md;
+		md.mTime = dwParam2;
+		md.mStatus = (UCHAR)(dwParam1 & 0xFF);
+		md.mParam1 = (UCHAR)((dwParam1 >> 8) & 0xFF);
+		md.mParam2 = (UCHAR)((dwParam1 >> 16) & 0xFF);
+		MidiEvent me(md.mStatus, md.mParam1, md.mParam2);
+
+		MidiPlugin::instance()->triplePlay->addEvent(me);
 	}
 	break;
 	case MIM_LONGDATA:
@@ -762,12 +805,24 @@ MidiDevice::~MidiDevice()
 bool MidiPlugin::init()
 {
 	currentTrack = 0;
+	
+#ifdef HAVE_ALSA
+
+			if (coVRMSController::instance()->isMaster())
+			{
+device_list();
+}
+#endif
+	triplePlay = new TriplePlay();
 
 	for (int i = 0; i < NUMMidiStreams; i++)
 	{
 #ifdef WIN32
 		hMidiDevice[i] = NULL;
 #else
+#ifdef HAVE_ALSA
+		hMidiDevice[i] = NULL;
+#endif
 #endif
 		midifd[i] = -1;
 		inputDevice[i] = NULL;
@@ -788,8 +843,6 @@ bool MidiPlugin::init()
 		devices.push_back(std::move(std::unique_ptr<MidiDevice>(new MidiDevice(entry.first, devices.size()))));
 	}
 
-	int instrument = coCoviseConfig::getInt("InPort", "COVER.Plugin.Midi.Instrument", 0);
-	int midiPortOut = coCoviseConfig::getInt("OutPort", "COVER.Plugin.Midi", 1);
 
 	coVRFileManager::instance()->registerFileHandler(&handlers[0]);
 	coVRFileManager::instance()->registerFileHandler(&handlers[1]);
@@ -883,23 +936,42 @@ bool MidiPlugin::init()
 
 	if (coVRMSController::instance()->isMaster())
 	{
-		int midiPort = coCoviseConfig::getInt("InPort", "COVER.Plugin.Midi", 0);
-		int midiPortOut = coCoviseConfig::getInt("OutPort", "COVER.Plugin.Midi", 1);
-                int n=0;
-		for (int i = 0; i < NUMMidiStreams; i++)
+		int streamNum = 0;
+		coCoviseConfig::ScopeEntries StreamEntries = coCoviseConfig::getScopeEntries("COVER.Plugin.Midi", "Stream");
+		for (const auto& stream : StreamEntries)
 		{
-			while(openMidiIn(i, midiPort + n)==false)
-			{
-			        if(n>50)
-			          break;
-				fprintf(stderr, "OpenMidiIn %d failed\n", midiPort+ n);
-			        n++;
-			}
-			fprintf(stderr, "OpenMidiIn Stream %d device %d succeeded\n", i,midiPort+ n);
-			if(n>50)
-			    break;
-			 n++;
+			std::string configEntry = "COVER.Plugin.Midi." + stream.first;
+			    std::string DeviceName = coCoviseConfig::getEntry("DeviceName", configEntry);
+			    if(DeviceName.length()>0)
+			    {
+			    #ifdef HAVE_ALSA
+			    OpenMidiDevice(DeviceName,hMidiDevice[streamNum],hMidiDeviceOut[streamNum]);
+			    
+		            //snd_rawmidi_read(hMidiDevice[streamNum], NULL, 0); /* trigger reading */
+			    
+			    #endif
+			    }
+			    else
+			    {
+			        int midiPort = coCoviseConfig::getInt("InPort", configEntry, -1);
+				if (midiPort >= 0)
+				{
+					if(openMidiIn(streamNum, midiPort) == false)
+					{
+						fprintf(stderr, "OpenMidiIn stream %d port %d failed\n", streamNum, midiPort );
+					}
+					else
+					{
+					    fprintf(stderr, "OpenMidiIn Stream %d device %d succeeded\n", streamNum, midiPort);
+					}
+				}
+			     }
+				streamNum++;
+				if (streamNum >= NUMMidiStreams)
+					break;
+					
 		}
+		int midiPortOut = coCoviseConfig::getInt("OutPort", "COVER.Plugin.Midi", 1);
 		fprintf(stderr, "OpenMidiOut %d\n", midiPortOut);
 		if (openMidiOut(midiPortOut))
 		{
@@ -943,7 +1015,7 @@ ControllerInfo::~ControllerInfo()
 bool MidiPlugin::openMidiIn(int streamNum, int device)
 {
 #ifndef WIN32
-	char devName[100];
+	/*char devName[100];
 	if (device == 0)
 		sprintf(devName, "/dev/midi");
 	else
@@ -956,7 +1028,7 @@ bool MidiPlugin::openMidiIn(int streamNum, int device)
 	}
 	fprintf(stderr, "open %s %d\n", devName, midifd[streamNum]);
 	if (midifd[streamNum] <= 0)
-		return false;
+		return false;*/
 #else
 	UINT nMidiDeviceNum;
 	nMidiDeviceNum = midiInGetNumDevs();
@@ -989,12 +1061,12 @@ bool MidiPlugin::openMidiIn(int streamNum, int device)
 bool MidiPlugin::openMidiOut(int device)
 {
 #ifndef WIN32
-	char devName[100];
+	/*char devName[100];
 	sprintf(devName, "-/dev/midi%d", device + 1);
 	midiOutfd = open(devName, O_WRONLY | O_NONBLOCK);
 	fprintf(stderr, "open /dev/midi%d %d", device + 1, midiOutfd);
 	if (midiOutfd <= 0)
-		return false;
+		return false;*/
 #else
 	UINT nMidiDeviceNum;
 	nMidiDeviceNum = midiInGetNumDevs();
@@ -1024,6 +1096,7 @@ bool MidiPlugin::openMidiOut(int device)
 //------------------------------------------------------------------------------
 MidiPlugin::~MidiPlugin()
 {
+	delete triplePlay;
 	for (int i = 0; i < NUMMidiStreams; i++)
 	{
 		delete lTrack[i];
@@ -1048,6 +1121,7 @@ MidiPlugin::~MidiPlugin()
 
 void MidiPlugin::addEvent(MidiEvent &me, int MidiStream)
 {
+	OpenThreads::ScopedLock<OpenThreads::Mutex> sl(eventQueueMutex);
 	eventqueue[MidiStream].push_back(me);
 }
 bool MidiPlugin::destroy()
@@ -1219,8 +1293,80 @@ void MidiPlugin::preFrame()
 	{
 		while (eventqueue[i].size() > 0)
 		{
-			MidiEvent me = *eventqueue[i].begin();
-			eventqueue[i].pop_front();
+			MidiEvent me;
+			{
+				OpenThreads::ScopedLock<OpenThreads::Mutex> sl(eventQueueMutex);
+				auto it = eventqueue[i].begin();
+				if (it == eventqueue[i].end())
+					continue;
+				me = *it;
+				eventqueue[i].pop_front();
+			}
+			if (debugButton->state())
+			{
+				if (me.isTimbre())
+				{
+					std::cerr << "Timbre" << std::endl;
+				}
+				else if (me.isAftertouch())
+				{
+					std::cerr << "Aftertouch" << std::endl;
+				}
+				else if (me.isController())
+				{
+					std::cerr << "Controller: " << me.getCommandByte() << std::endl;
+					fprintf(stderr, "Raw: p0 %d, p1 %d, p2 %d, p3 %d\n",  me.getP0(), me.getP1(), me.getP2(), me.getP3());
+			
+				}
+				else if (me.isEndOfTrack())
+				{
+					std::cerr << "EndOfTrack: " << me.getCommandByte() << std::endl;
+				}
+				else if (me.isLinked())
+				{
+					std::cerr << "Linked: " << me.getCommandByte() << std::endl;
+				}
+				else if (me.isMeta())
+				{
+					std::cerr << "Meta: " << me.getMetaType() << std::endl;
+				}
+				else if (me.isMetaMessage())
+				{
+					std::cerr << "MetaMessage: " << me.getMetaType() << std::endl;
+				}
+				else if (me.isNoteOn())
+				{
+					fprintf(stderr, "NoteOn: channel: %d  key: %02d velo %03d \n", me.getChannel(), me.getKeyNumber(), me.getVelocity());
+				}
+				else if (me.isNoteOff())
+				{
+					fprintf(stderr, "NoteOff: channel: %d  key: %02d velo %03d \n", me.getChannel(), me.getKeyNumber(), me.getVelocity());
+				}
+				else if (me.isNote())
+				{
+					fprintf(stderr, "Note: channel: %d  key: %02d velo %03d \n", me.getChannel(), me.getKeyNumber(), me.getVelocity());
+				}
+				else if (me.isPatchChange())
+				{
+					fprintf(stderr, "PatchChange: channel: %d  key: %02d velo %03d , p0 %d, p1 %d, p2 %d, p3 %d\n", me.getChannel(), me.getKeyNumber(), me.getVelocity(),me.getP0(), me.getP1(), me.getP2(), me.getP3());
+				}
+				else if (me.isPitchbend())
+				{
+					fprintf(stderr, "PitchBend: channel: %d  key: %02d velo %03d , p0 %d, p1 %d, p2 %d, p3 %d\n", me.getChannel(), me.getKeyNumber(), me.getVelocity(), me.getP0(), me.getP1(), me.getP2(), me.getP3());
+				}
+				else if (me.isPressure())
+				{
+					fprintf(stderr, "Pressure: channel: %d  key: %02d velo %03d , p0 %d, p1 %d, p2 %d, p3 %d\n", me.getChannel(), me.getKeyNumber(), me.getVelocity(), me.getP0(), me.getP1(), me.getP2(), me.getP3());
+				}
+				else if (me.isTempo())
+				{
+					fprintf(stderr, "Tempo: tempoMicro %d, tempoMicroseconds %d\n", me.getTempoMicro(), me.getTempoMicroseconds());
+				}
+				else if (me.isTimbre())
+				{
+					fprintf(stderr, "Timbre: duration %lf\n", me.getDurationInSeconds());
+				}
+						}
 			if (me.getKeyNumber() == 31) // special reset key (drumpad)
 			{
 				if (me.getVelocity() < 50)
@@ -1534,6 +1680,9 @@ void MidiPlugin::MIDItab_create(void)
 		clearStore();
 		});
 
+	debugButton = new ui::Button(MIDITab, "DebugMidi");
+	debugButton->setText("Debug");
+
 	radius1Slider = new ui::Slider(MIDITab, "Radius1");
 	radius1Slider->setText("Radius1");
 	radius1Slider->setBounds(1, 100);
@@ -1685,12 +1834,7 @@ void MidiPlugin::MIDItab_create(void)
 		openMidiOut(newOutDev);
 
 	});
-
-	outputDevice = new ui::SelectionList(MIDITab, "outputDevicest");
-
-
-	infoLabel = new ui::Label(MIDITab, "MIDI Version 1.0");
-
+	triplePlay->MIDItab_create();
 
 }
 
@@ -1790,6 +1934,30 @@ void Track::addNote(Note *n)
 	n->spin = rotationSpeed;
 	if (n->track->instrument->type == "keyboard")
 	{
+	// check if there is already a note on, then turn it off
+	
+	// find key press for this release
+	for (auto it = notes.end(); it != notes.begin(); )
+	{
+	Note *note = NULL;
+		it--;
+		if ((*it)->event.getKeyNumber() == n->event.getKeyNumber())
+		{
+			note = *it;
+			//printf("foundNoteOn: %02d velo %03d chan %d device %d\n", me.getKeyNumber(), me.getVelocity(), me.getChannel());
+			if (note->track->instrument->type == "keyboard")
+			{
+				Note* lastNode = *it;
+				if (it != notes.begin())
+					it--;
+				note = *it;
+				n->event.setVelocity(note->event.getVelocity());
+				lastNode->setInactive(false);
+			}
+			break;
+		}
+	}
+	
 		notes.push_back(n);
 		n->setInactive(false);
 		n->vertNum = lineVert->size();
@@ -1852,6 +2020,7 @@ void Track::endNote(MidiEvent& me)
 	fprintf(stderr,"end: %02d velo %03d chan %d\n", me.getKeyNumber(), me.getVelocity(), me.getChannel());
 
 	// find key press for this release
+	bool found = false;
 	for (auto it = notes.end(); it != notes.begin(); )
 	{
 		it--;
@@ -1867,10 +2036,16 @@ void Track::endNote(MidiEvent& me)
 				note = *it;
 				me.setVelocity(note->event.getVelocity());
 				lastNode->setInactive(false);
+				found = true;
 			}
 			break;
 		}
 	}
+	if(!found && instrument->type == "keyboard")
+	{
+	  // this is an end Note without a note On, treat it as noteOn if this is a keyboard or guitar
+	  addNote(new Note(me, this));
+	} 
 	if (note != NULL)
 	{
 
@@ -1980,6 +2155,7 @@ void Track::update()
 	double speed = MidiPlugin::instance()->midifile.getTicksPerQuarterNote();
 	double time = cover->frameTime() - MidiPlugin::instance()->startTime;
 	MidiEvent me;
+
 	if (life)
 	{
 		char buf[1000];
@@ -1992,6 +2168,57 @@ void Track::update()
 			me.setP2(0);
 			if (coVRMSController::instance()->isMaster())
 			{
+			
+			    #ifdef HAVE_ALSA
+				unsigned char buf[256];
+				int i, length;
+				unsigned short revents;
+				int err;
+				if(MidiPlugin::instance()->hMidiDevice[trackNumber]>0)
+				{
+
+				     numRead=1;
+					err = snd_rawmidi_read(MidiPlugin::instance()->hMidiDevice[trackNumber], buf, sizeof(buf));
+				     //fprintf(stderr,"handle %d %d %ld, %d\n",err,trackNumber,MidiPlugin::instance()->hMidiDevice[trackNumber],(int)sizeof(buf));
+					if (err <= 0)
+						numRead=0;
+					else
+					{
+
+					       length = 0;
+					       for (i = 0; i < err; ++i)
+						       if ( buf[i] != 0xfe)
+							       buf[length++] = buf[i];
+					       if (length >=3)
+					       {
+						   me.setP0(buf[0]);
+						   me.setP1(buf[1]);
+						   me.setP2(buf[2]);
+						   TokenBuffer tb;
+						   tb << me.getChannel();
+						   tb << me.getP0();
+						   tb << me.getP1();
+						   tb << me.getP2();
+						   tb << me.getP3();
+						   UdpMessage um(tb, covise::MIDI_STREAM);
+						   cover->sendVrbMessage(&um);
+						   //cerr << "sent:" << me.isNoteOn() << " " << me.getKeyNumber() << endl;
+						   //fprintf(stderr, "sent: %01d %02d velo %03d chan %d numRead %d streamnum %d\n", me.isNoteOn(), me.getKeyNumber(), me.getVelocity(), me.getChannel(), numRead, streamNum);
+                        		       }
+					       else
+					       {
+						   numRead=0;
+					       }
+					   }
+				}
+				else
+				{
+					numRead=0;
+				}
+				buf[3]=numRead;
+		        	coVRMSController::instance()->sendSlaves((char*)buf, 4); // nothing read
+
+			    #else
 				if (MidiPlugin::instance()->midifd[streamNum] > 0)
 				{
 					numRead = read(MidiPlugin::instance()->midifd[streamNum], buf, 1);
@@ -2026,8 +2253,8 @@ void Track::update()
 					tb << me.getP3();
 					UdpMessage um(tb, covise::MIDI_STREAM);
 					cover->sendVrbMessage(&um);
-					cerr << "sent:" << me.isNoteOn() << " " << me.getKeyNumber() << endl;
-					fprintf(stderr, "sent: %01d %02d velo %03d chan %d numRead %d streamnum %d\n", me.isNoteOn(), me.getKeyNumber(), me.getVelocity(), me.getChannel(), numRead, streamNum);
+					//cerr << "sent:" << me.isNoteOn() << " " << me.getKeyNumber() << endl;
+					//fprintf(stderr, "sent: %01d %02d velo %03d chan %d numRead %d streamnum %d\n", me.isNoteOn(), me.getKeyNumber(), me.getVelocity(), me.getChannel(), numRead, streamNum);
 
 
 					}
@@ -2051,7 +2278,8 @@ void Track::update()
 				buf[2] = me.getP2();
 				buf[3] = numRead;
 				coVRMSController::instance()->sendSlaves((char*)buf, 4);
-
+//fprintf(stderr, "sent: %01d %02d velo %03d chan %d numRead %d streamnum %d\n", me.isNoteOn(), me.getKeyNumber(), me.getVelocity(), me.getChannel(), numRead, streamNum);*/
+			
 
 				if (numRead > 0)
 				{
@@ -2066,6 +2294,7 @@ void Track::update()
 					cerr << "sent:" << me.isNoteOn() << " " << me.getKeyNumber() << endl;
 					fprintf(stderr, "sent: %01d %02d velo %03d chan %d numRead %d streamnum %d\n", me.isNoteOn(), me.getKeyNumber(), me.getVelocity(), me.getChannel(), numRead, streamNum);*/
 				}
+			    #endif
 			}
 			else
 			{
@@ -2077,6 +2306,7 @@ void Track::update()
 				numRead = buf[3];
 	//fprintf(stderr,"received: %01d %02d velo %03d chan %d numRead %d\n", me.isNoteOn(),me.getKeyNumber(), me.getVelocity(), me.getChannel(),numRead);
 			}
+			
 			if(numRead > 0 &&  me.getP0()!=0)
 			{
 
@@ -2651,3 +2881,502 @@ int MidiPlugin::initOPCUA() {
 		return 1;
 
 }
+
+
+TriplePlay::TriplePlay()
+{
+
+	int InDev = coCoviseConfig::getInt("DeviceIn", "COVER.Plugin.Midi.TriplePlay",1);
+	int OutDev = coCoviseConfig::getInt("DeviceOut", "COVER.Plugin.Midi.TriplePlay",2);
+	std::string DeviceName = coCoviseConfig::getEntry("DeviceName", "COVER.Plugin.Midi.TriplePlay","TriplePlay Connect TP Control");
+#ifdef HAVE_ALSA
+	MidiPlugin::instance()->OpenMidiDevice(DeviceName,hMidiDeviceIn,hMidiDeviceOut);
+#else
+	openMidiIn(InDev);
+	openMidiOut(OutDev);
+#endif
+
+    unsigned char InitMSG[] = { 0xf0, 0x7e, 0x00, 0x06, 0x01, 0xf7 };
+    unsigned char InitMSG2[] = { 0xf0, 0x7e, 0x10, 0x06, 0x01, 0xf7 };
+    unsigned char InitMSG3[] = {
+        0xf0,0x00,0x01,0x6e,0x04,0x41,0x01,0x7f,0x01,0x1f,0x1f,0x06,0x06,0x00,0x1e,0x0f,0x04,0x00,0x00,0x00,0x00,0x00,0x18,0x00,0x14,0x0a,0x00,0x00,0x00,0x00,0x00,0x18,0x00,0x14,0x0a,0x00,0x00,0x00,0x00,0x00,0x18,0x00,0x14,0x0a,0x00,0x00,0x00,0x00
+       ,0x00,0x18,0x00,0x14,0x0a,0x00,0x00,0x00,0x00,0x00,0x18,0x00,0x14,0x0a,0x00,0x00,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1a,0x1b,0x1c,0x1d,0x1e,0x1f
+       ,0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2a,0x2b,0x2c,0x2d,0x2e,0x2f,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3a,0x3b,0x3c,0x3d,0x3e,0x3f,0x4c,0x45,0x44,0x20,0x53,0x61,0x78,0x79,0x00,0x00,0x00,0x1a,0x38,0xf7
+    };
+
+    unsigned char InitMSG4[] = {
+        0xf0,0x00,0x01,0x6e,0x04,0x41,0x03,0x7f,0x10,0x4c,0x65,0x61,0x64,0x73,0x2d,0x53,0x61,0x78,0x79,0x6e,0x74,0x68,0x6f,0x6e,0x65,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0c,0x00,0x00,0x00,0x00,0x00,0x00
+       ,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+       ,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0f,0x19,0xf7
+	};
+	// initialize
+	sendSysexMessage(InitMSG, sizeof(InitMSG));
+	setParam(0x04, 0x02);
+	setParam(0x05, 0x00);
+	// initialize
+	sendSysexMessage(InitMSG2, sizeof(InitMSG2));
+	setParam(0x3d, 0x63);
+	setParam(0x40, 0x0c);
+	sendSysexMessage(InitMSG2, sizeof(InitMSG2));
+	sendSysexMessage(InitMSG3, sizeof(InitMSG3));
+	sendSysexMessage(InitMSG4, sizeof(InitMSG4));
+
+	setParam(0x71, 0x01);
+	setParam(0x6b, 0x6a);
+	setParam(0x43, 0x00);
+	setParam(0x5b, 0x01);
+	setParam(0x5c, 0x00);
+	setParam(0x5d, 0x00);
+	setParam(0x5e, 0x00);
+	setParam(0x5f, 0x00);
+	setParam(0x60, 0x00);
+	setParam(0x61, 0x00);
+	setParam(0x62, 0x00);
+	setParam(0x63, 0x00);
+	setParam(0x5b, 0x02);
+	setParam(0x42, 0x00);
+	setParam(0x3d, 0x63);
+	setParam(0x40, 0x0c);
+	setParam(0x41, 0x00);
+	setParam(0x42, 0x01);
+	setParam(0x43, 0x00);
+	setParam(0x42, 0x02);
+	setParam(0x42, 0x03);
+	setParam(0x42, 0x04);
+	setParam(0x42, 0x05);
+	setParam(0x42, 0x09);
+	setParam(0x6e, 0x00);
+	setParam(0x43, 0x00);
+	setParam(0x02, 0x0a);
+	setParam(0x43, 0x00);
+}
+
+TriplePlay::~TriplePlay()
+{
+}
+
+//--------------------------------------------------------------------
+void TriplePlay::MIDItab_create(void)
+{
+    FTPGroup = new ui::Group(MidiPlugin::instance()->MIDITab, "TriplePlay");
+    FTPGroup->setText("TriplePlay");
+
+    MonoButton = new ui::Action(FTPGroup, "Mono");
+    MonoButton->setText("Mono");
+    MonoButton->setCallback([this] {
+        setParam(MIDIMode, ftpValue::Mono);
+        setParam(MIDIMode, ftpValue::Mono);
+        });
+    PolyButton = new ui::Action(FTPGroup, "Poly");
+    PolyButton->setText("Poly");
+    PolyButton->setCallback([this] {
+        setParam(MIDIMode, ftpValue::Poly);
+        setParam(MIDIMode, ftpValue::Poly);
+        });
+
+}
+
+
+void TriplePlay::setParam(unsigned char Var, unsigned char Value)
+{
+	sendMidiMessage(0xb7, 0x1f, Var);
+	sendMidiMessage(0xb7, 0x3f, Value);
+}
+void TriplePlay::sendMidiMessage(unsigned char P0, unsigned char P1, unsigned char P2)
+{
+#ifdef HAVE_ALSA
+if(hMidiDeviceOut!=nullptr)
+{
+int err;
+unsigned char buf[3];
+buf[0]=P0;
+buf[1]=P1;
+buf[2]=P2;
+		if ((err = snd_rawmidi_write(hMidiDeviceOut, buf, 3)) < 0) {
+			MidiPlugin::instance()->error("cannot send data: %s", snd_strerror(err));
+		}
+		}
+#endif
+#ifdef WIN32
+	DWORD dwParam1 = (DWORD)P0 | ((DWORD)P1 << 8) | ((DWORD)P2 << 16);
+
+
+	if (hMidiDeviceOut != NULL)
+	{
+		int flag;
+		flag = midiOutShortMsg(hMidiDeviceOut, dwParam1);
+		if (flag != MMSYSERR_NOERROR) {
+			printf("Warning: MIDI Output is not open.\n");
+		}
+
+	}
+#endif
+}
+
+void TriplePlay::sendSysexMessage(unsigned char* buf, size_t size)
+{
+#ifdef HAVE_ALSA
+if(hMidiDeviceOut!=nullptr)
+{
+int err;
+		if ((err = snd_rawmidi_write(hMidiDeviceOut, buf, size)) < 0) {
+			MidiPlugin::instance()->error("cannot send data: %s", snd_strerror(err));
+		}
+}
+#endif
+    #ifdef WIN32
+	MIDIHDR     midiHdr;
+	UINT        err;
+
+    /* Store pointer in MIDIHDR */
+    midiHdr.lpData = (LPSTR)buf;
+
+    /* Store its size in the MIDIHDR */
+    midiHdr.dwBufferLength = size;
+
+    /* Flags must be set to 0 */
+    midiHdr.dwFlags = 0;
+
+    /* Prepare the buffer and MIDIHDR */
+    err = midiOutPrepareHeader(hMidiDeviceOut, &midiHdr, sizeof(MIDIHDR));
+    if (!err)
+    {
+        /* Output the SysEx message */
+        err = midiOutLongMsg(hMidiDeviceOut, &midiHdr, sizeof(MIDIHDR));
+        if (err)
+        {
+            char   errMsg[120];
+
+            midiOutGetErrorText(err, &errMsg[0], 120);
+            fprintf(stderr,"Error: %s\r\n", &errMsg[0]);
+        }
+
+        /* Unprepare the buffer and MIDIHDR */
+        while (MIDIERR_STILLPLAYING == midiOutUnprepareHeader(hMidiDeviceOut, &midiHdr, sizeof(MIDIHDR)))
+        {
+            /* Should put a delay in here rather than a busy-wait */
+        }
+    }
+    #endif
+
+}
+
+
+bool TriplePlay::openMidiIn(int device)
+{
+#ifndef WIN32
+	/*char devName[100];
+	if (device == 0)
+		sprintf(devName, "/dev/midi");
+	else
+		sprintf(devName, "/dev/midi%d", device);
+	midiInfd= open(devName, O_RDONLY | O_NONBLOCK);
+	if (midiInfd<= 0)
+	{
+		sprintf(devName, "/dev/midi%d", device);
+		midiInfd= open(devName, O_RDONLY | O_NONBLOCK);
+	}
+	fprintf(stderr, "open %s\n", devName );
+	if (midiInfd<= 0)
+		return false;*/
+#else
+	UINT nMidiDeviceNum;
+	nMidiDeviceNum = midiInGetNumDevs();
+	if (nMidiDeviceNum == 0) {
+		fprintf(stderr, "midiInGetNumDevs() return 0...");
+		return false;
+	}
+	else
+	{
+		MMRESULT rv;
+		UINT nMidiPort = (uint)device;
+
+		rv = midiInOpen(&hMidiDeviceIn, nMidiPort, (DWORD_PTR)FTPMidiInProc, device, CALLBACK_FUNCTION);
+		if (rv != MMSYSERR_NOERROR) {
+			fprintf(stderr, "midiInOpen() failed...rv=%d", rv);
+			return false;
+		}
+		else
+		{
+			midiInStart(hMidiDeviceIn);
+		}
+
+	}
+
+#endif
+
+	return true;
+}
+
+void TriplePlay::addEvent(MidiEvent& me)
+{
+
+}
+bool TriplePlay::openMidiOut(int device)
+{
+#ifndef WIN32
+/*	char devName[100];
+	sprintf(devName, "-/dev/midi%d", device + 1);
+	midiOutfd = open(devName, O_WRONLY | O_NONBLOCK);
+	fprintf(stderr, "open /dev/midi%d %d", device + 1, midiOutfd);
+	if (midiOutfd <= 0)
+		return false;*/
+#else
+	UINT nMidiDeviceNum;
+	nMidiDeviceNum = midiInGetNumDevs();
+	if (nMidiDeviceNum == 0) {
+		fprintf(stderr, "midiInGetNumDevs() return 0...");
+		return false;
+	}
+	else
+	{
+		MMRESULT rv;
+		UINT nMidiPort = (uint)device;
+
+		rv = midiOutOpen(&hMidiDeviceOut, nMidiPort, 0, 0, CALLBACK_NULL);
+		if (rv != MMSYSERR_NOERROR) {
+			fprintf(stderr, "midiOutOpen() failed...rv=%d", rv);
+			return false;
+		}
+		fprintf(stderr, "midiOutOpen() succeded...rv=%d nMidiPort %d", rv, nMidiPort);
+
+	}
+
+#endif
+	return true;
+}
+#ifdef HAVE_ALSA
+void MidiPlugin::OpenMidiDevice(const std::string &DeviceName,snd_rawmidi_t *&inputp,snd_rawmidi_t *&outputp)
+{
+       int card, err;
+
+	card = -1;
+	if ((err = snd_card_next(&card)) < 0) {
+		error("cannot determine card number: %s", snd_strerror(err));
+		return;
+	}
+	if (card < 0) {
+		error("no sound card found");
+		return;
+	}
+	do {
+	
+	snd_ctl_t *ctl;
+	char devName[128];
+	int device;
+
+	sprintf(devName, "hw:%d", card);
+	if ((err = snd_ctl_open(&ctl, devName, 0)) < 0) {
+		error("cannot open control for card %d: %s", card, snd_strerror(err));
+		return;
+	}
+	device = -1;
+	for (;;) {
+		if ((err = snd_ctl_rawmidi_next_device(ctl, &device)) < 0) {
+			error("cannot determine device number: %s", snd_strerror(err));
+			break;
+		}
+		if (device < 0)
+			break;snd_rawmidi_info_t *info;
+	const char *name;
+	const char *sub_name;
+	int subs, subs_in, subs_out;
+	int sub;
+	int err;
+
+	snd_rawmidi_info_alloca(&info);
+	snd_rawmidi_info_set_device(info, device);
+
+	snd_rawmidi_info_set_stream(info, SND_RAWMIDI_STREAM_INPUT);
+	err = snd_ctl_rawmidi_info(ctl, info);
+	if (err >= 0)
+		subs_in = snd_rawmidi_info_get_subdevices_count(info);
+	else
+		subs_in = 0;
+
+	snd_rawmidi_info_set_stream(info, SND_RAWMIDI_STREAM_OUTPUT);
+	err = snd_ctl_rawmidi_info(ctl, info);
+	if (err >= 0)
+		subs_out = snd_rawmidi_info_get_subdevices_count(info);
+	else
+		subs_out = 0;
+
+	subs = subs_in > subs_out ? subs_in : subs_out;
+	if (!subs)
+		return;
+
+	for (sub = 0; sub < subs; ++sub) {
+		snd_rawmidi_info_set_stream(info, sub < subs_in ?
+					    SND_RAWMIDI_STREAM_INPUT :
+					    SND_RAWMIDI_STREAM_OUTPUT);
+		snd_rawmidi_info_set_subdevice(info, sub);
+		err = snd_ctl_rawmidi_info(ctl, info);
+		if (err < 0) {
+			error("cannot get rawmidi information %d:%d:%d: %s\n",
+			      card, device, sub, snd_strerror(err));
+			return;
+		}
+		name = snd_rawmidi_info_get_name(info);
+		sub_name = snd_rawmidi_info_get_subdevice_name(info);
+		if(DeviceName == name)
+		{
+		
+			sprintf(devName, "hw:%d,%d", card, device);
+			if ((err = snd_rawmidi_open(&inputp, &outputp, devName, SND_RAWMIDI_NONBLOCK)) < 0) {
+				error("cannot open port \"%s\": %s", devName, snd_strerror(err));
+			}
+			if ((err = snd_rawmidi_nonblock(inputp, 1)) < 0) {
+				error("cannot set nonblocking mode: %s", snd_strerror(err));
+			}
+			else
+			{
+			    fprintf(stderr,"opened %s non blocking\n",devName);
+			}
+		}
+		if(DeviceName == sub_name)
+		{
+		        inputp = outputp = nullptr;
+			sprintf(devName, "hw:%d,%d,%d", card, device, sub);
+			if ((err = snd_rawmidi_open(&inputp, &outputp, devName, SND_RAWMIDI_NONBLOCK)) < 0) {
+				error("cannot open port \"%s\": %s", devName, snd_strerror(err));
+				
+			}
+			if ((err = snd_rawmidi_nonblock(inputp, 1)) < 0) {
+				error("cannot set nonblocking mode: %s", snd_strerror(err));
+			}
+			else
+			{
+			    fprintf(stderr,"opened %s non blocking\n",devName);
+			}
+		}
+	}
+	}
+	snd_ctl_close(ctl);
+	
+		if ((err = snd_card_next(&card)) < 0) {
+			error("cannot determine card number: %s", snd_strerror(err));
+			break;
+		}
+	} while (card >= 0);
+}
+
+void MidiPlugin::list_device(snd_ctl_t *ctl, int card, int device)
+{
+	snd_rawmidi_info_t *info;
+	const char *name;
+	const char *sub_name;
+	int subs, subs_in, subs_out;
+	int sub;
+	int err;
+
+	snd_rawmidi_info_alloca(&info);
+	snd_rawmidi_info_set_device(info, device);
+
+	snd_rawmidi_info_set_stream(info, SND_RAWMIDI_STREAM_INPUT);
+	err = snd_ctl_rawmidi_info(ctl, info);
+	if (err >= 0)
+		subs_in = snd_rawmidi_info_get_subdevices_count(info);
+	else
+		subs_in = 0;
+
+	snd_rawmidi_info_set_stream(info, SND_RAWMIDI_STREAM_OUTPUT);
+	err = snd_ctl_rawmidi_info(ctl, info);
+	if (err >= 0)
+		subs_out = snd_rawmidi_info_get_subdevices_count(info);
+	else
+		subs_out = 0;
+
+	subs = subs_in > subs_out ? subs_in : subs_out;
+	if (!subs)
+		return;
+
+	for (sub = 0; sub < subs; ++sub) {
+		snd_rawmidi_info_set_stream(info, sub < subs_in ?
+					    SND_RAWMIDI_STREAM_INPUT :
+					    SND_RAWMIDI_STREAM_OUTPUT);
+		snd_rawmidi_info_set_subdevice(info, sub);
+		err = snd_ctl_rawmidi_info(ctl, info);
+		if (err < 0) {
+			error("cannot get rawmidi information %d:%d:%d: %s\n",
+			      card, device, sub, snd_strerror(err));
+			return;
+		}
+		name = snd_rawmidi_info_get_name(info);
+		sub_name = snd_rawmidi_info_get_subdevice_name(info);
+		if (sub == 0 && sub_name[0] == '\0') {
+			printf("%c%c  hw:%d,%d    %s",
+			       sub < subs_in ? 'I' : ' ',
+			       sub < subs_out ? 'O' : ' ',
+			       card, device, name);
+			if (subs > 1)
+				printf(" (%d subdevices)", subs);
+			putchar('\n');
+			break;
+		} else {
+			printf("%c%c  hw:%d,%d,%d  %s\n",
+			       sub < subs_in ? 'I' : ' ',
+			       sub < subs_out ? 'O' : ' ',
+			       card, device, sub, sub_name);
+		}
+	}
+}
+
+void MidiPlugin::list_card_devices(int card)
+{
+	snd_ctl_t *ctl;
+	char name[32];
+	int device;
+	int err;
+
+	sprintf(name, "hw:%d", card);
+	if ((err = snd_ctl_open(&ctl, name, 0)) < 0) {
+		error("cannot open control for card %d: %s", card, snd_strerror(err));
+		return;
+	}
+	device = -1;
+	for (;;) {
+		if ((err = snd_ctl_rawmidi_next_device(ctl, &device)) < 0) {
+			error("cannot determine device number: %s", snd_strerror(err));
+			break;
+		}
+		if (device < 0)
+			break;
+		list_device(ctl, card, device);
+	}
+	snd_ctl_close(ctl);
+}
+
+void MidiPlugin::device_list(void)
+{
+	int card, err;
+
+	card = -1;
+	if ((err = snd_card_next(&card)) < 0) {
+		error("cannot determine card number: %s", snd_strerror(err));
+		return;
+	}
+	if (card < 0) {
+		error("no sound card found");
+		return;
+	}
+	puts("Dir Device    Name");
+	do {
+		list_card_devices(card);
+		if ((err = snd_card_next(&card)) < 0) {
+			error("cannot determine card number: %s", snd_strerror(err));
+			break;
+		}
+	} while (card >= 0);
+}
+void MidiPlugin::error(const char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	vfprintf(stderr, format, ap);
+	va_end(ap);
+	putc('\n', stderr);
+}
+
+
+#endif

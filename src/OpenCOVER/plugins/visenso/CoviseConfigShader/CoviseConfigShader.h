@@ -19,13 +19,13 @@
 
 #include <cover/coVRPlugin.h>
 
-#include <QRegExp>
+#include <QRegularExpression>
 
 using namespace opencover;
 
 struct Definition
 {
-    QRegExp regexp;
+    QRegularExpression regexp;
     std::string shader;
     bool smooth;
     float transparency;
@@ -43,7 +43,7 @@ public:
 
     virtual bool init();
     virtual void addNode(osg::Node *, const RenderObject *);
-    virtual void guiToRenderMsg(const char *msg);
+    virtual void guiToRenderMsg(const grmsg::coGRMsg &msg) ;
     virtual void preFrame();
 
 private:

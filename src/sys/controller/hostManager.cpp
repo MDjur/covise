@@ -27,7 +27,7 @@ HostManager::HostManager()
 {
     m_vrb->connectToServer();
     auto userInfos = getConfiguredHosts();
-    std::cerr << userInfos.size() << " hosts are preconfigured" << std::endl;
+    //std::cerr << userInfos.size() << " hosts are preconfigured" << std::endl;
     int i = clientIdForPreconfigured;
     for (auto &userInfo : userInfos)
     {
@@ -615,7 +615,6 @@ bool HostManager::handleVrbMessage()
     }
     case COVISE_MESSAGE_SOCKET_CLOSED:
     case COVISE_MESSAGE_CLOSE_SOCKET:
-    case COVISE_MESSAGE_VRB_CLOSE_VRB_CONNECTION:
     {
         if (m_hosts.empty()) //we are shutting down
             return false;

@@ -88,14 +88,23 @@ void coVRCollaboration::init()
         fprintf(stderr, "\nnew coVRCollaboration\n");
     coVRPartnerList::instance()->hideAvatars();
     syncMode.setUpdateFunction([this]()
-    {
+                               {
         assert(syncMode < 3);
         if (m_collaborationMode)
             m_collaborationMode->select(syncMode);
         syncModeChanged(syncMode);
+        updated = true;
     });
     avatarPosition.setUpdateFunction([this]()
     {
+        //overwrite other's viewpoints after initiating tight coupling
+        constexpr double overwriteTime = 1; //sec
+        if (syncMode == SyncMode::TightCoupling && cover->frameTime() - couplingModeChangedTime < overwriteTime)
+        {
+            avatarPosition = VRSceneGraph::instance()->getTransform()->getMatrix();
+            return;
+        }
+        updated = true;
         osg::Matrix m = avatarPosition;
         remoteTransform(m);
     });
@@ -144,27 +153,45 @@ void coVRCollaboration::initCollMenu()
     assert(1 == MasterSlaveCoupling);
     assert(2 == TightCoupling);
     m_collaborationMode->setList(std::vector<std::string>({"Loose", "Master/Slave", "Tight"}));
-    m_collaborationMode->setCallback([this](int mode) {
-        syncMode = mode;
-        if (mode == MasterSlaveCoupling)
+    m_collaborationMode->setCallback(
+        [this](int mode)
         {
-            coVRCommunication::instance()->becomeMaster();
-            m_master->setEnabled(false);
-            m_returnToMaster->setEnabled(false);
-        }
-        syncModeChanged(mode);
-
-    });
+            syncMode = mode;
+            syncModeChanged(syncMode);
+            couplingModeChangedTime = cover->frameTime();
+            avatarPosition = VRSceneGraph::instance()->getTransform()->getMatrix();
+        });
     m_collaborationMode->select(syncMode);
 
+    m_master = new ui::Button(m_collaborativeMenu, "Master");
+    m_master->setState(isMaster());
+    m_master->setCallback(
+        [this](bool state)
+        {
+            if (state)
+            {
+                coVRCommunication::instance()->becomeMaster();
+                avatarPosition = VRSceneGraph::instance()->getTransform()->getMatrix();
+                scaleFactor = VRSceneGraph::instance()->scaleFactor();
+                vrb::SharedStateManager::instance()->becomeMaster();
+                updateSharedStates();
+            }
+            updateUi();
+        });
 
+    m_returnToMaster = new ui::Action(m_collaborativeMenu, "ReturnToMaster");
+    m_returnToMaster->setText("Teleport to master");
+    m_returnToMaster->setCallback([this](void) { updateSharedStates(true); });
 
     m_showAvatar = new ui::Button(m_collaborativeMenu, "ShowAvatar");
-    m_showAvatar->setText("Show avatar");
+    m_showAvatar->setText("Show avatars");
     m_showAvatar->setState(true);
     m_showAvatar->setCallback([this](bool state){
         showAvatar = state;
-        coVRPartnerList::instance()->showAvatars();
+        if (state)
+            coVRPartnerList::instance()->showAvatars();
+        else
+            coVRPartnerList::instance()->hideAvatars();
         covise::TokenBuffer tb;
         tb << vrb::SYNC_MODE;
         tb << showAvatar;
@@ -188,33 +215,10 @@ void coVRCollaboration::initCollMenu()
 
     });
 
-    m_master = new ui::Button(m_collaborativeMenu, "Master");
-    m_master->setState(isMaster());
-    m_master->setEnabled(!isMaster() && m_visible);
-    m_master->setCallback([this](bool state){
-        if (state)
-        {
-            coVRCommunication::instance()->becomeMaster();
-            avatarPosition = VRSceneGraph::instance()->getTransform()->getMatrix();
-            scaleFactor = VRSceneGraph::instance()->scaleFactor();
-            vrb::SharedStateManager::instance()->becomeMaster();
-            updateSharedStates();
-        }
-
-        m_master->setEnabled(!state && m_visible);
-        m_returnToMaster->setEnabled(!state && m_visible);
-    });
-
-    m_returnToMaster = new ui::Action(m_collaborativeMenu, "ReturnToMaster");
-    m_returnToMaster->setText("Return to master");
-    m_returnToMaster->setEnabled(false);
-    m_returnToMaster->setCallback([this](void) {
-        updateSharedStates(true);
-    });
-
     m_partnerGroup = new ui::Group(m_collaborativeMenu, "Partners");
 
     showCollaborative(false);
+    syncModeChanged(syncMode);
 }
 
 bool coVRCollaboration::updateCollaborativeMenu()
@@ -229,8 +233,6 @@ bool coVRCollaboration::updateCollaborativeMenu()
         changed = true;
         oldMasterStatus = isMaster();
         m_master->setState(isMaster());
-        m_master->setEnabled(!isMaster() && m_visible);
-        m_returnToMaster->setEnabled(!isMaster() && m_visible);
     }
     if (oldSyncInterval != syncInterval)
     {
@@ -245,6 +247,9 @@ bool coVRCollaboration::updateCollaborativeMenu()
         m_showAvatar->setState(coVRPartnerList::instance()->avatarsVisible());
     }
 
+    if (changed)
+        updateUi();
+
     return changed;
 }
 
@@ -256,8 +261,12 @@ bool coVRCollaboration::update()
     bool changed = false;
     if (updateCollaborativeMenu())
         changed = true;
-	//
-	double thisTime = cover->frameTime();
+	if(updated)
+    {
+        changed = true;
+        updated = false;
+    }
+    double thisTime = cover->frameTime();
 
     //sync avatar position 
 	static double lastAvatarUpdateTime = 0.0;
@@ -268,11 +277,15 @@ bool coVRCollaboration::update()
         coVRPartnerList::instance()->sendAvatarMessage();
         lastAvatarUpdateTime = thisTime;
     }
-	if (vrui::coInteractionManager::the()->isNaviagationBlockedByme()) //i am navigating
+	if (vrui::coInteractionManager::the()->isNaviagationBlockedByme()|| syncXform) //i am navigating
 	{
 		//store my viewpoint in shared state to be able to reload it
-        avatarPosition = VRSceneGraph::instance()->getTransform()->getMatrix();
-        scaleFactor = VRSceneGraph::instance()->scaleFactor();
+        auto &currentPos = VRSceneGraph::instance()->getTransform()->getMatrix();
+        if(currentPos != avatarPosition)
+            avatarPosition = currentPos;
+        if(scaleFactor != VRSceneGraph::instance()->scaleFactor())
+            scaleFactor = VRSceneGraph::instance()->scaleFactor();
+        syncXform = false;
 	}
     return changed;
 }
@@ -303,9 +316,14 @@ void opencover::coVRCollaboration::sessionChanged(bool isPrivate)
 void coVRCollaboration::setSyncMode(const char *mode)
 {
     if (cover->debugLevel(3))
-        fprintf(stderr, "coVRCollaboration::setSyncMode\n");
+        fprintf(stderr, "coVRCollaboration::setSyncMode: %s\n", mode);
 
-    else if (strcmp(mode, "SHOW_AVATAR") == 0)
+    if (std::string(mode) == "LOOSE")
+    {
+        syncMode = LooseCoupling;
+    }
+
+    if (strcmp(mode, "SHOW_AVATAR") == 0)
     {
         coVRPartnerList::instance()->showAvatars();
     }
@@ -341,24 +359,16 @@ void coVRCollaboration::showCollaborative(bool visible)
 {
     m_visible = visible;
 
-    if (m_collaborativeMenu)
-        m_collaborativeMenu->setVisible(visible);
-    if (m_collaborationMode)
-        m_collaborationMode->setEnabled(visible);
-    if (m_syncInterval)
-        m_syncInterval->setEnabled(visible);
-    if (m_master)
-        m_master->setEnabled(visible && !isMaster());
-    if (m_showAvatar)
-        m_showAvatar->setEnabled(visible);
     if (visible && syncMode == LooseCoupling)
     {
-        coVRPartnerList::instance()->showAvatars();
+        if (showAvatar)
+            coVRPartnerList::instance()->showAvatars();
     }
     else
     {
         coVRPartnerList::instance()->hideAvatars();
     }
+    updateUi();
 }
 
 float coVRCollaboration::getSyncInterval()
@@ -408,35 +418,70 @@ ui::Group *coVRCollaboration::partnerGroup() const
     return m_partnerGroup;
 }
 
-void coVRCollaboration::syncModeChanged(int mode) {
-    switch (mode) {
+void coVRCollaboration::syncModeChanged(int mode)
+{
+    switch (mode)
+    {
     case LooseCoupling:
-        coVRPartnerList::instance()->showAvatars();
-        m_returnToMaster->setEnabled(false);
+        if (showAvatar)
+            coVRPartnerList::instance()->showAvatars();
         break;
     case MasterSlaveCoupling:
-        coVRPartnerList::instance()->hideAvatars();
-        if (!isMaster())
-        {
-            m_returnToMaster->setEnabled(true);
-        }
-        SyncXform();
-        break;
     case TightCoupling:
         coVRPartnerList::instance()->hideAvatars();
-        SyncXform();
-        m_returnToMaster->setEnabled(false);
         break;
-
     }
     updateSharedStates();
+    updateUi();
 }
+
 void coVRCollaboration::setSyncInterval() 
 {
     scaleFactor.setSyncInterval(syncInterval);
     avatarPosition.setSyncInterval(syncInterval);
-
 }
 
+void coVRCollaboration::showAvatars(bool visible)
+{
+    showAvatar = visible;
+    updateUi();
+}
 
+void coVRCollaboration::updateUi()
+{
+    switch (syncMode)
+    {
+    case LooseCoupling:
+        m_showAvatar->setEnabled(m_visible);
+        m_master->setEnabled(false);
+        m_returnToMaster->setEnabled(false);
+        break;
+    case MasterSlaveCoupling:
+        m_showAvatar->setEnabled(m_visible);
+        m_master->setEnabled(m_visible && !isMaster());
+        m_returnToMaster->setEnabled(!isMaster());
+        break;
+    case TightCoupling:
+        m_showAvatar->setEnabled(false);
+        m_master->setEnabled(false);
+        m_returnToMaster->setEnabled(false);
+        break;
+    }
 
+    if (isMaster())
+    {
+        m_master->setText("Master");
+    }
+    else
+    {
+        m_master->setText("Become master");
+    }
+    m_showAvatar->setState(showAvatar);
+
+    if (m_collaborativeMenu)
+        m_collaborativeMenu->setVisible(m_visible);
+    if (m_collaborationMode)
+        m_collaborationMode->setEnabled(m_visible);
+    if (m_syncInterval)
+        m_syncInterval->setEnabled(m_visible);
+}

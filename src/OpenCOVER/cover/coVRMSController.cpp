@@ -1151,6 +1151,15 @@ int coVRMSController::readSlaves(SlaveData *c)
     return c->size();
 }
 
+std::vector<std::string> coVRMSController::readSlaves(const std::string &s)
+{
+    assert(isMaster());
+    std::vector<std::string> retval(numSlaves);
+    for (int i = 0; i < numSlaves; i++)
+        readSlave(i, retval[i]);
+    return retval;
+}
+
 // Default for readMasterDraw: if multicast is set, do not send over TCP
 int coVRMSController::readMasterDraw(void *c, int n)
 {

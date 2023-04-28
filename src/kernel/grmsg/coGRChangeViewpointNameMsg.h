@@ -25,15 +25,15 @@ namespace grmsg
 class GRMSGEXPORT coGRChangeViewpointNameMsg : public coGRMsg
 {
 public:
-    int getId();
-    char *getName();
+    int getId() const;
+    const char *getName() const;
 
     coGRChangeViewpointNameMsg(int id, const char *name);
     coGRChangeViewpointNameMsg(const char *msg);
 
 private:
     int id_;
-    char *name_;
+    std::string name_;
 };
 }
 #endif

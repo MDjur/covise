@@ -32,12 +32,13 @@ public:
     virtual void addElement(TUIElement *el);
     virtual void removeElement(TUIElement *el);
     virtual void showElement(TUIElement *el);
+    virtual void setValue(TabletValue type, covise::TokenBuffer&) override;
     void removeAllChildren();
 
     /// get the Element's classname
     virtual const char *getClassName() const override;
 
-    QGridLayout *gridLayout() const;
+    QGridLayout *gridLayout();
 
     /// set number of columns after which lines should be wrapped (-1: no wrapping)
     void setNumberOfColumns(int columns);
@@ -52,6 +53,7 @@ protected:
     ElementList elements;
 
     int numberOfColumns = -1;
+    bool allowRelayout= false;
     std::set<TUIElement *> inLayout;
 };
 #endif

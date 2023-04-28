@@ -11,7 +11,6 @@
 /.project
 /.settings
 /.vs
-/.vscode
 /*/bin
 /*/build.cover
 /*/build.covise
@@ -268,6 +267,8 @@
 /bionicopt
 /focal
 /focalopt
+/jammy
+/jammyopt
 /sgin32
 /sgin32opt
 /sgin32p31
@@ -284,3 +285,7 @@
 /leopardopt
 /lion
 /lionopt
+.vscode/*     
+!.vscode/configureCovise
+!.vscode/tasks.json
+compile_commands.json

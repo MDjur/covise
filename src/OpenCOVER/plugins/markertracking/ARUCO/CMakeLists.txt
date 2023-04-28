@@ -1,8 +1,7 @@
 
-if(NOT COVISE_USE_OPENCV3)
+if(NOT COVISE_USE_OPENCV4)
     return()
 endif()
-
 USING(OpenCV)
 USING(ARUCO)
 
@@ -97,12 +96,16 @@ ENDIF(ARUCO_USE_CUDA)
 
 SET(HEADERS
   ARUCOTrackerPlugin.h
+  Marker.h
+  MatrixUtil.h
 #  CvCapture.h
   ../common/RemoteAR.h
 )
 
 SET(SOURCES
   ARUCOTrackerPlugin.cpp
+  Marker.cpp
+  MatrixUtil.cpp
 #  CvCapture.cpp
   ../common/RemoteAR.cpp
 )
@@ -130,6 +133,18 @@ ENDIF(CUDA_FOUND)
 ELSE(ARUCO_USE_CUDA)
 cover_add_plugin(ARUCO ${HEADERS} ${SOURCES})
 ENDIF(ARUCO_USE_CUDA)
+
+
+SET(HEADERS
+)
+SET(SOURCES
+  create_marker.cpp
+)
+
+ADD_COVISE_EXECUTABLE(createMarker)
+COVISE_WNOERROR(createMarker)
+
+TARGET_LINK_LIBRARIES(createMarker ${EXTRA_LIBS} )
 
 
 #IF(MSVC AND NOT MSVC10)

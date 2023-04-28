@@ -35,7 +35,6 @@
 
 #include "OpenCOVER.h"
 #include "coVRFileManager.h"
-#include "coVRAnimationManager.h"
 #include "coVRNavigationManager.h"
 #include "coVRCollaboration.h"
 #include "coVRLighting.h"
@@ -176,7 +175,7 @@ void VRSceneGraph::init()
         toggleHeadTracking(state);
     });
 
-    m_allowHighQuality= new ui::Button("AllowHighQuality", this);
+    m_allowHighQuality= new ui::Button(cover->viewOptionsMenu, "AllowHighQuality");
     cover->viewOptionsMenu->add(m_allowHighQuality);
     m_allowHighQuality->setState(m_enableHighQualityOption);
     m_allowHighQuality->setText("Allow high quality");
@@ -184,7 +183,7 @@ void VRSceneGraph::init()
         toggleHighQuality(state);
     });
 
-    auto switchToHighQuality = new ui::Action("SwitchToHighQuality", this);
+    auto switchToHighQuality = new ui::Action(cover->viewOptionsMenu, "SwitchToHighQuality");
     switchToHighQuality->setVisible(false);
     cover->viewOptionsMenu->add(switchToHighQuality);
     switchToHighQuality->setText("Enable high quality rendering");
@@ -194,7 +193,7 @@ void VRSceneGraph::init()
             m_switchToHighQuality = true;
     });
 
-    m_drawStyle = new ui::SelectionList("DrawStyle", this);
+    m_drawStyle = new ui::SelectionList(cover->viewOptionsMenu, "DrawStyle");
     m_drawStyle->setText("Draw style");
     m_drawStyle->append("As is");
     m_drawStyle->append("Wireframe");
@@ -208,7 +207,7 @@ void VRSceneGraph::init()
     });
     m_drawStyle->select(0);
 
-    m_showAxis = new ui::Button("ShowAxis", this);
+    m_showAxis = new ui::Button(cover->viewOptionsMenu, "ShowAxis");
     cover->viewOptionsMenu->add(m_showAxis);
     m_showAxis->setState(m_coordAxis);
     m_showAxis->setText("Show axis");
@@ -217,7 +216,7 @@ void VRSceneGraph::init()
         toggleAxis(state);
     });
 
-    m_useTextures = new ui::Button("Texturing", this);
+    m_useTextures = new ui::Button(cover->viewOptionsMenu, "Texturing");
     m_useTextures->setVisible(false, ui::View::VR);
     m_useTextures->setShortcut("Shift+T");
     m_useTextures->setState(m_textured);
@@ -234,7 +233,7 @@ void VRSceneGraph::init()
         }
     });
 
-    m_useShaders = new ui::Button("UseShaders", this);
+    m_useShaders = new ui::Button(cover->viewOptionsMenu, "UseShaders");
     m_useShaders->setText("Use shaders");
     m_useShaders->setVisible(false, ui::View::VR);
     m_useShaders->setShortcut("Alt+s");
@@ -251,6 +250,45 @@ void VRSceneGraph::init()
         {
             m_objectsStateSet->setAttributeAndModes(program, osg::StateAttribute::OVERRIDE | osg::StateAttribute::OFF);
         }
+    });
+
+
+    auto tm = new ui::Button(cover->viewOptionsMenu, "ShowMenu");
+    cover->viewOptionsMenu->add(tm);
+    tm->setText("Show VR menu");
+    tm->setState(m_showMenu);
+    tm->addShortcut("m");
+    tm->setCallback([this](bool state){
+            setMenu(state);
+            });
+    tm->setVisible(false);
+    m_showMenuButton = tm;
+
+    auto fc = new ui::Action(cover->viewOptionsMenu, "ForceCompile");
+    fc->setText("Force display list compilation");
+    fc->setVisible(false);
+    fc->addShortcut("Alt+Shift+C");
+    fc->setCallback([this](){
+            VRViewer::instance()->forceCompile();
+    });
+
+    auto fs = new ui::Action(cover->viewOptionsMenu, "FlipStereo");
+    fs->setText("Flip stereo 3D eyes");
+    fs->setVisible(false);
+    fs->addShortcut("Alt+e");
+    fs->setCallback([this](){
+            VRViewer::instance()->flipStereo();
+    });
+
+    auto cw = new ui::Action(cover->viewOptionsMenu, "ClearWindow");
+    cw->setText("Clear window");
+    cw->setVisible(false);
+    cw->addShortcut("Alt+c");
+    cw->setCallback([this](){
+            windowStruct *ws = &(coVRConfig::instance()->windows[0]);
+            ws->window->setWindowRectangle(ws->ox, ws->oy, ws->sx, ws->sy);
+            ws->window->setWindowDecoration(false);
+            VRViewer::instance()->clearWindow = true;
     });
 }
 
@@ -544,21 +582,8 @@ bool VRSceneGraph::keyEvent(int type, int keySym, int mod)
                 saveScenegraph(true);
                 handled = true;
             }
-            else if (keySym == 'c' || keySym == 231) //c
-            {
-                windowStruct *ws = &(coVRConfig::instance()->windows[0]);
-                ws->window->setWindowRectangle(ws->ox, ws->oy, ws->sx, ws->sy);
-                ws->window->setWindowDecoration(false);
-                VRViewer::instance()->clearWindow = true;
-                handled = true;
-            }
             else if (keySym == 'm' || keySym == 181) //m
             {
-            }
-            else if (keySym == 'e' || keySym == 101) //e
-            {
-                VRViewer::instance()->flipStereo();
-                handled = true;
             }
 #ifdef _OPENMP
             else if (keySym >= '0' && keySym <= '9')
@@ -572,22 +597,7 @@ bool VRSceneGraph::keyEvent(int type, int keySym, int mod)
                 handled = true;
             }
 #endif
-            if (keySym == 'C')
-            {
-                 VRViewer::instance()->forceCompile();
-            }
         } // unmodified keys
-        else if (mod & osgGA::GUIEventAdapter::MODKEY_SHIFT)
-        {
-        }
-        else
-        {
-            if (keySym == 'm')
-            {
-                toggleMenu();
-                handled = true;
-            }
-        }
     }
     return handled;
 }
@@ -618,6 +628,7 @@ void
 VRSceneGraph::setMenu(bool state)
 {
     m_showMenu = state;
+    m_showMenuButton->setState(state);
 
     if (m_showMenu)
     {
@@ -2251,7 +2262,7 @@ void VRSceneGraph::setMaterial(const char *nodeName, int *ambient, int *diffuse,
 }
 
 // set opengl-material of node geode
-void VRSceneGraph::setMaterial(osg::Geode *geode, int *ambient, int *diffuse, int *specular, float shininess, float transparency)
+void VRSceneGraph::setMaterial(osg::Geode *geode, const int *ambient, const int *diffuse, const int *specular, float shininess, float transparency)
 {
     if (cover->debugLevel(3))
         fprintf(stderr, "VRSceneGraph::setMaterial 2 %f\n", transparency);

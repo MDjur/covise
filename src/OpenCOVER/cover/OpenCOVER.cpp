@@ -566,9 +566,15 @@ bool OpenCOVER::init()
 #ifndef _WIN32
     coVRConfig::instance()->m_useDISPLAY = useDISPLAY;
 #endif
+
+    const char *vistlePlugin = getenv("VISTLE_PLUGIN");
+    bool loadVistlePlugin = vistlePlugin;
+    m_loadVistlePlugin = coVRMSController::instance()->syncBool(loadVistlePlugin);
+
 	coVRCommunication::instance();
-	cover = new coVRPluginSupport();
-	coVRCommunication::instance()->init();
+    interactionManager.initializeRemoteLock();
+    cover = new coVRPluginSupport();
+    coVRCommunication::instance()->init();
     cover->initUI();
     if (cover->debugLevel(2))
     {
@@ -629,10 +635,13 @@ bool OpenCOVER::init()
     cover->setScale(coCoviseConfig::getFloat("COVER.DefaultScaleFactor", 1.f));
 
     bool haveWindows = VRWindow::instance()->config();
+    haveWindows = coVRMSController::instance()->allReduceOr(haveWindows);
+    if (!haveWindows)
+        return false;
 
     // initialize communication
     bool loadCovisePlugin = false;
-    if (loadFiles == false && coVRConfig::instance()->collaborativeOptionsFile.empty() && coCommandLine::argc() > 3 && m_vrbCredentials == NULL)
+    if (!m_loadVistlePlugin && loadFiles == false && coVRConfig::instance()->collaborativeOptionsFile.empty() && coCommandLine::argc() > 3 && m_vrbCredentials == NULL)
     {
         loadCovisePlugin = true;
         //fprintf(stderr, "need covise connection\n");
@@ -655,36 +664,29 @@ bool OpenCOVER::init()
     cover->ui->addView(cover->vruiView);
 
     hud = coHud::instance();
-    loadCovisePlugin = coVRMSController::instance()->syncBool(loadCovisePlugin);
-    if (loadCovisePlugin)
+    if (m_loadVistlePlugin)
     {
-		m_visPlugin = coVRPluginList::instance()->addPlugin("COVISE", coVRPluginList::Vis);
+        loadFiles = false;
+        m_visPlugin = coVRPluginList::instance()->addPlugin("Vistle", coVRPluginList::Vis);
         if (!m_visPlugin)
         {
-            fprintf(stderr, "failed to load COVISE plugin\n");
+            fprintf(stderr, "failed to load Vistle plugin\n");
             exit(1);
         }
     }
     else
     {
-        const char *vistlePlugin = getenv("VISTLE_PLUGIN");
-        bool loadVistlePlugin = vistlePlugin;
-        m_loadVistlePlugin = coVRMSController::instance()->syncBool(loadVistlePlugin);
-        if (m_loadVistlePlugin)
+        loadCovisePlugin = coVRMSController::instance()->syncBool(loadCovisePlugin);
+        if (loadCovisePlugin)
         {
-            loadFiles = false;
-            m_visPlugin = coVRPluginList::instance()->addPlugin("Vistle", coVRPluginList::Vis);
+            m_visPlugin = coVRPluginList::instance()->addPlugin("COVISE", coVRPluginList::Vis);
             if (!m_visPlugin)
             {
-                fprintf(stderr, "failed to load Vistle plugin\n");
+                fprintf(stderr, "failed to load COVISE plugin\n");
                 exit(1);
             }
         }
     }
-
-    haveWindows = coVRMSController::instance()->allReduceOr(haveWindows);
-    if (!haveWindows)
-        return false;
 
     VRViewer::instance()->config();
 
@@ -922,17 +924,32 @@ void OpenCOVER::loop()
             exitFlag = true;
         exitFlag = coVRMSController::instance()->syncBool(exitFlag);
         if (exitFlag)
+            break;
+        frame();
+    }
+
+    VRViewer::instance()->disableSync();
+
+    std::string exitCommand = coCoviseConfig::getEntry("COVER.ExitCommand");
+    if (!exitCommand.empty())
+    {
+        int ret = system(exitCommand.c_str());
+        if (ret == -1)
         {
-            VRViewer::instance()->disableSync();
-            frame();
-            frame();
-            return;
+            std::cerr << "COVER.ExitCommand " << exitCommand << " failed: " << strerror(errno) << std::endl;
         }
-        else
+        else if (ret > 0)
         {
-            frame();
+            std::cerr << "COVER.ExitCommand " << exitCommand << " returned exit code  " << ret << std::endl;
         }
     }
+
+    m_visPlugin = NULL; // prevent any new messages from being sent
+    coVRPluginList::instance()->unloadAllPlugins(coVRPluginList::Vis);
+    coVRFileManager::instance()->unloadFile();
+    frame();
+    coVRPluginList::instance()->unloadAllPlugins();
+    frame();
 }
 
 void OpenCOVER::handleEvents(int type, int state, int code)
@@ -1379,28 +1396,10 @@ void OpenCOVER::doneRendering()
 
 OpenCOVER::~OpenCOVER()
 {
-    std::string exitCommand = coCoviseConfig::getEntry("COVER.ExitCommand");
-    if (!exitCommand.empty())
-    {
-        int ret = system(exitCommand.c_str());
-        if (ret == -1)
-        {
-            std::cerr << "COVER.ExitCommand " << exitCommand << " failed: " << strerror(errno) << std::endl;
-        }
-        else if (ret > 0)
-        {
-            std::cerr << "COVER.ExitCommand " << exitCommand << " returned exit code  " << ret << std::endl;
-        }
-    }
-
     if (cover->debugLevel(2))
     {
         fprintf(stderr, "\ndelete OpenCOVER\n");
     }
-    m_visPlugin = NULL; // prevent any new messages from being sent
-    coVRFileManager::instance()->unloadFile();
-    coVRPluginList::instance()->unloadAllPlugins();
-    coVRPluginList::instance()->unloadAllPlugins(coVRPluginList::Vis);
     VRViewer::instance()->stopThreading();
     VRViewer::instance()->setSceneData(NULL);
     //delete vrbHost;
@@ -1482,6 +1481,7 @@ OpenCOVER::requestQuit()
     {
         terminateOnCoverQuit = true;
     }
+    terminateOnCoverQuit = coVRMSController::instance()->syncBool(terminateOnCoverQuit);
     if (terminateOnCoverQuit)
         coVRPluginList::instance()->requestQuit(true);
     m_vrbc.reset(nullptr);
@@ -1591,6 +1591,11 @@ void OpenCOVER::restartVrbc()
         m_vrbc.reset(new vrb::VRBClient(covise::Program::opencover, coVRConfig::instance()->collaborativeOptionsFile.c_str(), coVRMSController::instance()->isSlave(),true));
     }
     m_vrbc->connectToServer(m_startSession);
+}
+
+bool OpenCOVER::useVistle() const
+{
+    return m_loadVistlePlugin;
 }
 
 bool OpenCOVER::isVRBconnected() const

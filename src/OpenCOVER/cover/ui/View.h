@@ -17,6 +17,7 @@ class Group;
 class Button;
 class Action;
 class Slider;
+class Container;
 class SelectionList;
 class TextField;
 class EditField;
@@ -72,10 +73,10 @@ class COVER_UI_EXPORT View {
     virtual void updateVisible(const Element *elem) = 0;
     //! reflect changed text in graphical representation
     virtual void updateText(const Element *elem) = 0;
-    //! reflect change of parent item in graphical representation
-    virtual void updateParent(const Element *elem) = 0;
     //! reflect changed button state in graphical representation
     virtual void updateState(const Button *button) = 0;
+    //! reflect change of child items in graphical representation
+    virtual void updateChildren(const Group *group) = 0;
     //! reflect change of child items in graphical representation
     virtual void updateChildren(const SelectionList *sl) = 0;
     //! reflect change of slider type in graphical representation
@@ -92,6 +93,8 @@ class COVER_UI_EXPORT View {
     virtual void updateFilter(const FileBrowser *fb) = 0;
     //! reflect change of viewpoint in graphical representation
     virtual void updateViewpoint(const CollaborativePartner *cp);
+
+    virtual void updateRelayout(const Group* gr) = 0;
 
     //! remove elem from View and delete associated data
     bool removeElement(Element *elem);

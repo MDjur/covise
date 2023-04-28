@@ -70,7 +70,6 @@ private:
     float max = 1.0;
     int numColors = 0;
     std::vector<float> r, g, b, a;
-    bool hudVisible_ = false;
 
 public:
 
@@ -109,10 +108,10 @@ public:
 
     /** set name */
     void setName(const char *name);
-
+    void show(bool state);
     /** get name
-       *  @return name the name of the colorbar, identical with module name, eg, g, Colors_1
-       */
+     *  @return name the name of the colorbar, identical with module name, eg, g, Colors_1
+     */
     const char *getName();
 
     /** parseAttrib

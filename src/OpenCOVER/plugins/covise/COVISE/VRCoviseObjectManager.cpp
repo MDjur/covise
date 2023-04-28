@@ -1797,32 +1797,7 @@ osg::Node *ObjectManager::addGeometry(const char *object, osg::Group *root, Covi
             // check for additional Model to load
             if (modelName)
             {
-                const char *modelPath = geometry->getAttribute("MODEL_PATH");
-                if (modelPath)
-                {
-                    //pfFilePath(modelPath);
-                    const char *osgFilePath = getenv("OSG_FILE_PATH");
-                    string tmpPath = modelPath;
-                    if (osgFilePath)
-                    {
-#ifdef _WIN32
-                        tmpPath += ";";
-#else
-                        tmpPath += ":";
-#endif
-                        tmpPath += osgFilePath;
-                    }
-                }
-                /* XXX: currently not supported by osg Inventor loader
-               pfdConverterMode("iv",PFIV_CONVERT_TWOSIDE,1);
-               if( (attr=geometry->getAttribute("BACKFACE"))!=NULL )
-               {
-               if(strcasecmp(attr,"OFF")==0)
-               {
-               pfdConverterMode("iv",PFIV_CONVERT_TWOSIDE,0);
-               }
-               }
-               */
+
                 // SceneGraphItems startID
                 const char *startIndex = geometry->getAttribute("SCENEGRAPHITEMS_STARTINDEX");
                 if (startIndex)
@@ -1831,17 +1806,17 @@ osg::Node *ObjectManager::addGeometry(const char *object, osg::Group *root, Covi
                 }
                 osg::Node *modelNode = NULL;
 
+                const char *modelPath = geometry->getAttribute("MODEL_PATH");
                 if (modelPath)
                 {
-                    char *tmpName = new char[strlen(modelPath) + strlen(modelName) + 2];
-                    strcpy(tmpName, modelPath);
-                    strcat(tmpName, "/");
-                    strcat(tmpName, modelName);
-                    modelNode = coVRFileManager::instance()->loadFile(tmpName, NULL, NULL, geometry->getName());
-                    coviseSG->attachNode(object, modelNode, tmpName);
-                    delete[] tmpName;
+                    std::string tmpName = std::string(modelPath) + "/" + modelName;
+                    if(!coVRFileManager::instance()->findFile(tmpName).empty())
+                    {
+                        modelNode = coVRFileManager::instance()->loadFile(tmpName.c_str(), NULL, NULL, geometry->getName());
+                        coviseSG->attachNode(object, modelNode, tmpName.c_str());
+                    }
                 }
-                else
+                else if(!coVRFileManager::instance()->findFile(modelName).empty())
                 {
                     modelNode = coVRFileManager::instance()->loadFile(modelName, NULL, NULL, geometry->getName());
                     coviseSG->attachNode(object, modelNode, modelName);

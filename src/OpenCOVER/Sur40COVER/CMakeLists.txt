@@ -1,3 +1,6 @@
+if(NOT COVISE_USE_CSHARP)
+    RETURN()
+endif()
 USING(Surface)
 PROJECT(Sur40COVER CSharp)
 include(CSharpUtilities)
@@ -16,7 +19,7 @@ ConnectionDialog.cs
 ConnectionDialog.Designer.cs
 ConnectionDialog.resx
 )
-set_property(TARGET Sur40COVER PROPERTY VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.7.1")
+set_property(TARGET Sur40COVER PROPERTY VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.8")
 #set_property(TARGET Sur40COVER PROPERTY WIN32_EXECUTABLE TRUE)
 
 TARGET_LINK_LIBRARIES(Sur40COVER ManagedOpenCOVER) 

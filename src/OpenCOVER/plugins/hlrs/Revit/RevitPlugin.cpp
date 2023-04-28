@@ -20,6 +20,8 @@
  \****************************************************************************/
 #define QT_NO_EMIT
 
+#include <algorithm>
+
 #include "RevitPlugin.h"
 #include <cover/coVRPluginSupport.h>
 #include <cover/coVRFileManager.h>
@@ -45,6 +47,8 @@
 
 #include <PluginUtil/PluginMessageTypes.h>
 
+#include <vrml97/vrml/VrmlNamespace.h>
+
 
 #include <osg/Geode>
 #include <osg/Switch>
@@ -62,6 +66,8 @@
 #include <net/tokenbuffer.h>
 #include <config/CoviseConfig.h>
 #include <util/unixcompat.h>
+
+#include "VrmlNodePhases.h"
 
 using covise::TokenBuffer;
 using covise::coCoviseConfig;
@@ -535,11 +541,11 @@ void RevitPlugin::updateIK()
 	for (auto& iki : ikInfos)
 	{
 
-		osg::Vec3 targetPos(RevitPlugin::instance()->xPos->number(), RevitPlugin::instance()->yPos->number(), RevitPlugin::instance()->zPos->number());
-		osg::Vec3 targetDir(RevitPlugin::instance()->xOri->number(), RevitPlugin::instance()->yOri->number(), RevitPlugin::instance()->zOri->number());
+		//osg::Vec3 targetPos(RevitPlugin::instance()->xPos->number(), RevitPlugin::instance()->yPos->number(), RevitPlugin::instance()->zPos->number());
+		//osg::Vec3 targetDir(RevitPlugin::instance()->xOri->number(), RevitPlugin::instance()->yOri->number(), RevitPlugin::instance()->zOri->number());
 
 
-		iki->updateIK(targetPos, targetDir);
+		//iki->updateIK(targetPos, targetDir);
 	}
 }
 
@@ -688,7 +694,7 @@ void ARMarkerInfo::setValues(int id, int docID, int mid, std::string& n, double 
 	
 	if (marker == nullptr)
 	{
-		marker = new ARToolKitMarker((markerType+std::to_string(MarkerID)),MarkerID,size, offsetMat,hostMat,true);
+		marker = new ARToolKitMarker((markerType+std::to_string(MarkerID)),MarkerID,size, offsetMat,true);
         if (markerType == "ObjectMarker")
         {
             marker->setObjectMarker(true);
@@ -979,6 +985,204 @@ void RevitViewpointEntry::activate()
 	cover->setXformMat(ivMat);
 }
 
+
+
+ObjectParamater::ObjectParamater(TokenBuffer& tb,int i)
+{
+	num = i;
+	int pID;
+	tb >> pID;
+	tb >> Name;
+	tb >> StorageType;
+	tb >> ParameterType;
+	switch (StorageType)
+	{
+	case RevitPlugin::Double:
+		tb >> d;
+		break;
+	case RevitPlugin::ElementId:
+		tb >> ElementReferenceID;
+		tb >> Value;
+		break;
+	case RevitPlugin::Integer:
+		tb >> i;
+		break;
+	case RevitPlugin::String:
+		tb >> Value;
+		break;
+	default:
+		tb >> Value;
+		break;
+	}
+}
+
+ObjectParamater::~ObjectParamater()
+{
+	delete Label;
+}
+
+void ObjectParamater::createMenu()
+{
+	Label = new ui::Label(RevitPlugin::instance()->parametersMenu, std::to_string(num) + "_ValLabel");
+
+	switch (StorageType)
+	{
+	case RevitPlugin::Double:
+		Label->setText(Name +  " = " + std::to_string(d));
+		break;
+	case RevitPlugin::ElementId:
+		Label->setText(Name +  " = " + Value);
+		break;
+	case RevitPlugin::Integer:
+    {
+        size_t pos = ParameterType.find("bool");
+        if (pos != std::string::npos)
+        {
+            if (i > 0)
+                Label->setText(Name + " = true");
+            else
+                Label->setText(Name + " = false");
+        }
+        else
+        {
+            Label->setText(Name + " = " + std::to_string(i));
+        }
+    }
+		break;
+	case RevitPlugin::String:
+		Label->setText(Name +  " = " + Value);
+		break;
+	default:
+		Label->setText(Name + " = " + Value);
+		break;
+	}
+}
+
+FamilyType::FamilyType(TokenBuffer& tb)
+{
+	tb >> Name;
+	tb >> ID;
+	tb >> FamilyName;
+}
+void FamilyType::createMenuEntry()
+{
+
+	selectType = new ui::Action(RevitPlugin::instance()->typesMenu, Name + FamilyName);
+	selectType->setText(Name);
+	selectType->setCallback([this]() {
+		TokenBuffer stb;
+		stb << RevitPlugin::instance()->currentObjectID;
+		stb << RevitPlugin::instance()->currentDocumentID;
+		stb << Name;
+		stb << ID;
+
+		Message message(stb);
+		message.type = (int)RevitPlugin::MSG_SelectType;
+		RevitPlugin::instance()->sendMessage(message);
+		});
+}
+void FamilyType::createFamilyLabel()
+{
+	FamilyLabel = new ui::Label(RevitPlugin::instance()->typesMenu, FamilyName + "_Label");
+	FamilyLabel->setText(FamilyName);
+}
+
+FamilyType::~FamilyType()
+{
+	delete selectType;
+	delete FamilyLabel;
+}
+ObjectInfo::ObjectInfo(TokenBuffer& tb)
+{
+	int numTypes = 0;
+	int numParams = 0;
+	int objID = 0;
+	int docID = 0;
+	tb >> objID;
+	tb >> docID;
+	tb >> TypeName;
+	tb >> TypeID;
+	tb >> CategoryName;
+	tb >> flipInfo;
+	tb >> numTypes;
+
+	TypeNameLabel = new ui::Label(RevitPlugin::instance()->objectInfoMenu, TypeName + "_TNLabel");
+	TypeNameLabel->setText(CategoryName);
+	for (int i = 0; i < numTypes; i++)
+	{
+		types.push_back(new FamilyType(tb));
+	}
+	tb >> numParams;
+	for (int i = 0; i < numParams; i++)
+	{
+		parameters.push_back(new ObjectParamater(tb,i));
+	}
+	std::sort(types.begin(), types.end(),
+		[](const FamilyType* LHS, const FamilyType* RHS)
+		{ if (LHS->FamilyName == RHS->FamilyName) return (LHS->Name < RHS->Name); return (LHS->FamilyName < RHS->FamilyName); });
+	std::string lastFamilyName;
+	for (FamilyType*& ft : types)
+	{
+		if (lastFamilyName != ft->FamilyName)
+		{
+			lastFamilyName = ft->FamilyName;
+			ft->createFamilyLabel();
+		}
+		ft->createMenuEntry();
+	}
+	std::sort(parameters.begin(), parameters.end(),
+		[](const ObjectParamater* LHS, const ObjectParamater* RHS)
+		{ return (LHS->Name < RHS->Name); });
+	for (ObjectParamater*& pt : parameters)
+	{
+		pt->createMenu();
+	}
+
+	if (flipInfo & 1)
+	{
+		flipLR = new ui::Action(RevitPlugin::instance()->objectInfoMenu, "flipLR");
+		flipLR->setText("flip hand");
+		flipLR->setCallback([this]() {
+			RevitPlugin::instance()->flip(0);
+			});
+	}
+	if (flipInfo & 2)
+	{
+		flipIO = new ui::Action(RevitPlugin::instance()->objectInfoMenu, "flipIO");
+		flipIO->setText("flip facing");
+		flipIO->setCallback([this]() {
+			RevitPlugin::instance()->flip(1);
+			});
+	}
+}
+void RevitPlugin::flip(int dir)
+{
+
+	TokenBuffer stb;
+	stb << currentObjectID;
+	stb << currentDocumentID;
+	stb << dir;
+
+	Message message(stb);
+	message.type = (int)RevitPlugin::MSG_Flip;
+	RevitPlugin::instance()->sendMessage(message);
+}
+
+ObjectInfo::~ObjectInfo()
+{
+	for (const auto& oi : types)
+	{
+		delete oi;
+	}
+	for (const auto& op : parameters)
+	{
+		delete op;
+	}
+	delete flipIO;
+	delete flipLR;
+	delete TypeNameLabel;
+}
+
 void RevitViewpointEntry::updateCamera()
 {
 	osg::Matrix m;
@@ -1072,7 +1276,7 @@ void RevitPlugin::createMenu()
 
 	revitMenu = new ui::Menu("Revit", this);
 	revitMenu->setText("Revit");
-	xPos = new ui::EditField(revitMenu, "X");
+	/*xPos = new ui::EditField(revitMenu, "X");
 	yPos = new ui::EditField(revitMenu, "Y");
 	zPos = new ui::EditField(revitMenu, "Z");
 	xPos->setCallback([this](const std::string &) {
@@ -1095,7 +1299,7 @@ void RevitPlugin::createMenu()
 		});
 	zOri->setCallback([this](const std::string&) {
 		updateIK();
-		});
+		});*/
 	viewpointMenu = new ui::Menu(revitMenu, "RevitViewpoints");
 	viewpointMenu->setText("Viewpoints");
 	parameterMenu = new ui::Menu(revitMenu, "RevitParameters");
@@ -1104,6 +1308,29 @@ void RevitPlugin::createMenu()
 	phaseMenu->setText("Phases");
 
 	PhaseGroup = new ui::ButtonGroup(phaseMenu, "RevitPhasesGroup");
+
+	objectInfoMenu = new ui::Menu(revitMenu, "ObjectInfo");
+	objectInfoMenu->setText("ObjectInfo");
+
+	objectInfoGroup = new ui::ButtonGroup(objectInfoMenu, "ObjectInfoGroup");
+
+
+	typesMenu = new ui::Menu(objectInfoMenu, "Types");
+	typesMenu->setText("Types");
+
+	TypesGroup = new ui::ButtonGroup(typesMenu, "TypesGroup");
+
+	parametersMenu = new ui::Menu(objectInfoMenu, "Parameters");
+	parametersMenu->setText("Parameters");
+
+	ParametersGroup = new ui::ButtonGroup(typesMenu, "ParametersGroup");
+
+	selectObjectInteraction = new vrui::coCombinedButtonInteraction(vrui::coInteraction::ButtonAction, "selectObject", vrui::coInteraction::High);
+	selectObject = new ui::Action(objectInfoMenu, "selectObject");
+	selectObject->setText("select");
+	selectObject->setCallback([this]() {
+		coInteractionManager::the()->registerInteraction(selectObjectInteraction);
+		});
 
 	roomInfoMenu = new ui::Menu(revitMenu,"RoomInfo");
 	roomInfoMenu->setText("Room Info");
@@ -1264,6 +1491,7 @@ bool RevitPlugin::init()
 	currentGroup.push(revitGroup.get());
 	cover->getObjectsRoot()->addChild(revitGroup.get());
 	createMenu();
+	VrmlNamespace::addBuiltIn(VrmlNodePhases::defineType());
 
 
 	return true;
@@ -1290,6 +1518,9 @@ RevitPlugin::~RevitPlugin()
         cover->unwatchFileDescriptor(toRevit->getSocket()->get_id());
 	delete msg;
 	toRevit = NULL;
+	if(selectObjectInteraction->isRegistered())
+	    coInteractionManager::the()->unregisterInteraction(selectObjectInteraction);
+	delete selectObjectInteraction;
 }
 
 
@@ -1610,6 +1841,13 @@ RevitPlugin::handleMessage(Message *m)
 		sprintf(info, "Nr.: %s\n%s\nArea: %3.7lfm^2\nLevel: %s", roomNumber, roomName, area / 10.0, levelName);
 		label1->setText(info);
 		//fprintf(stderr,"Room %s %s Area: %lf Level: %s\n", roomNumber,roomName,area,levelName);
+	}
+	break;
+	case MSG_ObjectInfo:
+	{
+		TokenBuffer tb(m);
+		delete currentObjectInfo;
+		currentObjectInfo = new ObjectInfo(tb);
 	}
 	break;
 	case MSG_NewParameter:
@@ -1978,7 +2216,7 @@ RevitPlugin::handleMessage(Message *m)
 		activeDoors.clear();
 		for (const auto& pi: phaseInfos)
 		{
-			delete pi->button;
+			delete pi;
 		}
 		phaseInfos.clear();
 		for (const auto &set: designOptionSets)
@@ -2024,10 +2262,31 @@ RevitPlugin::handleMessage(Message *m)
 			pi->button->setText(pi->PhaseName);
 			pi->button->setCallback([this,pi](bool state) {if (state) RevitPlugin::instance()->setPhase(pi->PhaseName); });
 			phaseMenu->add(pi->button);
-			phaseInfos.push_back(pi);
+
+			for (const auto& pi1 : phaseInfos)
+			{
+				if (pi1->PhaseName == pi->PhaseName)
+				{
+					// we already got this phase, probably from an inline, ignore the new definition
+					delete pi;
+					pi = nullptr;
+					break;
+				}
+			}
+			if(pi)
+			{
+			    phaseInfos.push_back(pi);
+			}
+		}
+
+		if (VrmlNodePhases::instance())
+		{
+			VrmlNodePhases::instance()->setNumPhases(phaseInfos.size());
 		}
 		if (currentPhase > numPhases - 1)
-			currentPhase = 0;
+		{
+			setPhase(0);
+		}
 	}
 	break;
 	case MSG_IKInfo:
@@ -2079,7 +2338,7 @@ RevitPlugin::handleMessage(Message *m)
 		{
 			m =iki->axis[i].mat*m;
 		}
-		if (iki->type == IKInfo::IKType::Rot)
+		/*if (iki->type == IKInfo::IKType::Rot)
 		{
 			xPos->setValue(iki->axis[4].origin.x());
 			yPos->setValue(iki->axis[4].origin.y());
@@ -2098,7 +2357,7 @@ RevitPlugin::handleMessage(Message *m)
 			zPos->setValue(iki->axis[3].origin.z());
 		}
 
-		yOri->setValue(1.0);
+		yOri->setValue(1.0);*/
 	}
 	break;
 	case MSG_NewAnnotation:
@@ -2143,6 +2402,8 @@ RevitPlugin::handleMessage(Message *m)
         const char *fileName;
         tb >> fileName;
 		tb >> TrueNorthAngle;
+		tb >> ProjectHeight;
+		ProjectHeight *= REVIT_FEET_TO_M;
 		double eastWest;
 		double northSouth;
 		double xo=0.0, yo = 0.0, zo = 0.0;
@@ -2422,6 +2683,8 @@ RevitPlugin::handleMessage(Message *m)
 
 		bool isHandle = false;
 		bool doWalk;
+		if (m->data.getLength() == 0)
+			return;
 		tb >> ID;
 		tb >> docID;
 		if (docID >= ElementIDMap.size())
@@ -2953,9 +3216,14 @@ RevitPlugin::handleMessage(Message *m)
 		{
 		case Message::SOCKET_CLOSED:
 		case Message::CLOSE_SOCKET:
-
+	        if (coVRMSController::instance()->isMaster())
+            {
+            if(toRevit!=nullptr && toRevit->getSocket() !=nullptr)
+            {
             cover->unwatchFileDescriptor(toRevit->getSocket()->get_id());
 			toRevit.reset(nullptr);
+            }
+            }
 
 			cerr << "connection to Revit closed" << endl;
 			break;
@@ -2965,6 +3233,10 @@ RevitPlugin::handleMessage(Message *m)
 		}
 	}
 }
+PhaseInfo::~PhaseInfo()
+{
+	delete button;
+}
 
 void RevitPlugin::setPhase(std::string phaseName)
 {
@@ -2972,17 +3244,36 @@ void RevitPlugin::setPhase(std::string phaseName)
 	{
 		if (pi->PhaseName == phaseName)
 		{
-			currentPhase = pi->ID;
+			setPhase(pi->ID);
+			break;
 		}
 	}
 
-	for (auto& iter : ElementIDMap)
+}
+void RevitPlugin::setPhase(int phase)
+{
+	if (phase == currentPhase)
+		return;
+	for (const auto& pi : phaseInfos)
 	{
-		for (std::map<int, ElementInfo*>::iterator it = iter.begin(); it != iter.end(); it++)
+		if (pi->ID == phase)
 		{
-			setPhaseVisible(it->second);
+			currentPhase = pi->ID;
+			for (auto& iter : ElementIDMap)
+			{
+				for (std::map<int, ElementInfo*>::iterator it = iter.begin(); it != iter.end(); it++)
+				{
+					setPhaseVisible(it->second);
+				}
+			}if (VrmlNodePhases::instance())
+			{
+				VrmlNodePhases::instance()->setPhase(currentPhase);
+				VrmlNodePhases::instance()->setPhase(pi->PhaseName);
+			}
+			return;
 		}
 	}
+
 }
 
 osg::Image *RevitPlugin::readImage(std::string fileName)
@@ -3087,6 +3378,37 @@ RevitPlugin::checkDoors()
 bool
 RevitPlugin::update()
 {
+	if (selectObjectInteraction->isRegistered())
+	{
+		if (selectObjectInteraction->wasStarted())
+		{
+			coInteractionManager::the()->unregisterInteraction(selectObjectInteraction);
+
+			const osg::NodePath& intersectedNodePath = cover->getIntersectedNodePath();
+			bool isSceneNode = false;
+			for (std::vector<osg::Node*>::const_iterator iter = intersectedNodePath.begin();
+				iter != intersectedNodePath.end();
+				++iter)
+			{
+				auto currentNode = (*iter);
+				info = dynamic_cast<RevitInfo*>(OSGVruiUserDataCollection::getUserData(currentNode, "RevitInfo"));
+				if (info)
+				{
+
+					TokenBuffer stb;
+					currentObjectID = info->ObjectID;
+					currentDocumentID = info->DocumentID;
+					stb << currentObjectID;
+					stb << currentDocumentID;
+
+					Message message(stb);
+					message.type = (int)RevitPlugin::MSG_ObjectInfo;
+					RevitPlugin::instance()->sendMessage(message);
+				}
+			}
+
+		}
+	}
 	for (auto & iki : ikInfos)
 	{
 		iki->update();
@@ -3172,8 +3494,9 @@ RevitPlugin::preFrame()
 			{
 				TokenBuffer stb;
 				
-
-				osg::Matrix mat = RevitScale * NorthRotMat * RevitGeoRefference * cover->getBaseMat();
+				osg::Matrix projectHeightMatrix;
+				projectHeightMatrix.makeTranslate(osg::Vec3(0,0,ProjectHeight));
+				osg::Matrix mat = RevitScale * NorthRotMat * projectHeightMatrix * RevitGeoRefference * cover->getBaseMat();
 				osg::Matrix invMat;
 				invMat.invert(mat);
 				osg::Matrix viewerTrans = cover->getViewerMat() * invMat;
@@ -3688,10 +4011,12 @@ DoorInfo::DoorInfo(int id, const char *Name, osg::MatrixTransform *tn, TokenBuff
 	osg::Vec3 BBMax;
 	tb >> BBMin;
 	tb >> BBMax;
+	tb >> maxDistance;
 	boundingBox.set(BBMin, BBMax);
 	if (isSliding != SlidingDirection::dirNone)
 	{
-		maxDistance = boundingBox.xMax() - boundingBox.xMin();
+		if(maxDistance == 0)
+		    maxDistance = boundingBox.xMax() - boundingBox.xMin();
 		if (maxDistance == 0)
 			maxDistance = 1;
 		HandOrientation.normalize(); // HandOrientation is in Revit World coordinates so either transform this back to local coordinates orjust use X for now.

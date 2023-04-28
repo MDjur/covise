@@ -87,6 +87,9 @@ IF(COMMAND cmake_policy)
 ENDIF()
 endmacro(covise_cmake_policy)
 
+
+set(CUDA_PROPAGATE_HOST_FLAGS OFF) # not working on windows and probably not necessary on linux
+
 IF(WIN32)
   # reenable the following if you want "d" suffix on debug versions of libraries and executables
   # please note that source and script changes are necessary in COVISE to make it run with suffixed executables/plugins
@@ -216,8 +219,9 @@ ENDIF()
 
 # treat warnings as errors?
 IF(COVISE_WARNING_IS_ERROR)
-   SET(COVISE_COMPILE_FLAGS "${COVISE_COMPILE_FLAGS} ${COVISE_WERROR_FLAG}")
+    set(CMAKE_COMPILE_WARNING_AS_ERROR TRUE)
 ELSE()
+    set(CMAKE_COMPILE_WARNING_AS_ERROR FALSE)
   # we are assuming that most compilers do not treat warnings as errors if no special flag is set
   # if we are wrong place check and flag setting here
 ENDIF()

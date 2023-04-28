@@ -68,6 +68,9 @@ void Manager::remove(Owner *owner)
 
 void Manager::remove(Element *elem)
 {
+    if (elem->m_removed)
+        return;
+
     auto nit = std::find(m_newElements.begin(), m_newElements.end(), elem);
     if (nit != m_newElements.end())
     {
@@ -103,6 +106,8 @@ void Manager::remove(Element *elem)
             m_elementsById.erase(it);
         }
     }
+
+    elem->m_removed = true;
 }
 
 Element *Manager::getById(int id) const
@@ -295,11 +300,11 @@ void Manager::updateState(const Button *button) const
     }
 }
 
-void Manager::updateParent(const Element *elem) const
+void Manager::updateChildren(const Group *group) const
 {
     for (auto v: m_views)
     {
-        v.second->updateParent(elem);
+        v.second->updateChildren(group);
     }
 }
 
@@ -364,6 +369,14 @@ void Manager::updateViewpoint(const CollaborativePartner *cp) const
     for (auto v: m_views)
     {
         v.second->updateViewpoint(cp);
+    }
+}
+
+void Manager::updateRelayout(const Group* gr) const
+{
+    for (auto v : m_views)
+    {
+        v.second->updateRelayout(gr);
     }
 }
 
@@ -588,20 +601,6 @@ void Manager::flushUpdates()
 
 void Manager::queueUpdate(const Element *elem, Element::UpdateMaskType mask, bool trigger)
 {
-    if (mask & Element::UpdateParent)
-    {
-        auto it = m_elements.find(elem->m_order);
-        if (it != m_elements.end())
-        {
-            Element *e = it->second;
-            assert(e == elem);
-            m_elements.erase(it);
-            e->m_order = m_elemOrder;
-            m_elements.emplace(e->m_order, e);
-            ++m_elemOrder;
-        }
-    }
-
     if (elem->elementId() < 0)
     {
         assert(!trigger);
@@ -661,7 +660,8 @@ void Manager::processUpdates(covise::TokenBuffer &updates, int numUpdates, bool 
         auto elem = getById(id);
         if (!elem)
         {
-            std::cerr << "ui::Manager::processUpdates NOT FOUND: id=" << id << ", trigger=" << trigger << std::endl;
+            if (cover->debugLevel(2))
+                std::cerr << "ui::Manager::processUpdates NOT FOUND: id=" << id << ", trigger=" << trigger << std::endl;
             continue;
         }
         if (cover->debugLevel(5))

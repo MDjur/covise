@@ -1,5 +1,7 @@
 #include "Container.h"
 #include "Element.h"
+#include "Manager.h"
+#include "Owner.h"
 
 #include <algorithm>
 #include <iostream>
@@ -76,7 +78,7 @@ int Container::index(const Element *elem) const
     if (it == m_children.end())
         return -1;
 
-    return it - m_children.begin();
+    return (int)(it - m_children.begin());
 }
 
 void Container::clearChildren()
@@ -86,6 +88,7 @@ void Container::clearChildren()
         remove(m_children.back().elem);
     }
 }
+
 
 }
 }

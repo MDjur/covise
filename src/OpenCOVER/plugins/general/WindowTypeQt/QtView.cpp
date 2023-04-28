@@ -62,9 +62,7 @@ QString sliderWidthText(const Slider *slider)
 }
 
 QtView::QtView(QMenuBar *menubar, QToolBar *toolbar)
-: View("Qt")
-, m_menubar(menubar)
-, m_toolbar(toolbar)
+: View((menubar && menubar->isNativeMenuBar()) ? "QtNativeMenu" : "Qt"), m_menubar(menubar), m_toolbar(toolbar)
 {
 }
 
@@ -426,15 +424,10 @@ void QtView::updateContainer(const Element *elem)
 {
     if (!elem)
         return;
-    auto parent = elem->parent();
-    if (!parent)
+    if (!elem->parent())
         return;
-    if (auto menu = dynamic_cast<Menu *>(parent))
-    {
-        updateMenu(menu, menu);
-    }
-    else
-        updateContainer(parent);
+
+    updateChildren(elem->parent());
 }
 
 void QtView::updateMenu(const Menu *menu, const Group *subGroup)
@@ -561,9 +554,16 @@ void QtView::updateState(const Button *button)
         a->setChecked(button->state());
 }
 
-void QtView::updateParent(const Element *elem)
+void QtView::updateChildren(const Group *group)
 {
-    updateContainer(elem);
+    if (auto menu = dynamic_cast<const Menu *>(group))
+    {
+        updateMenu(menu, menu);
+    }
+    else
+    {
+        updateContainer(group);
+    }
 }
 
 void QtView::updateChildren(const SelectionList *sl)
@@ -697,6 +697,10 @@ void QtView::updateFilter(const FileBrowser *fb)
 {
     QString filter = QString::fromStdString(fb->filter());
 
+}
+
+void QtView::updateRelayout(const Group* co)
+{
 }
 
 QtViewElement::QtViewElement(Element *elem, QObject *obj)

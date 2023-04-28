@@ -5,7 +5,6 @@
 
  * License: LGPL 2+ */
 
-#include <util/byteswap.h>
 #include "VRAvatar.h"
 #include "VRSceneGraph.h"
 #include "coVRCollaboration.h"
@@ -81,44 +80,24 @@ PartnerAvatar::PartnerAvatar(coVRPartner *partner)
     :VRAvatar(0)
     ,m_partner(partner)
 {
-   handTransform = nullptr; 
-   headTransform = nullptr;
-   feetTransform = nullptr;
-   avatarNodes = nullptr;
-   
+    handTransform = new osg::MatrixTransform;
+    headTransform = new osg::MatrixTransform;
+    feetTransform = new osg::MatrixTransform;
+    avatarNodes = nullptr;
 }
 
 bool PartnerAvatar::init(const std::string &hostAdress)
 {
     if (!initialized)
     {
-        handTransform = new osg::MatrixTransform;
-        headTransform = new osg::MatrixTransform;
-        feetTransform = new osg::MatrixTransform;
         if(!VRAvatar::init("Avatar " + hostAdress))
             return false;
+        initialized = true;
 
-        hostIconNode = coVRFileManager::instance()->loadIcon(m_partner->userInfo().icon.c_str());
-        if (!hostIconNode)
-        {
-            auto iconFile = coVRFileManager::instance()->findOrGetFile(m_partner->userInfo().icon, m_partner->ID());
-            hostIconNode = coVRFileManager::instance()->loadIcon(iconFile.c_str());
-            if(!hostIconNode)
-                cerr << "Hosticon not found " << iconFile << endl;
-
-        }
-      
-        coBillboard *bb = new coBillboard;
-        feetTransform->addChild(bb);
-        if (hostIconNode)
-        {
-            bb->addChild(hostIconNode);
-        }
         if (coVRCollaboration::instance()->showAvatar)
         {
             cover->getObjectsRoot()->addChild(avatarNodes.get());
         }
-        initialized = true;
 
         return true;
     }
@@ -145,6 +124,28 @@ void VRAvatar::hide()
         cover->getObjectsRoot()->removeChild(avatarNodes.get());
     }
 }
+
+void PartnerAvatar::loadPartnerIcon()
+{
+    if (!m_partner->userInfo().icon.empty())
+    {
+        hostIconNode = coVRFileManager::instance()->loadIcon(m_partner->userInfo().icon.c_str());
+        if (!hostIconNode)
+        {
+            auto iconFile = coVRFileManager::instance()->findOrGetFile(m_partner->userInfo().icon, m_partner->ID());
+            hostIconNode = coVRFileManager::instance()->loadIcon(iconFile.c_str());
+            if (!hostIconNode)
+                cerr << "host icon not found " << iconFile << endl;
+        }
+    }
+    coBillboard *bb = new coBillboard;
+    feetTransform->addChild(bb);
+    if (hostIconNode)
+    {
+        bb->addChild(hostIconNode);
+    }
+}
+
 
 RecordedAvatar::RecordedAvatar() : m_icon(covise::coCoviseConfig::getEntry("value", "COVER.Collaborative.Icon", "$COVISE_PATH/share/covise/icons/hosts/localhost.obj"))
 {

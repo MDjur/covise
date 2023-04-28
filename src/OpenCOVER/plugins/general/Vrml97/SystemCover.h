@@ -75,8 +75,8 @@ public:
     }
     double time() override;
 
-    std::string remoteFetch(const std::string &filename, bool isTmp = false) override;
-    int getFileId(const char* url) override;
+    std::string remoteFetch(const std::string &filename) override;
+    int getFileId(const std::string &url) override;
     bool loadUrl(const char *url, int np, char **parameters) override;
 
 #if 0
@@ -140,6 +140,7 @@ public:
     CacheMode getCacheMode() const override;
     std::string getCacheName(const char *url, const char *pathname) const override;
     void storeInline(const char *name, const Viewer::Object d_viewerObject) override;
+    int isUTF8(const char* data, size_t size);
     Viewer::Object getInline(const char *name) override;
     void insertObject(Viewer::Object d_viewerObject, Viewer::Object sgObject) override;
 
@@ -179,7 +180,6 @@ protected:
     float *positions;
     float *orientations;
     bool record;
-    bool doRemoteFetch;
     int viewPointCount = 0;
     CacheMode cacheMode = CACHE_CREATE;
 

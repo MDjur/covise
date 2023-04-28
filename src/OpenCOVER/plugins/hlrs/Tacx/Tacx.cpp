@@ -208,14 +208,26 @@ float Tacx::getAngle()
 {
 
                     //fprintf(stderr,"vrdata.Lenkwinkel %d\n",vrdata.Lenkwinkel);
+/*
     float angle = (vrdata.Lenkwinkel - zeroAngle) / 300.0;
     int diff = (vrdata.Lenkwinkel - zeroAngle);
     if(diff < 0)
         angle = (diff/231.0);
+*/
+    int val =  (vrdata.Lenkwinkel - zeroAngle) ;
+    float angle = (vrdata.Lenkwinkel - zeroAngle) / 300.0;
+    if(val > 0)
+        angle = val/50.0*1.0;
     else
-        angle = (diff/56.0);
+        angle = val/204.0*1.0;
+                    fprintf(stderr,"vrdata.Lenkwinkel %d angle %f\n",val,angle);
+    if (angle < 0.) {
+       return -angle*angle;
+    } 
+    //else
+        //angle = (diff/56.0);
 	
-                    fprintf(stderr,"diff %d %f\n",diff,angle);
+                   // fprintf(stderr,"diff %d %f\n",diff,angle);
     return angle;
 } // -1 - 1 min-max
 

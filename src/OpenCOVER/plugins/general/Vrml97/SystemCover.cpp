@@ -21,6 +21,9 @@
 #endif
 
 #include <boost/filesystem.hpp>
+#include <boost/locale.hpp>
+#include <locale>
+#include <codecvt>
 
 #include <util/common.h>
 #include <util/unixcompat.h>
@@ -132,7 +135,6 @@ SystemCover::SystemCover()
     maxEntryNumber = 0;
     record = false;
     fileNumber = 0;
-    doRemoteFetch = coCoviseConfig::isOn("COVER.Plugin.Vrml97.DoRemoteFetch", false);
 	m_optimize = coCoviseConfig::isOn("COVER.Plugin.Vrml97.DoOptimize", true);
 	cerr << "vrml optimizer  = " << m_optimize << endl;
     if (coVRMSController::instance()->isMaster())
@@ -513,134 +515,12 @@ double SystemCover::time()
     return cover->frameTime();
 }
 
-//TODO: Add distinction for vrb files here. filename is always an url.
-//      Return the path to the file in local temp dir.
-//      --> Handle vrb:// and agtk3://
-//      Also add file:// path substition here?
-std::string SystemCover::remoteFetch(const std::string& filename, bool isTmp)
+std::string SystemCover::remoteFetch(const std::string& filename)
 {
 	return coVRFileManager::instance()->findOrGetFile(filename);
-//    char *result = 0;
-//    const char *buf = NULL;
-//    int numBytes = 0;
-//    static int working = 0;
-//    if(!doRemoteFetch)
-//    {
-//        return NULL;
-//    }
-//
-//    if (working)
-//    {
-//        cerr << "WARNING!!! reentered remoteFetch!!!!" << endl;
-//        return NULL;
-//    }
-//
-//    working = 1;
-//
-//    if (strncmp(filename, "vrb://", 6) == 0)
-//    {
-//        //Request file from VRB
-//        std::cerr << "VRB file, needs to be requested through FileBrowser-ProtocolHandler!" << std::endl;
-//        coTUIFileBrowserButton *locFB = this->mFileManager->getMatchingFileBrowserInstance(string(filename));
-//        std::string sresult = locFB->getFilename(filename).c_str();
-//        char *result = new char[sresult.size() + 1];
-//        strcpy(result, sresult.c_str());
-//        working = 0;
-//        return result;
-//    }
-//    else if (strncmp(filename, "agtk3://", 8) == 0)
-//    {
-//        //REquest file from AG data store
-//        std::cerr << "AccessGrid file, needs to be requested through FileBrowser-ProtocolHandler!" << std::endl;
-//        coTUIFileBrowserButton *locFB = this->mFileManager->getMatchingFileBrowserInstance(string(filename));
-//        working = 0;
-//        return locFB->getFilename(filename).c_str();
-//    }
-//
-//    if (vrbc || !coVRMSController::instance()->isMaster())
-//    {
-//        if (coVRMSController::instance()->isMaster())
-//        {
-//            TokenBuffer rtb;
-//            rtb << filename;
-//            rtb << vrbc->getID();
-//            Message m(rtb);
-//            m.type = COVISE_MESSAGE_VRB_REQUEST_FILE;
-//            cover->sendVrbMessage(&m);
-//        }
-//        int message = 1;
-//        Message *msg = new Message;
-//        do
-//        {
-//            if (coVRMSController::instance()->isMaster())
-//            {
-//                if (!vrbc->isConnected())
-//                {
-//                    message = 0;
-//                    coVRMSController::instance()->sendSlaves((char *)&message, sizeof(message));
-//                    break;
-//                }
-//                else
-//                {
-//                    vrbc->wait(msg);
-//                }
-//                coVRMSController::instance()->sendSlaves((char *)&message, sizeof(message));
-//            }
-//            if (coVRMSController::instance()->isMaster())
-//            {
-//                coVRMSController::instance()->sendSlaves(msg);
-//            }
-//            else
-//            {
-//                coVRMSController::instance()->readMaster((char *)&message, sizeof(message));
-//                if (message == 0)
-//                    break;
-//                // wait for message from master instead
-//                coVRMSController::instance()->readMaster(msg);
-//            }
-//            coVRCommunication::instance()->handleVRB(msg);
-//        } while (msg->type != COVISE_MESSAGE_VRB_SEND_FILE);
-//
-//        if ((msg->data) && (msg->type == COVISE_MESSAGE_VRB_SEND_FILE))
-//        {
-//            TokenBuffer tb(msg);
-//            int myID;
-	//std::string fn;
-//            tb >> myID; // this should be my ID
-	//tb >> fn; //this should be the requested file
-//            tb >> numBytes;
-//            buf = tb.getBinary(numBytes);
-//            if ((numBytes > 0) && (result = tempnam(0, "VR")))
-//            {
-//#ifndef _WIN32
-//                int fd = open(result, O_RDWR | O_CREAT, 0777);
-//#else
-//                int fd = open(result, O_RDWR | O_CREAT | O_BINARY, 0777);
-//#endif
-//                if (fd != -1)
-//                {
-//                    if (write(fd, buf, numBytes) != numBytes)
-//                    {
-//                        warn("remoteFetch: temp file write error\n");
-//                        free(result);
-//                        result = NULL;
-//                    }
-//                    close(fd);
-//                }
-//                else
-//                {
-//                    free(result);
-//                    result = NULL;
-//                }
-//            }
-//        }
-//        delete msg;
-//    }
-//    working = 0;
-//    return result;
 }
 
-int SystemCover::getFileId(const char* url)
+int SystemCover::getFileId(const std::string &url)
 {
 	return coVRFileManager::instance()->getFileId(url);
 }
@@ -1126,19 +1006,100 @@ void SystemCover::storeInline(const char *name, const Viewer::Object d_viewerObj
 				osgUtil::Optimizer optimzer;
 				optimzer.optimize(osgNode);
 			}
-            std::string n(name);
-            if (coVRMSController::instance()->isMaster() || coVRFileManager::instance()->isInTmpDir(n))
-                osgDB::writeNodeFile(*osgNode, n.c_str());
+            if (coVRMSController::instance()->isMaster() || !coVRFileManager::instance()->isInSharedDir(name))
+                osgDB::writeNodeFile(*osgNode, name);
         }
     }
+}
+
+
+int SystemCover::isUTF8(const char* data, size_t size)
+{
+    const unsigned char* str = (unsigned char*)data;
+    const unsigned char* end = str + size;
+    unsigned char byte;
+    unsigned int code_length, i;
+    uint32_t ch;
+    while (str != end) {
+        byte = *str;
+        if (byte <= 0x7F) {
+            /* 1 byte sequence: U+0000..U+007F */
+            str += 1;
+            continue;
+        }
+
+        if (0xC2 <= byte && byte <= 0xDF)
+            /* 0b110xxxxx: 2 bytes sequence */
+            code_length = 2;
+        else if (0xE0 <= byte && byte <= 0xEF)
+            /* 0b1110xxxx: 3 bytes sequence */
+            code_length = 3;
+        else if (0xF0 <= byte && byte <= 0xF4)
+            /* 0b11110xxx: 4 bytes sequence */
+            code_length = 4;
+        else {
+            /* invalid first byte of a multibyte character */
+            return 0;
+        }
+
+        if (str + (code_length - 1) >= end) {
+            /* truncated string or invalid byte sequence */
+            return 0;
+        }
+
+        /* Check continuation bytes: bit 7 should be set, bit 6 should be
+         * unset (b10xxxxxx). */
+        for (i = 1; i < code_length; i++) {
+            if ((str[i] & 0xC0) != 0x80)
+                return 0;
+        }
+
+        if (code_length == 2) {
+            /* 2 bytes sequence: U+0080..U+07FF */
+            ch = ((str[0] & 0x1f) << 6) + (str[1] & 0x3f);
+            /* str[0] >= 0xC2, so ch >= 0x0080.
+               str[0] <= 0xDF, (str[1] & 0x3f) <= 0x3f, so ch <= 0x07ff */
+        }
+        else if (code_length == 3) {
+            /* 3 bytes sequence: U+0800..U+FFFF */
+            ch = ((str[0] & 0x0f) << 12) + ((str[1] & 0x3f) << 6) +
+                (str[2] & 0x3f);
+            /* (0xff & 0x0f) << 12 | (0xff & 0x3f) << 6 | (0xff & 0x3f) = 0xffff,
+               so ch <= 0xffff */
+            if (ch < 0x0800)
+                return 0;
+
+            /* surrogates (U+D800-U+DFFF) are invalid in UTF-8:
+               test if (0xD800 <= ch && ch <= 0xDFFF) */
+            if ((ch >> 11) == 0x1b)
+                return 0;
+        }
+        else if (code_length == 4) {
+            /* 4 bytes sequence: U+10000..U+10FFFF */
+            ch = ((str[0] & 0x07) << 18) + ((str[1] & 0x3f) << 12) +
+                ((str[2] & 0x3f) << 6) + (str[3] & 0x3f);
+            if ((ch < 0x10000) || (0x10FFFF < ch))
+                return 0;
+        }
+        str += code_length;
+    }
+    return 1;
 }
 
 Viewer::Object SystemCover::getInline(const char *name)
 {
     osg::ref_ptr<osg::Group> g = new osg::Group;
-    std::string n(name);
 
-    coVRFileManager::instance()->loadFile(n.c_str(), NULL, g);
+    std::string validFileName(name);
+#ifdef WIN32
+    if (isUTF8(name, strlen(name)))
+    {
+        validFileName = boost::locale::conv::from_utf<char>(validFileName,"ISO-8859-1");// we hope  the system locale is Latin1
+    }
+#endif
+
+
+    coVRFileManager::instance()->loadFile(validFileName.c_str(), NULL, g);
 
     if (g->getNumChildren() > 0)
     {

@@ -67,7 +67,7 @@ demo 4 "SWA Augsburg (Variante)" run_swa_var
 category="CFD"
 demo 11 "Audi" covise /data/covise_net/2009/Audi_Bilder.net
 demo 12 "Forbach" covise /data/enbw/2015/out/LaermFinal.net
-demo 13 "Kiebingen" covise /data/covise_net/2006/kiebingen_viscluster_fischeNeu.net
+demo 13 "Forbach-Dammbruch" covise /data/enbw/2015/out/LaermFinalDambreak.net
 demo 14 "Axialzyklon" covise /data/IET/AXIALZYKLON/130424_ML_Axialcyclone_Steady.net
 run_archflow() {
     cd /home/covise/covise/net
@@ -208,6 +208,7 @@ demo 77 "OptimaPharma" covise /data/covise_net/2013/BaxterPraesentation.net
 demo 78 "Wasserturbine Taubenloch" cover /data/ihs/taubenloch/taubenloch.uwe.wrl
 demo 79 "Buran" cover /data/shabrov/praesentation.wrl
 demo 80 "Maschinenhalle" cover /data/Lionel/Labor.wrl
+demo 53 "Biomechanik" covise /data/schneider/happy_pr_man/Happy_PR_Man_4_reduced.net
 
 #covise -e /data/covise_net/2014/ThyssenNeu.net
 demo 81 "Thyssen Testturm Multi" cover /data/Thyssen/Turm/praesentation.wrl
@@ -247,6 +248,7 @@ fasi_nuerburg() {
 }
 demo 90 "start FaSi: Nuerburgring" fasi_nuerburg
 demo 91 "start COVER: Nuerburgring" cover /data/porsche/nr/nr11.xodr 
+demo 92 "Kiebingen" covise /data/covise_net/2006/kiebingen_viscluster_fischeNeu.net
 
 run_glider() {
     echo -e "Starting Paraglider Flightsim Ctrl-P Ctrl-U in flightgear Ctrl-r in Opencover"
@@ -288,6 +290,21 @@ demo 122 "Receiver: Volume Down" sasu kenwoodVolDown
 demo 123 "Receiver: Input: Video 1" sasu kenwoodVideo
 demo 124 "Receiver: Input: Au" sasu kenwoodAux
 
+category="MSC"
+demo 130 "Oper" cover /data/Staatstheater_Stuttgart_local/FrauOhneSchatten/praesentation.wrl
+demo 131 "Theater" cover /data/Staatstheater_Stuttgart_local/out/praesentation.wrl
+demo 132 "Ludwigsburg Punktwolke" cover /data/Ludwigsburg/TheaterNeu.ptsb
+demo 133 "Ludwigsburg Modell" cover /data/Ludwigsburg/out/allPloy.wrl
+# Mobilitaetswoche
+category="MOBILITAETSWOCHE"
+run_marienplatz_mobilitaetswoche() {
+#    bash /data/CapeReviso/SumoMarienplatz/250x250m2/startSumo.sh &
+    mobWeekSumo & # /home/covise/bin
+    SUMO=$!
+    opencover /data/CapeReviso/Marienplatz/praesentation2.wrl opencover://plugin/SumoTraCI
+    kill $SUMO
+}
+demo 140 "Zweite mobilitaetswoche" run_marienplatz_mobilitaetswoche 
 
 # Vistle
 category="Vistle"
@@ -318,6 +335,17 @@ demo 28 "LEGO Porsche vs. Bugatti (Remote)" run_lego
 #ChEESE
 demo 29 "Tsunami (Cádiz)" vistle /data/ChEESE/tsunami/cadiz/vistle_files/cadiz_tsunami_video.vsl
 
+maxcol=3
+col="0"
+printentry() {
+    printf "${MENU}${OPT}%3s) ${MENU}%-45s" "$1" "$2"
+}
+newline() {
+    if [ "$col" != "0" ]; then
+        col="0"
+        echo
+    fi
+}
 printmenu() {
     cat=""
     for key in "${keys[@]}"; do
@@ -326,14 +354,25 @@ printmenu() {
             cat="$ncat"
             #echo -e "                                                      "
             if [ -n "$cat" ]; then
-                echo -e "${MENU}-----${TYP} ${cat} ${MENU}---------------------------------"
+                if [ "$col" != "0" ]; then
+                    echo
+                fi
+                echo -e "${MENU}-----${TYP} ${cat} ${MENU}-----"
+                col="0"
             fi
         fi
-        echo -e "${MENU} ${OPT}  ${keys[$key]})  ${MENU} ${titles[$key]}"
+        #printf "${MENU}${OPT}%3s) ${MENU}%-45s" "$key" "${titles[$key]}"
+        printentry "$key" "${titles[$key]}"
+        col=$((${col}+1))
+        if [ "$col" -ge "$maxcol" ]; then
+            newline
+        fi
     done
 
+    newline
     echo -e "                                                      "
-    echo -e "${MENU} ${OPT}  q)  ${MENU} exit this menu            "
+    printentry "q" "exit this menu"
+    echo
     echo -e "${MENU}---------------------------------------------"
     echo -e "${ENTER}   Enter choice ([Enter] reprints menu) ${NORMAL}"
 }

@@ -7,8 +7,8 @@
   <COVER>
    <NumScreens value="0" />
    <NumWindows value="0" />
-   <StartCommand value="nvidia-smi -ac 4513,1657" />
-   <ExitCommand value="nvidia-smi -rac" />
+   <StartCommand value="sudo nvidia-smi -ac 4513,1657" />
+   <ExitCommand value="sudo nvidia-smi -rac" />
   </COVER>
  </GLOBAL>
 
@@ -32,7 +32,7 @@
               <Orientation h="0" p="0" r="0" />
            </DTrackCaveOutside>
 
-           <DTrackCave driver="dtrack" port="5000" serverHost="141.58.8.245">
+           <DTrackCave driver="dtrack" port="5000" serverHost="141.58.8.78">
               <Offset x="0" y="-0" z="-1327" />
               <Orientation h="0" p="0" r="0" />
            </DTrackCave>
@@ -49,7 +49,7 @@
            </ConstHead>
 
            <CaveHead device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="1">
-              <Offset x="-105" y="-40" z="-50" />
+              <Offset x="105" y="-50" z="-60" />
               <Orientation h="0" p="0" r="0" />
            </CaveHead>
 
@@ -59,7 +59,7 @@
            </CaveHand>
 
            <CaveCamera device="DTrackCave" device1="DTrackCaveOutside" bodyIndex="2">
-              <Offset x="0" y="120" z="-200" />
+              <Offset x="0" y="120" z="-100" />
               <Orientation h="0" p="0" r="0" />
            </CaveCamera>
 
@@ -197,6 +197,9 @@
     <Server port="31809" />
    </covRemote>
 
+   <VRB>
+	  <RemoteFetch value="on" path="/var/tmp/$USER/remoteFetch" hash="on"/>
+   </VRB>
   </System>
 
 
@@ -235,7 +238,7 @@
 
      <Lights value="ON" />
      <Audio value="AServer" >
-      <Host value="141.58.8.223" />
+      <!--Host value="141.58.8.223" /-->
      </Audio>
 
 
@@ -409,7 +412,7 @@
     <Viewport width="1" left="0" windowIndex="0" bottom="0" name="0" height="1" />
    </ViewportConfig>
    <WindowConfig>
-   <Window ARCH="x11" type="Qt" width="1600" comment="MAIN" window="0" pipeIndex="0" height="1000" left="100" top="50" name="0" decoration="true" />
+   <Window ARCH="x11" type="" width="1600" comment="MAIN" window="0" pipeIndex="0" height="1000" left="100" top="50" name="0" decoration="true" />
    </WindowConfig>
   </COVER>
  </LOCAL>
@@ -507,6 +510,7 @@
 
    <Collaborative>
     <Sync mode="LOOSE_COUPLING" />
+    <Icon value="/data/KoLabBW/KolabBWLogo.3ds"/>
    </Collaborative>
 
    <Spotlight value="OFF" />
@@ -581,7 +585,8 @@
    <PorscheHupe value="/dev/input/porschehupe" />
    <FKFS value="OFF" host="192.168.0.95" origin="-1.80877" />
    <CAN value="OFF" port="1" speed="1000" nodeID="1" origin="0.0" />
-   <CarSound host="192.168.0.88" port="31804"/>
+   <CarSound host="192.168.0.233" port="31804"/>
+   <!--CarSound host="192.168.0.88" port="31804"/-->
    <!--CarSound host="141.58.8.110" port="31804"/-->
    <!--CarSound host="141.58.8.32" port="31804"/-->
    <!--InputDevice value="PORSCHE_SIM"/-->

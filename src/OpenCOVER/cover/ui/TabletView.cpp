@@ -5,6 +5,7 @@
 
 #include "Element.h"
 #include "Menu.h"
+#include "Group.h"
 #include "ButtonGroup.h"
 #include "Label.h"
 #include "Action.h"
@@ -219,7 +220,7 @@ void TabletView::add(TabletViewElement *ve, const Element *elem)
         }
     }
 
-    updateParent(elem);
+    updateChildren(elem->parent());
 }
 
 void TabletView::updateEnabled(const Element *elem)
@@ -273,12 +274,16 @@ void TabletView::updateState(const Button *button)
     }
 }
 
-void TabletView::updateParent(const Element *elem)
+void TabletView::updateChildren(const Group *group)
 {
-    auto ve = tuiElement(elem);
-    if (!ve)
+    auto vgr = tuiElement(group);
+    if (!vgr)
         return;
-    updateVisible(elem);
+    for (unsigned i = 0; i < group->numChildren(); ++i)
+    {
+        auto *elem = group->child(i);
+        updateVisible(elem);
+    }
 }
 
 void TabletView::updateChildren(const SelectionList *sl)
@@ -402,6 +407,17 @@ void TabletView::updateFilter(const FileBrowser *fb)
     if (auto te = dynamic_cast<coTUIFileBrowserButton *>(ve->m_elem))
     {
         te->setFilterList(fb->filter());
+    }
+}
+
+void TabletView::updateRelayout(const Group* gr)
+{
+    auto ve = tuiElement(gr);
+    if (!ve)
+        return;
+    if (auto te = dynamic_cast<coTUITab*>(ve->m_elem))
+    {
+        te->allowRelayout(gr->allowRelayout());
     }
 }
 

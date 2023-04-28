@@ -241,7 +241,7 @@ public:
     void setShader(const char *nodeName, const char *shaderName, const char *paraFloat, const char *paraVec2, const char *paraVec3, const char *paraVec4, const char *paraInt, const char *paraBool, const char *paraMat2, const char *paraMat3, const char *paraMat4);
     void setShader(osg::Geode *geode, const char *shaderName, const char *paraFloat, const char *paraVec2, const char *paraVec3, const char *paraVec4, const char *paraInt, const char *paraBool, const char *paraMat2, const char *paraMat3, const char *paraMat4);
     void setMaterial(const char *nodeName, int *ambient, int *diffuse, int *specular, float shininess, float transparency);
-    void setMaterial(osg::Geode *geode, int *ambient, int *diffuse, int *specular, float shininess, float transparency);
+    void setMaterial(osg::Geode *geode, const int *ambient, const int *diffuse, const int *specular, float shininess, float transparency);
 
     // disables "store scenegraph"
     void protectScenegraph();
@@ -348,6 +348,7 @@ private:
     ui::SelectionList *m_showStats=nullptr;
     ui::Button *m_showAxis=nullptr, *m_allowHighQuality=nullptr;
     ui::Button *m_useTextures=nullptr, *m_useShaders=nullptr;
+    ui::Button *m_showMenuButton=nullptr;
 };
 }
 #endif

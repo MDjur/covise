@@ -1,0 +1,53 @@
+<OctPoints>
+  <uniform max="64" min="1" name="Size" type="float" value="20"/>
+  <uniform max="10.0" min="0.0001" name="Scale" type="float" value="1"/>
+  <attribute name="dataAttrib" type="float" value="10"/>
+
+  <uniform name="Light0Enabled" type="bool" value="true"/>
+  <uniform name="Light1Enabled" type="bool" value="false"/>
+  <uniform name="blendWithMaterial" type="bool" value="false"/>
+  <uniform name="dataValid" type="bool" value="true"/>
+  <uniform name="rangeMax" type="float" value="1."/>
+  <uniform name="rangeMin" type="float" value="0."/>
+  <uniform name="texUnit1" type="sampler1D" value="1"/>
+
+  <preamble>
+    #define POINTS
+  </preamble>
+  <vertexProgram>
+
+      varying float data;
+      varying vec2 Texcoord;
+      uniform float Scale;
+      uniform float Size;
+
+      attribute float dataAttrib;
+
+      varying vec3 V;
+      varying vec3 N;
+
+      void main( void )
+      {
+        data = dataAttrib;
+        Texcoord = gl_MultiTexCoord0.st;
+        vec4 transformedVertex = gl_ModelViewMatrix*gl_Vertex;
+        gl_ClipVertex = transformedVertex;
+              gl_Position = ftransform();
+        float dist = length(transformedVertex);
+        float s = (dist)*-0.001*Scale+Size;
+        if(s &gt; Size)
+        s = Size;
+        if(s &lt; 2.0)
+        s = 2.0 ;
+        gl_PointSize = s ;
+
+        // Eye-coordinate position of vertex, needed in various calculations
+        V = vec3(gl_ModelViewMatrix * gl_Vertex);
+        N = normalize(gl_NormalMatrix * gl_Normal);
+      }
+  </vertexProgram>
+
+   
+  <fragmentProgram value="MapColorsFragment.glsl">
+</fragmentProgram>
+</OctPoints>

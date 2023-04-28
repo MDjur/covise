@@ -39,6 +39,13 @@ struct WCData
     int64_t countRight;
     uint32_t state;
 };
+struct WCDataOut
+{
+    float normal[3];
+    float direction[3];
+    float downhillForce;
+    uint32_t state;
+};
 #pragma pack(pop)
 
 
@@ -56,6 +63,7 @@ public:
     unsigned char getButton();
     void syncData();
     bool doStop;
+    float calculateDownhillForce(const osg::Vec3 &, const osg::Vec3 &);
 private:
     float stepSizeUp;
     float stepSizeDown;
@@ -65,6 +73,7 @@ private:
     void updateThread();
     UDPComm* udp=nullptr;
     WCData wcData;
+    WCDataOut wcDataOut;
     int ret;
     OpenThreads::Mutex mutex;
     float speed=0.0;
@@ -83,6 +92,9 @@ private:
     int64_t oldCountLeft=0;
     int64_t oldCountRight=0;
     osg::Matrix WheelchairPos;
+    float wheelBase = 450;
+    float wheelWidth = 595;
+    osg::Vec3 wcNormal;
 };
 
 #endif /* Wheelchair_H */

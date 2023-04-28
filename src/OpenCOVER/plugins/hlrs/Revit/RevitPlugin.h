@@ -51,6 +51,9 @@
 #include "IK/CAlgoFactory.h"
 
 
+
+
+
 #define REVIT_FEET_TO_M 0.304799999536704
 #define REVIT_M_TO_FEET 3.2808399
 
@@ -331,7 +334,8 @@ class PhaseInfo
 public:
     std::string PhaseName;
     int ID=0;
-    ui::Button* button;
+    ui::Button* button=nullptr;
+    ~PhaseInfo();
 };
 
 class DoorInfo
@@ -395,8 +399,55 @@ public:
 private:
 };
 
+class FamilyType
+{
+public:
+    FamilyType(TokenBuffer& tb);
+    ~FamilyType();
+    void createMenuEntry();
+    void createFamilyLabel();
+    std::string Name;
+    int ID;
+    std::string FamilyName;
+    ui::Action* selectType = nullptr;
+    ui::Label* FamilyLabel = nullptr;
+    
+};
+class ObjectParamater
+{
+public:
+    ObjectParamater(TokenBuffer& tb,int i);
+    ~ObjectParamater();
+    void createMenu();
+    std::string Name;
+    std::string Value;
+    ui::Label* Label = nullptr;
+    int num;
+    int StorageType;
 
+    double d;
+    int ElementReferenceID;
+    int i;
 
+    std::string ParameterType;
+};
+
+class ObjectInfo
+{
+public:
+    ObjectInfo(TokenBuffer& tb);
+    ~ObjectInfo();
+    std::string TypeName;
+    int TypeID;
+    std::string CategoryName;
+    int flipInfo;
+    std::vector<FamilyType*> types;
+    std::vector<ObjectParamater*> parameters;
+
+    ui::Action* flipLR = nullptr;
+    ui::Action* flipIO = nullptr;
+    ui::Label* TypeNameLabel = nullptr;
+};
 
 
 class RevitPlugin : public coVRPlugin, public opencover::ui::Owner
@@ -467,7 +518,10 @@ public:
         MSG_IKInfo = 534,
         MSG_Phases = 535,
         MSG_ViewPhase = 536,
-        MSG_AddRoomInfo = 537
+        MSG_AddRoomInfo = 537,
+        MSG_ObjectInfo = 538,
+        MSG_Flip = 539,
+        MSG_SelectType = 540
     };
     enum ObjectTypes
     {
@@ -508,13 +562,22 @@ public:
     ui::Menu* viewpointMenu = nullptr;
     ui::Menu* parameterMenu = nullptr;
     ui::Menu* phaseMenu = nullptr;
-    ui::EditField* xPos;
+    ui::Menu* objectInfoMenu = nullptr;
+    ui::ButtonGroup* PhaseGroup = nullptr;
+    ui::ButtonGroup* objectInfoGroup = nullptr;
+    ui::Action* selectObject = nullptr;
+    ui::Menu* typesMenu = nullptr;
+    ui::ButtonGroup* TypesGroup=nullptr;
+    ui::Menu* parametersMenu = nullptr;
+    ui::ButtonGroup* ParametersGroup = nullptr;
+
+    vrui::coCombinedButtonInteraction *selectObjectInteraction = nullptr;
+    /*ui::EditField* xPos;
     ui::EditField* yPos;
     ui::EditField* zPos;
     ui::EditField* xOri;
     ui::EditField* yOri;
-    ui::EditField* zOri;
-    ui::ButtonGroup* PhaseGroup;
+    ui::EditField* zOri;*/
 
 
     IKInfo *currentIKI=nullptr;
@@ -541,13 +604,19 @@ public:
     std::list<RevitDesignOptionSet*> designOptionSets;
     std::list<PhaseInfo*> phaseInfos;
     void setPhase(std::string phaseName);
+    void setPhase(int phase);
     int currentPhase=0;
     double TrueNorthAngle = 0.0;
+    double ProjectHeight = 0.0;
     osg::Matrix NorthRotMat;
     osg::Matrix RevitScale;
     osg::Matrix RevitGeoRefference;
     osg::Group* getCurrentGroup() { return currentGroup.top(); };
     ui::Button* toggleRoomLabels = nullptr;
+    int currentObjectID=-1;
+    int currentDocumentID=-1;
+    ObjectInfo* currentObjectInfo=nullptr;
+    void flip(int dir);
 protected:
     static RevitPlugin *plugin;
     ui::Label *label1 = nullptr;
@@ -598,4 +667,7 @@ protected:
     Message *msg = nullptr;
 
 };
+
+
+
 #endif

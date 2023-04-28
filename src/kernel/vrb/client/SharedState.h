@@ -94,16 +94,15 @@ private:
 template <class T>
 class  SharedState : public SharedStateBase {
 public:
-    SharedState<T>(std::string name, T value = T(), SharedStateType mode = USE_COUPLING_MODE)
+    SharedState(std::string name, T value = T(), SharedStateType mode = USE_COUPLING_MODE)
         : SharedStateBase(name, mode)
         , m_value(value) {
-        assert(m_registry);
         covise::TokenBuffer tb;
         serializeWithType(tb, m_value);
         subscribe(tb.getData());
     }
 
-    SharedState<T>& operator=(T value) {
+    SharedState& operator=(T value) {
         if (m_value != value) {
             m_value = value;
             push();

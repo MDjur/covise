@@ -2794,7 +2794,6 @@ Viewer::Object ViewerOsg::insertText(int *justify,
             pText->setAlignment(osgText::Text::RIGHT_BASE_LINE);
 
         std::string vrmlText(strings[i]);
-        vrmlText = localizeString(vrmlText);
         osgText::String osgStr(vrmlText, osgText::String::ENCODING_UTF8);
         pText->setText(osgStr);
 
@@ -3597,6 +3596,9 @@ void ViewerOsg::setModesByName(const char *objectName)
                     else if (strncmp(name, "coDepthOnly", 11) == 0)
                     {
                         // after Video but before all normal geometry
+
+                        //stateset->setRenderingHint(StateSet::TRANSPARENT_BIN);
+                        stateset->setNestRenderBins(false);
                         stateset->setRenderBinDetails(-1, "RenderBin");
                         stateset->setAttributeAndModes(cover->getNoFrameBuffer().get(), StateAttribute::ON);
                     }
@@ -6270,35 +6272,6 @@ void ViewerOsg::matToVrml(double *M, const Matrix &mat)
     {
         M[i] = mat.ptr()[i];
     }
-}
-
-std::string ViewerOsg::localizeString(const std::string &stringToLocalize) const
-{
-    std::string retStr(stringToLocalize);
-
-#if 0
-    if (coCoviseConfig::isOn("COVER.Plugin.Vrml97.TranslateVRMLTextNodes", false))
-    {
-        //-------------TRANSLATION BEGIN------------------------
-        char *covisepath = getenv("COVISE_PATH");
-        if (covisepath)
-        {
-            std::string covisePath(covisepath);
-            //yes, there could be a semicolon in it!
-            covisePath.erase(remove(covisePath.begin(), covisePath.end(), ';'), covisePath.end());
-
-            retStr = vtrans::VTrans::translate(
-                coCoviseConfig::getEntry("value", "COVER.Localization.TranslatorType", ""),
-                std::string(covisepath) + std::string("/") + coCoviseConfig::getEntry("value", "COVER.Localization.LocalePath", ""),
-                coCoviseConfig::getEntry("value", "COVER.Localization.VRMLDomain", ""),
-                coCoviseConfig::getEntry("value", "COVER.Localization.LanguageLocale", ""),
-                retStr);
-        }
-        //-------------TRANSLATION END--------------------------
-    }
-#endif
-
-    return retStr;
 }
 
 int ViewerOsg::getBlendModeForVrmlNode(const char *modeString)

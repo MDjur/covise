@@ -88,7 +88,7 @@ void CoviseConfigShader::readConfig()
         if (regexp != "")
         {
             Definition d;
-            d.regexp = QRegExp(regexp.c_str());
+            d.regexp = QRegularExpression(regexp.c_str());
             d.shader = shader;
             d.smooth = smooth;
             d.transparency = transparency;
@@ -132,7 +132,9 @@ void CoviseConfigShader::addShader(osg::Node *node)
     // check node name against all definitions
     for (size_t index = 0; index < definitions.size(); ++index)
     {
-        if (definitions[index].regexp.exactMatch(QString(node->getName().c_str())))
+        auto nodeName = QString::fromStdString(node->getName());
+        auto match = definitions[index].regexp.match(nodeName);
+        if (match.hasMatch() && match.capturedLength() == nodeName.length())
         {
 
             // Transparency
@@ -173,18 +175,13 @@ void CoviseConfigShader::addShader(osg::Node *node)
     }
 }
 
-void CoviseConfigShader::guiToRenderMsg(const char *msg)
+void CoviseConfigShader::guiToRenderMsg(const grmsg::coGRMsg &msg) 
 {
-    string fullMsg(string("GRMSG\n") + msg);
-    coGRMsg grMsg(fullMsg.c_str());
-    if (grMsg.isValid())
+    if (msg.isValid() && msg.getType() == coGRMsg::SET_TRANSPARENCY)
     {
-        if (grMsg.getType() == coGRMsg::SET_TRANSPARENCY)
-        {
-            coGRObjSetTransparencyMsg setTransparencyMsg(fullMsg.c_str());
-            const char *objectName = setTransparencyMsg.getObjName();
-            transparencyList.push_back(objectName); // we have to delay setting the shader because the transparency needs to be set first
-        }
+        auto &setTransparencyMsg = msg.as<coGRObjSetTransparencyMsg>();
+        const char *objectName = setTransparencyMsg.getObjName();
+        transparencyList.push_back(objectName); // we have to delay setting the shader because the transparency needs to be set first
     }
 }
 
@@ -234,7 +231,9 @@ int CoviseConfigShader::getDefinitionIndex(osg::Node *node)
     // check node name against all definitions
     for (size_t i = 0; i < definitions.size(); ++i)
     {
-        if (definitions[i].regexp.exactMatch(QString(node->getName().c_str())))
+        auto nodeName = QString::fromStdString(node->getName());
+        auto match = definitions[i].regexp.match(nodeName);
+        if (match.hasMatch() && match.capturedLength() == nodeName.length())
         {
             return i;
         }

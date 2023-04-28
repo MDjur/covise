@@ -12,6 +12,7 @@
 #include <util/byteswap.h>
 #include <util/unixcompat.h>
 #include <cover/coVRMSController.h>
+#include <cover/coVRCollaboration.h>
 #include <cover/VRSceneGraph.h>
 #include <osg/LineSegment>
 #include <osgUtil/IntersectionVisitor>
@@ -35,9 +36,9 @@ Wheelchair::Wheelchair()
     wcData.countLeft = 0;
     wcData.countRight = 0;
     wcData.state = 0;
-    float u = M_PI * 0.6;
-    // 30000 counts /revolution 72/24 = 3 gear ratio
-    mPerCount = u / ((-30000)*3);
+    float u = M_PI * 0.1; // 100mm Durchmesser
+    // 30000 counts /revolution ;10000 counts on motor ;72/24 = 3 gear ratio
+    mPerCount = u / ((-10000)*3);
 
 
         stepSizeUp=200;
@@ -151,13 +152,20 @@ bool Wheelchair::update()
 {
     if (isEnabled())
     {
-        //fprintf(stderr, "wc %ld %ld\n", wcData.countLeft, wcData.countRight);
+        fprintf(stderr, "wc %ld %ld\n", (long)wcData.countLeft, (long)wcData.countRight);
+        if (oldCountLeft == 0)
+        {
+            oldCountLeft = wcData.countLeft;
+            oldCountRight = wcData.countRight;
+	}
 
         float ml = (wcData.countLeft - oldCountLeft)* mPerCount;
         float mr = (wcData.countRight - oldCountRight)*mPerCount;
+        oldCountLeft = wcData.countLeft;
         oldCountRight = wcData.countRight;
+	
         double dT = cover->frameDuration();
-        float wheelBase = 0.98;
+        float wheelBase = 0.595;;
         float v = 0;
         float x = 0;
         /*if (dev && dev->number_axes[joystickNumber] >= 10)
@@ -183,18 +191,10 @@ bool Wheelchair::update()
             s = 0;
         }
         osg::Vec3 V(0, -s, 0);
-        wheelBase = 0.5;
-        float rotAngle = sin((mr-ml)/0.3);
+        float rotAngle = tan((mr-ml)/wheelBase);
         //fprintf(stderr, "v: %f \n", v);
         if ((s < 0.0001 && s > -0.0001)) // straight
         {
-        }
-        else
-        {
-            if (v > 0)
-            {
-                rotAngle = x * xScale;
-            }
         }
         fprintf(stderr, "s %f r %f\n", s, rotAngle);
 
@@ -207,8 +207,7 @@ bool Wheelchair::update()
         TransformMat = VRSceneGraph::instance()->getTransform()->getMatrix();
         TransformMat = TransformMat * relRot * relTrans;
 
-        MoveToFloor();
-
+        MoveToFloor();  
 
         if (coVRMSController::instance()->isMaster())
         {
@@ -219,8 +218,7 @@ bool Wheelchair::update()
             coVRMSController::instance()->readMaster((char*)TransformMat.ptr(), sizeof(TransformMat));
         }
         VRSceneGraph::instance()->getTransform()->setMatrix(TransformMat);
-        oldCountLeft = wcData.countLeft;
-        oldCountRight = wcData.countRight;
+        coVRCollaboration::instance()->SyncXform();
     }
        
     return false;
@@ -233,24 +231,38 @@ void Wheelchair::MoveToFloor()
     //  just adjust height here
 
 
-    osg::Vec3 pos = WheelchairPos.getTrans();
+    //osg::Vec3 pos = WheelchairPos.getTrans();
+    osg::Vec3 pos(-wheelWidth/2.0, 0, 0);
+    pos = pos * WheelchairPos;
+    pos[2]-=floorHeight;
+    osg::Vec3 pos2(-wheelWidth / 2.0, wheelBase, 0);
+    pos2 = pos2 * WheelchairPos;
+    pos2[2]-=floorHeight;
+    osg::Vec3 pos3(wheelWidth / 2.0, wheelBase, 0);
+    pos3 = pos3 * WheelchairPos;
+    pos3[2]-=floorHeight;
 
     // down segment
     osg::Vec3 p0, q0;
-    p0.set(pos[0], pos[1], floorHeight + stepSizeUp);
-    q0.set(pos[0], pos[1], floorHeight - stepSizeDown);
+    p0.set(pos[0], pos[1], pos[2] + floorHeight + stepSizeUp);
+    q0.set(pos[0], pos[1], pos[2] + floorHeight - stepSizeDown);
 
-    osg::ref_ptr<osg::LineSegment> ray[2];
+    osg::ref_ptr<osg::LineSegment> ray[3];
     ray[0] = new osg::LineSegment(p0, q0);
 
     // down segment 2
-    p0.set(pos[0], pos[1] + 10, floorHeight + stepSizeUp);
-    q0.set(pos[0], pos[1] + 10, floorHeight - stepSizeDown);
+    p0.set(pos2[0], pos2[1], pos2[2] + floorHeight + stepSizeUp);
+    q0.set(pos2[0], pos2[1], pos2[2] + floorHeight - stepSizeDown);
     ray[1] = new osg::LineSegment(p0, q0);
 
+    // down segment 3
+    p0.set(pos3[0], pos3[1], pos3[2] + floorHeight + stepSizeUp);
+    q0.set(pos3[0], pos3[1], pos3[2] + floorHeight - stepSizeDown);
+    ray[2] = new osg::LineSegment(p0, q0);
+
     osg::ref_ptr<osgUtil::IntersectorGroup> igroup = new osgUtil::IntersectorGroup;
-    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersectors[2];
-    for (int i=0; i<2; ++i)
+    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersectors[3];
+    for (int i=0; i<3; ++i)
     {
         intersectors[i] = coIntersection::instance()->newIntersector(ray[i]->start(), ray[i]->end());
         igroup->addIntersector(intersectors[i]);
@@ -260,9 +272,12 @@ void Wheelchair::MoveToFloor()
     visitor.setTraversalMask(Isect::Walk);
     VRSceneGraph::instance()->getTransform()->accept(visitor);
 
-    bool haveIsect[2];
-    for (int i=0; i<2; ++i)
+    bool haveIsect[3];
+    for (int i=0; i<3; ++i)
+    {
         haveIsect[i] = intersectors[i]->containsIntersections();
+       fprintf(stderr,"haveIsect %d %d\n",i,haveIsect[i]);
+    }
     if (!haveIsect[0] && !haveIsect[1])
     {
         oldFloorNode = NULL;
@@ -285,6 +300,10 @@ void Wheelchair::MoveToFloor()
         isect = intersectors[1]->getFirstIntersection();
         dist = isect.getWorldIntersectPoint()[2] - floorHeight;
         floorNode = isect.nodePath.back();
+    }
+    if(!haveIsect[0]&&!haveIsect[1])
+    {
+        dist = 0;
     }
 
     //  get xform matrix
@@ -335,10 +354,12 @@ void Wheelchair::MoveToFloor()
             sf = 1.0 / sf;
             iS.makeScale(sf, sf, sf);
             imT.invert_4x4(modelTransform);
-            TransformMat = iS *imT*oldFloorMatrix * S * TransformMat;
+	    
+	fprintf(stderr,"oops %f \n",dist);
+           // TransformMat = iS *imT*oldFloorMatrix * S * TransformMat;
             oldFloorMatrix = modelTransform;
             // set new xform matrix
-            VRSceneGraph::instance()->getTransform()->setMatrix(TransformMat);
+            //VRSceneGraph::instance()->getTransform()->setMatrix(TransformMat);
             // now we have a new base matrix and we have to compute the floor height again, otherwise we will jump up and down
             //
             VRSceneGraph::instance()->getTransform()->accept(visitor);
@@ -348,7 +369,7 @@ void Wheelchair::MoveToFloor()
             visitor.setTraversalMask(Isect::Walk);
             VRSceneGraph::instance()->getTransform()->accept(visitor);
 
-            for (int i=0; i<2; ++i)
+            for (int i=0; i<3; ++i)
                 haveIsect[i] = intersectors[i]->containsIntersections();
             dist = FLT_MAX;
             if (haveIsect[0])
@@ -363,9 +384,42 @@ void Wheelchair::MoveToFloor()
                 dist = isect.getWorldIntersectPoint()[2] - floorHeight;
                 floorNode = isect.nodePath.back();
             }
+    if(!haveIsect[0]&&!haveIsect[1])
+    {
+        dist = 0;
+    }
         }
     }
 
+    if (haveIsect[0] && haveIsect[1] && haveIsect[2])
+    {
+        isect = intersectors[0]->getFirstIntersection();
+        osg::Vec3 p0 = isect.getWorldIntersectPoint();
+        isect = intersectors[1]->getFirstIntersection();
+        osg::Vec3 p1 = isect.getWorldIntersectPoint();
+        isect = intersectors[2]->getFirstIntersection();
+        osg::Vec3 p2 = isect.getWorldIntersectPoint();
+        osg::Vec3 v1 = p1 - p0;
+        osg::Vec3 v2 = p2 - p1;
+        v1.normalize();
+        v2.normalize();
+        wcNormal = v2 ^ v1;
+        wcNormal.normalize();
+        wcDataOut.normal[0] = wcNormal[0];
+        wcDataOut.normal[1] = wcNormal[1];
+        wcDataOut.normal[2] = wcNormal[2];
+        wcDataOut.direction[0] = WheelchairPos(0, 1);
+        wcDataOut.direction[1] = WheelchairPos(1, 1);
+        wcDataOut.direction[2] = WheelchairPos(2, 1);
+        //wcDataOut.downhillForce = 100.0;
+        wcDataOut.downhillForce = calculateDownhillForce(wcNormal,osg::Vec3(wcDataOut.direction[0],wcDataOut.direction[1],wcDataOut.direction[2]));
+        //fprintf(stderr, "test1");
+        fprintf(stderr, "normal\nx: %f y: %f\n z:%f\n direction\nx: %f y: %f\n z:%f\ndownhillForce: %f\n",
+                wcNormal[0], wcNormal[1], wcNormal[2], wcDataOut.direction[0], wcDataOut.direction[1],
+                wcDataOut.direction[2], wcDataOut.downhillForce);
+    }
+
+	fprintf(stderr,"dist %f \n",dist);
 
     //  apply translation , so that isectPt is at floorLevel
     osg::Matrix tmp;
@@ -433,6 +487,7 @@ void Wheelchair::updateThread()
             {
                 OpenThreads::ScopedLock<OpenThreads::Mutex> lock(mutex);
                 memcpy(&wcData, tmpBuf, sizeof(WCData));
+                udp->send(&wcDataOut, sizeof(wcDataOut));
             }
 
         }
@@ -461,9 +516,24 @@ void Wheelchair::Initialize()
         }
 }
 
+float Wheelchair::calculateDownhillForce(const osg::Vec3 &n,const osg::Vec3 &direction)
+{
+
+    osg::Vec3 g(0.0, 0.0, -1.0);
+    osg::Vec3 b = n*((g*n)/(n*n));
+    osg::Vec3 gEbene = g-b;
+
+    osg::Vec3 gwc= direction * ((gEbene*direction)/(direction*direction));
+
+    float downhillForce = gwc.length();
+    if((gwc*direction) <0)
+       downhillForce *= -1;
+
+    return downhillForce * 100 * 9.81;
+}
+
 unsigned char Wheelchair::getButton()
 {
 	return wcData.state;
 }
 COVERPLUGIN(Wheelchair)
-

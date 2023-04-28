@@ -131,6 +131,9 @@ julidochromis   OpenSUSE 13.2 on x86_64
 cyprichromis    OpenSUSE Leap 42.2 on x86_64
 tangachromis    openSUSE Leap 15.1
 altolamprologus openSUSE Leap 15.2
+leap153         openSUSE Leap 15.3
+leap154         openSUSE Leap 15.4
+chalinochromis  openSUSE Tumbleweed
 
 sarge           Debian Linux 3.1 (Sarge) with updates on ia32
 etch32          Debian Linux 4.0 (Etch) with updates on ia32
@@ -171,6 +174,7 @@ werewolf        Ubuntu 15.10 Wily Werewolf on x86_64 (64 bit mode)
 xerus           Ubuntu 16.04 Xenial Xerus on x86_64 (64 bit mode)
 bionic          Ubuntu 18.04 Bionic Beaver on x86_64 (64 bit mode)
 focal           Ubuntu 20.04 Focal Fossa on x86_64 (64 bit mode)
+jammy           Ubuntu 22.04 Jammy Jellyfish on x86_64 (64 bit mode)
 
 sgin32          IRIX 6.5, N32, Performer 2.5.2
 sgin32p31       IRIX 6.5, N32, Performer 3.1

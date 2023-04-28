@@ -74,12 +74,13 @@ class COVER_UI_EXPORT VruiView: public View
    VruiViewElement *vruiContainer(const Element *elem) const;
 
    void add(VruiViewElement *ve, const Element *elem);
+   void addToParent(VruiViewElement *ve, const Element *elem);
 
    void updateEnabled(const Element *elem) override;
    void updateVisible(const Element *elem) override;
    void updateText(const Element *elem) override;
-   void updateParent(const Element *elem) override;
    void updateState(const Button *) override;
+   void updateChildren(const Group *elem) override;
    void updateChildren(const SelectionList *sl) override;
    void updateIntegral(const Slider *slider) override;
    void updateScale(const Slider *slider) override;
@@ -87,6 +88,7 @@ class COVER_UI_EXPORT VruiView: public View
    void updateBounds(const Slider *slider) override;
    void updateValue(const TextField *input) override;
    void updateFilter(const FileBrowser *fb) override;
+   void updateRelayout(const Group* gr) override;
 
    VruiViewElement *elementFactoryImplementation(Menu *menu) override;
    VruiViewElement *elementFactoryImplementation(Group *group) override;

@@ -25,6 +25,15 @@ Group::~Group()
     clearChildren();
 }
 
+void Group::update(UpdateMaskType mask) const
+{
+    Element::update(mask);
+    if (mask & UpdateChildren)
+        manager()->updateChildren(this);
+    if (mask & UpdateRelayout)
+        manager()->updateRelayout(this);
+}
+
 bool Group::add(Element *elem, int where)
 {
     if (Container::add(elem, where))
@@ -35,8 +44,8 @@ bool Group::add(Element *elem, int where)
                 elem->parent()->remove(elem);
             assert(!elem->m_parent);
         }
-        elem->m_parent = this;
-        manager()->queueUpdate(elem, UpdateParent);
+        elem->setParent(this);
+        manager()->queueUpdate(this, UpdateChildren);
         return true;
     }
     return false;
@@ -46,13 +55,31 @@ bool Group::remove(Element *elem)
 {
     if (Container::remove(elem))
     {
-        elem->m_parent = nullptr;
-        manager()->queueUpdate(elem, UpdateParent);
+        elem->setParent(nullptr);
+        manager()->queueUpdate(this, UpdateChildren);
         return true;
     }
     return false;
 }
 
-}
+void Group::allowRelayout(bool rl)
+{
+    m_allowRelayout = rl;
+    manager()->queueUpdate(this, UpdateRelayout);
 }
 
+
+void Group::save(covise::TokenBuffer& buf) const
+{
+    Element::save(buf);
+    buf << m_allowRelayout;
+}
+
+void Group::load(covise::TokenBuffer& buf)
+{
+    Element::load(buf);
+    buf >> m_allowRelayout;
+}
+
+}
+}

@@ -34,7 +34,6 @@
 #include "VRViewer.h"
 #include "coHud.h"
 #include "coTUIFileBrowser/VRBData.h"
-#include "coVRAnimationManager.h"
 #include "coVRCollaboration.h"
 #include "coVRCommunication.h"
 #include "coVRConfig.h"
@@ -58,6 +57,7 @@
 #include <OpenVRUI/coNavInteraction.h>
 #include <PluginUtil/PluginMessageTypes.h>
 #include <config/CoviseConfig.h>
+#include <grmsg/coGRMsg.h>
 #include <net/covise_host.h>
 #include <net/message_types.h>
 #include <net/udpMessage.h>
@@ -312,46 +312,19 @@ void coVRCommunication::processVRBMessage(covise::TokenBuffer &tb)
     {
         coVRPartnerList::instance()->receiveAvatarMessage(tb);
     }
-        break;
-    case vrb::TIMESTEP:
-    {
-        int ts;
-        tb >> ts;
-        coVRAnimationManager::instance()->setRemoteAnimationFrame(ts);
-    }
-        break;
-    case vrb::TIMESTEP_ANIMATE:
-    {
-        bool anumRunning;
-        tb >> anumRunning;
-        coVRAnimationManager::instance()->setRemoteAnimate(anumRunning);
-    }
-        break;
-    case vrb::TIMESTEP_SYNCRONIZE:
-    {
-        int ts;
-        tb >> ts;
-        coVRAnimationManager::instance()->setRemoteSynchronize(ts == 1);
-    }
-        break;
+    break;
     case vrb::SYNC_MODE:
     {
         bool showAvatar;
         tb >> showAvatar;
-        if (showAvatar)
-        {
-            coVRPartnerList::instance()->showAvatars();
-        }
-        else
-        {
-            coVRPartnerList::instance()->hideAvatars();
-        }
+        coVRCollaboration::instance()->showAvatars(showAvatar);
     }
         break;
     case vrb::MASTER:
     {
         coVRPartnerList::instance()->setMaster(me()->ID());
         coVRCollaboration::instance()->updateSharedStates();
+        coVRCollaboration::instance()->updateUi();
     }
         break;
     case vrb::SLAVE:
@@ -360,6 +333,7 @@ void coVRCommunication::processVRBMessage(covise::TokenBuffer &tb)
         tb >> id;
         coVRPartnerList::instance()->setMaster(id); //nobody is master here?
         coVRCollaboration::instance()->updateSharedStates();
+        coVRCollaboration::instance()->updateUi();
     }
         break;
     case vrb::MOVE_HAND:
@@ -437,6 +411,7 @@ void coVRCommunication::becomeMaster()
     coVRPluginList::instance()->becomeCollaborativeMaster();
     coVRPartnerList::instance()->setMaster(me()->ID());
     me()->becomeMaster();
+    coVRCollaboration::instance()->updateUi();
 }
 
 void coVRCommunication::handleVRB(const Message &msg)
@@ -482,6 +457,7 @@ void coVRCommunication::handleVRB(const Message &msg)
         }
         coVRPartnerList::instance()->print();
         coVRCollaboration::instance()->updateSharedStates();
+        coVRCollaboration::instance()->updateUi();
     }
     break;
     case COVISE_MESSAGE_VRB_QUIT:
@@ -491,7 +467,7 @@ void coVRCommunication::handleVRB(const Message &msg)
         if (id != me()->ID())
         {
              coVRPartnerList::instance()->removePartner(id);
-			 vrui::coInteractionManager::the()->resetLocks(id);
+			 vrui::coInteractionManager::the()->resetLock(id);
         }
         if (coVRPartnerList::instance()->numberOfPartners() <= 1)
             coVRCollaboration::instance()->showCollaborative(false);
@@ -534,26 +510,22 @@ void coVRCommunication::handleVRB(const Message &msg)
     case COVISE_MESSAGE_RENDER_MODULE:
     {
         coVRPluginList::instance()->forwardMessage(msg.data);
-        std::cerr << "coVRCommunication received COVISE_MESSAGE_RENDER_MODULE, this might be deprecated." << std::endl
-                  << "Please tell dennis.grieger@hlrs.de what you did to get this message." << std::endl;
         break;
     }
     case COVISE_MESSAGE_RENDER:
     {
-        if (msg.data.length() > 1 && strcmp(msg.data.data() + 1, "GRMSG") == 0)
+        if(auto grmsg = grmsg::create(msg.data.data()))
         {
-            cover->guiToRenderMsg(msg.data.data() + 1 + strlen("GRMSG") + 1);
+            cover->guiToRenderMsg(*grmsg);
         }
         else
         {
-            std::cerr << "coVRCommunication received COVISE_MESSAGE_RENDER, this might be deprecated." << std::endl
-                      << "Please tell dennis.grieger@hlrs.de what you did to get this message." << std::endl;
+            std::cerr << "coVRCommunication received COVISE_MESSAGE_RENDER, this might be deprecated." << std::endl;
         }
         break;
     }
     case COVISE_MESSAGE_SOCKET_CLOSED:
     case COVISE_MESSAGE_CLOSE_SOCKET:
-    case COVISE_MESSAGE_VRB_CLOSE_VRB_CONNECTION:
     {
         toggleClientState(false);
     }
@@ -693,6 +665,7 @@ void coVRCommunication::handleVRB(const Message &msg)
             coVRPartnerList::instance()->print();
         }
         coVRCollaboration::instance()->updateSharedStates();
+        coVRCollaboration::instance()->updateUi();
     }
     break;
     case COVISE_MESSAGE_VRBC_CHANGE_SESSION:
@@ -706,7 +679,16 @@ void coVRCommunication::handleVRB(const Message &msg)
         while (me()->ID() == 0)
         {
             Message m;
-            OpenCOVER::instance()->vrbc()->wait(&m);
+            if (coVRMSController::instance()->isMaster())
+            {
+                OpenCOVER::instance()->vrbc()->wait(&m);
+                coVRMSController::instance()->sendSlaves(&m);
+            }
+            else
+            {
+                coVRMSController::instance()->readMaster(&m);
+            }
+
             assert(m.type != COVISE_MESSAGE_VRBC_CHANGE_SESSION);
             handleVRB(m);
         }
@@ -715,6 +697,7 @@ void coVRCommunication::handleVRB(const Message &msg)
         tb >> sessionID;
         coVRCollaboration::instance()->sessionChanged(sessionID.isPrivate());
         setSessionID(sessionID);
+        coVRCollaboration::instance()->updateUi();
     }
     break;
     case COVISE_MESSAGE_VRB_SAVE_SESSION:
@@ -728,6 +711,7 @@ void coVRCommunication::handleVRB(const Message &msg)
         tb >> sessionID;
         registry->resubscribe(sessionID);
         coVRCollaboration::instance()->updateSharedStates(true);
+        coVRCollaboration::instance()->updateUi();
     }
     break;
     case COVISE_MESSAGE_VRB_MESSAGE:

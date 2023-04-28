@@ -137,7 +137,7 @@ void VrmlNodeImageTexture::render(Viewer *viewer)
     // them...
     if (!d_image && d_url.size() > 0)
     {
-        const char *relUrl = d_relativeUrl.get() ? d_relativeUrl.get() : d_scene->urlDoc()->url();
+        auto relUrl = d_relativeUrl.get() ? d_relativeUrl.get() : d_scene->urlDoc()->url();
         Doc relDoc(relUrl);
         d_image = new Image;
         if (!d_image->tryURLs(d_url.size(), d_url.get(), &relDoc))
@@ -156,8 +156,8 @@ void VrmlNodeImageTexture::render(Viewer *viewer)
         if (d_image && (pix = d_image->pixels()))
         {
             // Ensure the image dimensions are powers of two
-            int sizes[] = { 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 };
-            int nSizes = sizeof(sizes) / sizeof(int);
+            static const int sizes[] = { 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 };
+            static const int nSizes = sizeof(sizes) / sizeof(int);
             int w = d_image->w();
             int h = d_image->h();
             int i, j;

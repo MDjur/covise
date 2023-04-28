@@ -14,7 +14,7 @@
 //
 %module coGRMsg
 %{
-#include "grmsg/coGRMsg.h"
+#include "grmsg/coGRMsg_decl.h"
 #include "grmsg/coGRObjMsg.h"
 #include "grmsg/coGRObjRegisterMsg.h"
 #include "grmsg/coGRObjVisMsg.h"
@@ -28,6 +28,7 @@
 #include "grmsg/coGRChangeViewpointMsg.h"
 #include "grmsg/coGRChangeViewpointIdMsg.h"
 #include "grmsg/coGRChangeViewpointNameMsg.h"
+#include "grmsg/coGRSetViewpointFile.h"
 #include "grmsg/coGRViewpointChangedMsg.h"
 #include "grmsg/coGRToggleFlymodeMsg.h"
 #include "grmsg/coGRObjSetCaseMsg.h"
@@ -77,8 +78,9 @@
 #include "grmsg/coGRObjSetVariantMsg.h"
 #include "grmsg/coGRObjSetAppearanceMsg.h"
 #include "grmsg/coGRObjKinematicsStateMsg.h"
+#include "grmsg/coGRColorBarPluginMsg.h"
 %}
-%include coGRMsg.h
+%include coGRMsg_decl.h
 %include coGRObjMsg.h
 %include coGRObjRegisterMsg.h
 %include coGRObjVisMsg.h
@@ -92,6 +94,7 @@
 %include coGRChangeViewpointMsg.h
 %include coGRChangeViewpointIdMsg.h
 %include coGRChangeViewpointNameMsg.h
+%include coGRSetViewpointFile.h
 %include coGRViewpointChangedMsg.h
 %include coGRShowPresentationpointMsg.h
 %include coGRObjSetCaseMsg.h
@@ -143,7 +146,7 @@
 %include coGRObjSetVariantMsg.h
 %include coGRObjSetAppearanceMsg.h
 %include coGRObjKinematicsStateMsg.h
-
+%include coGRColorBarPluginMsg.h
 using namespace std;
 
 

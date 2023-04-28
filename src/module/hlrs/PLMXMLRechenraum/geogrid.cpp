@@ -2029,17 +2029,20 @@ int DefineBCs(struct rechgrid *grid, struct rech_model *model, int number)
 int GenerateFloorBCs(struct rechgrid *grid, struct rech_model *model)
 {
     // read BC file
-    FILE *stream;
+#if NONCOMPLIENTPARSING
+    FILE* stream;
     char buf[2000];
-    char *token;
+    double b[6];
+    double mat[16];
+    char* token;
+    int jhi, khi;
+#endif
     float x, y;
     int i, j, k;
 
-    int jlo, jhi; // y-position in structured grid
-    int klo, khi; // x-position
+    int jlo; // y-position in structured grid
+    int klo; // x-position
 
-    double mat[16];
-    double b[6];
 
     //read from PLMXML-File
     plmxml_file = model->PLMXMLFile;
@@ -2843,12 +2846,15 @@ int GenerateCeilingBCs(struct rechgrid *grid, struct rech_model *model)
     // here we want to generate the ceiling outlet BCs
     fprintf(stderr, "GenerateCeilingBCs!\n");
 
-    char *token;
     float x, y;
+#if NONCOMPLIENTPARSING
+    char* token;
     int kx, jy;
+#endif
+    int  jhi;
     int i, j, k;
 
-    int jlo, jhi; // y-position in structured grid
+    int jlo; // y-position in structured grid
     int klo, khi; // x-position
 
     vector<float> dx;

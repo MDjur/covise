@@ -115,7 +115,7 @@ void preventBrokenPipe()
 
 #else
 
-    coSignalHandler emptyHandler;
+    static coSignalHandler emptyHandler;
     coSignal::addSignal(SIGPIPE, emptyHandler);
 
 #endif
@@ -134,7 +134,7 @@ void printWelcomeMessage()
     cerr << endl;
     cerr << "*******************************************************************************" << endl;
     string text = CoviseVersion::shortVersion();
-    string text2 = "* COVISE " + text + " starting up, please be patient....                    *";
+    string text2 = "* COVISE " + text + " starting up, please be patient....                  *";
     cerr << text2 << endl;
     cerr << "*                                                                             *" << endl;
 }
@@ -151,14 +151,13 @@ CTRLHandler *CTRLHandler::singleton = nullptr;
 CTRLHandler::CTRLHandler(int argc, char *argv[])
     : m_autosavefile(autosaveFile())
 {
-    std::cerr << "starting covise" << std::endl;
     singleton = this;
 
     preventBrokenPipe();
     initDummyMessage();
 
     // signal(SIGTERM, sigHandlerQuit );
-    sigQuitHandler quitHandler(m_hostManager);
+    static sigQuitHandler quitHandler(m_hostManager);
     coSignal::addSignal(SIGTERM, quitHandler);
 
     parseCommandLine(argc, argv);
@@ -180,6 +179,11 @@ CTRLHandler *CTRLHandler::instance()
 {
     assert(singleton);
     return singleton;
+}
+
+CTRLHandler::~CTRLHandler()
+{
+    coSignal::blockAllSignals();
 }
 
 NumRunning &CTRLHandler::numRunning()

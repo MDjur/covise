@@ -61,8 +61,6 @@ std::string coCoviseConfig::getEntry(const std::string &variable, const std::str
 
 std::string coCoviseConfig::getEntry(const std::string &variable, const std::string &entry, const std::string &defaultValue, bool *exists)
 {
-    if (entry == "COVER.UI.NavigationManager.Navigation.ViewAll")
-        std::cerr << " " << std::endl;
     auto val = coConfig::getInstance()->getValue(variable, entry);
 
     if (val == coConfigEntryString{})
@@ -102,9 +100,9 @@ int coCoviseConfig::getInt(const std::string &entry, int defaultValue, bool *exi
  */
 int coCoviseConfig::getInt(const std::string &variable, const std::string &entry, int defaultValue, bool *exists)
 {
-    COCONFIGDBG("coCoviseConfig::getInt info: enter " << entry.c_str() << "/" << variable.c_str() << " default " << defaultValue);
+    COCONFIGDBG("coCoviseConfig::getInt info: enter " << entry << "/" << variable.c_str() << " default " << defaultValue);
     coConfigInt val = coConfig::getInstance()->getInt(variable, entry);
-    COCONFIGDBG("coCoviseConfig::getInt info: " << entry.c_str() << "/" << variable.c_str() << " = " << val
+    COCONFIGDBG("coCoviseConfig::getInt info: " << entry << "/" << variable.c_str() << " = " << val
                                                 << " (" << val.hasValidValue() << ")");
     if (exists)
         *exists = val.hasValidValue();
@@ -137,9 +135,9 @@ long coCoviseConfig::getLong(const std::string &entry, long defaultValue, bool *
  */
 long coCoviseConfig::getLong(const std::string &variable, const std::string &entry, long defaultValue, bool *exists)
 {
-    COCONFIGDBG("coCoviseConfig::getLong info: enter " << entry.c_str() << "/" << variable.c_str() << " default " << defaultValue);
+    COCONFIGDBG("coCoviseConfig::getLong info: enter " << entry << "/" << variable.c_str() << " default " << defaultValue);
     coConfigLong val = coConfig::getInstance()->getLong(variable, entry);
-    COCONFIGDBG("coCoviseConfig::getLong info: " << entry.c_str() << "/" << variable.c_str() << " = " << val
+    COCONFIGDBG("coCoviseConfig::getLong info: " << entry << "/" << variable.c_str() << " = " << val
                                                  << " (" << val.hasValidValue() << ")");
     if (exists)
         *exists = val.hasValidValue();
@@ -173,9 +171,9 @@ bool coCoviseConfig::isOn(const std::string &entry, bool defaultValue, bool *exi
  */
 bool coCoviseConfig::isOn(const std::string &variable, const std::string &entry, bool defaultValue, bool *exists)
 {
-    COCONFIGDBG("coCoviseConfig::isOn info: enter " << entry.c_str() << "/" << variable.c_str() << " default " << defaultValue);
+    COCONFIGDBG("coCoviseConfig::isOn info: enter " << entry << "/" << variable << " default " << defaultValue);
     coConfigBool val = coConfig::getInstance()->getBool(variable, entry);
-    COCONFIGDBG("coCoviseConfig::isOn info: " << entry.c_str() << "/" << variable.c_str() << " = " << val
+    COCONFIGDBG("coCoviseConfig::isOn info: " << entry << "/" << variable << " = " << val
                                               << " (" << val.hasValidValue() << ")");
     if (exists)
         *exists = val.hasValidValue();
@@ -208,9 +206,9 @@ float coCoviseConfig::getFloat(const std::string &entry, float defaultValue, boo
  */
 float coCoviseConfig::getFloat(const std::string &variable, const std::string &entry, float defaultValue, bool *exists)
 {
-    COCONFIGDBG("coCoviseConfig::getFloat info: enter " << entry.c_str() << "/" << variable.c_str() << " default " << defaultValue);
+    COCONFIGDBG("coCoviseConfig::getFloat info: enter " << entry << "/" << variable << " default " << defaultValue);
     coConfigFloat val = coConfig::getInstance()->getFloat(variable, entry);
-    COCONFIGDBG("coCoviseConfig::getFloat info: " << entry.c_str() << " = " << val
+    COCONFIGDBG("coCoviseConfig::getFloat info: " << entry << " = " << val
                                                   << " (" << val.hasValidValue() << ")");
     if (exists)
         *exists = val.hasValidValue();
