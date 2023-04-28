@@ -658,25 +658,25 @@ namespace OpenFOAMInterface.BIM
         /// <param name="lambda">Lambda expression.</param>
         /// <param name="convertFunc">Convert-function Func<Parameter, DisplayUnitType, T>.</param>
         /// <returns>Converted Parameter as T.</returns>
-        private T GetParamValue<T>(Parameter param, ForgeTypeId type, Func<bool> lambda, Func<Parameter, ForgeTypeId, T> convertFunc)
-        {
-            T paramValue = default;
-            if (lambda())
-                paramValue = convertFunc(param, type);
-            return paramValue;
-        }
+        // private T GetParamValue<T>(Parameter param, ForgeTypeId type, Func<bool> lambda, Func<Parameter, ForgeTypeId, T> convertFunc)
+        // {
+        //     T paramValue = default;
+        //     if (lambda())
+        //         paramValue = convertFunc(param, type);
+        //     return paramValue;
+        // }
 
         /// <summary>
         /// Convert given parameter in type with UnitUtils function ConvertFromInternalUnits.
         /// </summary>
         /// <param name="param">Parameter of object.</param>
         /// <param name="type">DisplayUnitType.</param>
-        /// <returns>Parameter value as double.</returns>
-        private double ConvertParameterToDisplayUnitType(Parameter param, Autodesk.Revit.DB.ForgeTypeId type)
+        /// <returns>Parameter value as T.</returns>
+        private T ConvertParameterToDisplayUnitType<T>(Parameter param, Autodesk.Revit.DB.ForgeTypeId type)
         {
             if (UnitTypeId.Custom == type)
-                return param.AsInteger();
-            return UnitUtils.ConvertFromInternalUnits(param.AsDouble(), type);
+                return (T) Convert.ChangeType(param.AsInteger(), typeof(T));
+            return (T) Convert.ChangeType(UnitUtils.ConvertFromInternalUnits(param.AsDouble(), type), typeof(T));
         }
 
 
@@ -1132,60 +1132,6 @@ namespace OpenFOAMInterface.BIM
             return InitDuctParameters();
         }
 
-        private void GetFlowParameters(FamilyInstance instance, ref double flowRate, ref double meanFlowVelocity, ref double staticPressure, ref int rpm, ref double surfaceArea, ref double temperature)
-        {
-            foreach (Parameter param in instance.Parameters)
-            {
-                try
-                {
-                    if (flowRate == 0)
-                    {
-                        flowRate = GetParamValue(param, Autodesk.Revit.DB.UnitTypeId.CubicMetersPerSecond,
-                            () => param.Definition.GetDataType() == SpecTypeId.AirFlow, ConvertParameterToDisplayUnitType);
-                        if (flowRate != 0 && surfaceArea > 0)
-                        {
-                            meanFlowVelocity = flowRate / surfaceArea;
-                            continue;
-                        }
-                    }
-
-                    if (staticPressure == 0)
-                    {
-                        staticPressure = GetParamValue(param, Autodesk.Revit.DB.UnitTypeId.Pascals,
-                            () => param.Definition.Name.Equals("static Pressure") && param.Definition.GetDataType() == SpecTypeId.HvacPressure,
-                            ConvertParameterToDisplayUnitType);
-                        if (staticPressure != 0)
-                            continue;
-                    }
-
-                    if (rpm == 0)
-                    {
-                        rpm = (int)GetParamValue(param, Autodesk.Revit.DB.UnitTypeId.Custom,
-                            () => param.Definition.Name.Equals("RPM"), ConvertParameterToDisplayUnitType);
-
-                        if (rpm != 0)
-                            continue;
-                    }
-
-                    if (temperature == 0)
-                    {
-                        temperature = (double)GetParamValue(param, Autodesk.Revit.DB.UnitTypeId.Kelvin,
-                            () => param.Definition.Name.Equals("Temperature") && param.Definition.GetDataType() == SpecTypeId.HvacTemperature, ConvertParameterToDisplayUnitType);
-
-                        if (temperature != 0)
-                            continue;
-                        else
-                            temperature = m_TempInlet;
-                    }
-                }
-                catch (Exception e)
-                {
-                    OpenFOAMDialogManager.ShowDialogException(e);
-                    return;
-                }
-            }
-        }
-
         /// <summary>
         /// Helper function for initializing the flow face lists Inlet/Outlet based on given element.
         /// <param name="entry">Autodesk Element.</param>
@@ -1199,12 +1145,28 @@ namespace OpenFOAMInterface.BIM
             XYZ faceNormal = GetSurfaceParameter(instance, GetFaceNormal);
             double faceBoundary = GetSurfaceParameter(instance, GetFaceBoundary);
             double surfaceArea = Math.Round(GetSurfaceParameter(instance, GetFaceArea), 2);
-            double flowRate = 0;
-            double meanFlowVelocity = 0;
-            double staticPressure = 0;
-            int rpm = 0;
-            double temperature = 0;
-            GetFlowParameters(instance, ref flowRate, ref meanFlowVelocity, ref staticPressure, ref rpm, ref surfaceArea, ref temperature);
+            double flowRate = default;
+            double meanFlowVelocity = default;
+            double staticPressure = default;
+            double temperature = default;
+            int rpm = default;
+            foreach (Parameter param in instance.Parameters)
+            {
+                if (param.Definition.GetDataType() == SpecTypeId.AirFlow)
+                    flowRate = ConvertParameterToDisplayUnitType<double>(param, Autodesk.Revit.DB.UnitTypeId.CubicMetersPerSecond);
+                else if(param.Definition.Name.Equals("static Pressure") && param.Definition.GetDataType() == SpecTypeId.HvacPressure)
+                    staticPressure = ConvertParameterToDisplayUnitType<double>(param, Autodesk.Revit.DB.UnitTypeId.CubicMetersPerSecond);
+                else if(param.Definition.Name.Equals("Temperature") && param.Definition.GetDataType() == SpecTypeId.HvacTemperature)
+                    temperature = ConvertParameterToDisplayUnitType<double>(param, Autodesk.Revit.DB.UnitTypeId.Kelvin);
+                else if(param.Definition.Name.Equals("RPM"))
+                    rpm = ConvertParameterToDisplayUnitType<int>(param, Autodesk.Revit.DB.UnitTypeId.Custom);
+            }
+            if (flowRate != default && meanFlowVelocity != default)
+                if (surfaceArea > 0)
+                    meanFlowVelocity = flowRate / surfaceArea;
+
+            if (temperature == default)
+                temperature = m_TempInlet;
 
             string name = AutodeskHelperFunctions.GenerateNameFromElement(entry);
             DuctProperties dProp = CreateDuctProperties(faceNormal, faceBoundary, flowRate, meanFlowVelocity, staticPressure, rpm, surfaceArea, temperature);
