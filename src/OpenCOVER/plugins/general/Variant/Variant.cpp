@@ -23,7 +23,10 @@ Variant *Variant::variantClass = NULL;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-Variant::Variant(std::string var_Name, osg::Node *node, osg::Node::ParentList pa, ui::Menu *Variant_menu, coTUITab *VariantPluginTab, int numVar, QDomDocument *xml, QDomElement *qDE_V, coVRBoxOfInterest *boi, bool default_state)
+Variant::Variant(VariantPlugin *plugin, std::string var_Name, osg::Node *node, osg::Node::ParentList pa,
+                 ui::Menu *Variant_menu, coTUITab *VariantPluginTab, int numVar, QDomDocument *xml, QDomElement *qDE_V,
+                 coVRBoxOfInterest *boi, bool default_state)
+: plugin(plugin)
 {
     myboi = boi;
     variantClass = this;
@@ -32,10 +35,7 @@ Variant::Variant(std::string var_Name, osg::Node *node, osg::Node::ParentList pa
     VarNode = new osg::MatrixTransform;
     VarNode->setName("Variant:"+var_Name);
 
-    if (node)
-    {
-        attachNode(node);
-    }
+    attachNode(node);
 
     origin_matrix = VarNode->getMatrix();
     createVRLabel();
@@ -84,6 +84,8 @@ void Variant::removeFromScenegraph(osg::Node *node)
         (*parent)->removeChild(VarNode);
         cout << "ParentName: " << (*parent)->getName() << endl;
     }
+    if (cn)
+        cn->getParent(0)->removeChild(cn);
 }
 //------------------------------------------------------------------------------
 
@@ -175,9 +177,11 @@ void Variant::menuEvent(coMenuItem *item)
         TokenBuffer tb;
         tb << vName;
         if (selected)
-            cover->sendMessage(this, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow, tb.get_length(), tb.get_data());
+            cover->sendMessage(plugin, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow, tb.get_length(),
+                               tb.get_data());
         else
-            cover->sendMessage(this, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantHide, tb.get_length(), tb.get_data());
+            cover->sendMessage(plugin, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantHide, tb.get_length(),
+                               tb.get_data());
     }
 }
 #endif
@@ -192,9 +196,11 @@ void Variant::tabletEvent(coTUIElement *item)
         TokenBuffer tb;
         tb << vName;
         if (selected)
-            cover->sendMessage(this, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow, tb.getData().length(), tb.getData().data());
+            cover->sendMessage(plugin, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow,
+                               tb.getData().length(), tb.getData().data());
         else
-            cover->sendMessage(this, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantHide, tb.getData().length(), tb.getData().data());
+            cover->sendMessage(plugin, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantHide,
+                               tb.getData().length(), tb.getData().data());
     }
     else if (item == ui->getRadioTUI_Item())
     {
@@ -208,7 +214,8 @@ void Variant::tabletEvent(coTUIElement *item)
         std::string vName = this->getVarname();
         TokenBuffer tb;
         tb << vName;
-        cover->sendMessage(this, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow, tb.getData().length(), tb.getData().data());
+        cover->sendMessage(plugin, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow, tb.getData().length(),
+                           tb.getData().data());
     }
     //EditFloatField Button:
     else

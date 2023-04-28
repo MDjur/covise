@@ -6,6 +6,10 @@
 #include <cover/VRSceneGraph.h>
 #include <cover/coVRMSController.h>
 
+extern "C" {
+#include <libavutil/imgutils.h>
+};
+
 #ifdef WIN32
 #include <sys/timeb.h>
 #else
@@ -40,7 +44,9 @@ FFMPEGVideoPlayer::FFMPEGVideoPlayer()
     loop = false;
     speed = 1.0;
 
+#if LIBAVCODEC_VERSION_MAJOR < 59
     av_register_all();
+#endif
 }
 
 FFMPEGVideoPlayer::~FFMPEGVideoPlayer()
@@ -165,14 +171,9 @@ void VideoStream::audio_callback(void *usrDat, Uint8 *stream, int len)
     int len1, size;
     double pts;
 
-#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55, 52, 102)
-    static uint8_t audioBuffer[(AVCODEC_MAX_AUDIO_FRAME_SIZE * 3) / 2];
-    static uint8_t stillBuffer[(AVCODEC_MAX_AUDIO_FRAME_SIZE * 3) / 2];
-#else
 #define MAX_AUDIO_FRAME_SIZE 192000
     static uint8_t audioBuffer[(MAX_AUDIO_FRAME_SIZE * 3) / 2];
     static uint8_t stillBuffer[(MAX_AUDIO_FRAME_SIZE * 3) / 2];
-#endif
     while (len > 0)
     {
         if (audioBufferIndex >= audioBufferSize)
@@ -242,9 +243,7 @@ int VideoStream::audioDecodeFrame(VideoStream *vStream, uint8_t *buffer, int siz
         while (audioPkt.size > 0)
         {
             bytesDecoded = size;
-#if LIBAVCODEC_VERSION_MAJOR < 53
-            len1 = avcodec_decode_audio2(vStream->audioCodecCtx, (int16_t *)buffer, &bytesDecoded, audioPkt.data, audioPkt.size);
-#elif LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 24, 102)
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 24, 102)
             len1 = avcodec_decode_audio3(vStream->audioCodecCtx, (int16_t *)buffer, &bytesDecoded, &audioPkt);
 #else
             AVFrame *frame = av_frame_alloc();
@@ -252,9 +251,22 @@ int VideoStream::audioDecodeFrame(VideoStream *vStream, uint8_t *buffer, int siz
                 audioPkt.size = 0;
                 break;
             }
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 0, 0)
             int got_output = 0;
             int ret = avcodec_decode_audio4(vStream->audioCodecCtx, frame, &got_output, &audioPkt);
             len1 = got_output? frame->nb_samples * vStream->audioCodecCtx->channels * bps : 0;
+#else
+            int ret = avcodec_receive_frame(vStream->audioCodecCtx, frame);
+            bool got_output = false;
+            if (ret == 0)
+                got_output = true;
+            if (ret == AVERROR(EAGAIN))
+                ret = 0;
+            len1 = 0;
+            if (ret == 0) {
+                len1 = avcodec_send_packet(vStream->audioCodecCtx, &audioPkt);
+            }
+#endif
 #endif
             if (len1 < 0) /* Error, skip frame */
             {
@@ -426,11 +438,7 @@ VideoStream::~VideoStream()
 
 bool VideoStream::openMovieCodec(const std::string filename, AVPixelFormat *pixFormat)
 {
-#if LIBAVFORMAT_VERSION_INT <= AV_VERSION_INT(52, 64, 2)
-    if (av_open_input_file(&oc, filename.c_str(), NULL, 0, NULL) != 0)
-#else
     if (avformat_open_input(&oc, filename.c_str(), NULL, NULL) != 0)
-#endif
     {
         fprintf(stderr, "Could not open file\n");
         playAudio = false;
@@ -448,29 +456,15 @@ bool VideoStream::openMovieCodec(const std::string filename, AVPixelFormat *pixF
         return false;
     }
 
-#if LIBAVFORMAT_VERSION_INT <= AV_VERSION_INT(52, 64, 2)
-    dump_format(oc, 0, filename.c_str(), 0);
-#else
     av_dump_format(oc, 0, filename.c_str(), 0);
-#endif
 
     for (unsigned int i = 0; i < oc->nb_streams; i++)
     {
-#if LIBAVCODEC_VERSION_MAJOR >= 53
-        if ((oc->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) && (videoStreamID < 0))
+        if ((oc->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) && (videoStreamID < 0))
             videoStreamID = i;
 #ifdef HAVE_SDL
-        else if ((oc->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) && (audioStreamID < 0))
+        else if ((oc->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) && (audioStreamID < 0))
             audioStreamID = i;
-#endif
-#else
-
-        if ((oc->streams[i]->codec->codec_type == CODEC_TYPE_VIDEO) && (videoStreamID < 0))
-            videoStreamID = i;
-#ifdef HAVE_SDL
-        else if ((oc->streams[i]->codec->codec_type == CODEC_TYPE_AUDIO) && (audioStreamID < 0))
-            audioStreamID = i;
-#endif
 #endif
     }
 
@@ -481,26 +475,39 @@ bool VideoStream::openMovieCodec(const std::string filename, AVPixelFormat *pixF
         return false;
     }
 
-    codecCtx = oc->streams[videoStreamID]->codec;
-
-    codec = avcodec_find_decoder(codecCtx->codec_id);
-    if (codec == NULL)
+    codec = avcodec_find_decoder(oc->streams[videoStreamID]->codecpar->codec_id);
+    if (!codec)
     {
-        fprintf(stderr, "Unsupported video codec\n");
+        av_log(NULL, AV_LOG_ERROR, "Failed to find decoder for stream #%u\n", videoStreamID);
         playAudio = false;
         return false;
     }
+    codecCtx = avcodec_alloc_context3(codec);
+    if (!codecCtx)
+    {
+        av_log(NULL, AV_LOG_ERROR, "Failed to allocate the decoder context for stream #%u\n", videoStreamID);
+        return false;
+    }
+    if (avcodec_parameters_to_context(codecCtx, oc->streams[videoStreamID]->codecpar) < 0)
+    {
+        av_log(NULL, AV_LOG_ERROR,
+               "Failed to copy decoder parameters to input decoder context "
+               "for stream #%u\n",
+               videoStreamID);
+        return false;
+    }
 
+
+    //codecCtx = oc->streams[videoStreamID]->codecctx;
+
+#ifdef AV_CODEC_CAP_TRUNCATED
     // Inform the codec that we can handle truncated bitstreams -- i.e.,
     // bitstreams where frame boundaries can fall in the middle of packets
     if (codec->capabilities & AV_CODEC_CAP_TRUNCATED)
         codecCtx->flags |= AV_CODEC_FLAG_TRUNCATED;
-
-#if LIBAVCODEC_VERSION_MAJOR < 54
-    if (avcodec_open(codecCtx, codec) < 0)
-#else
-    if (avcodec_open2(codecCtx, codec, NULL) < 0)
 #endif
+
+    if (avcodec_open2(codecCtx, codec, NULL) < 0)
     {
         fprintf(stderr, "Could not open video codec\n");
         playAudio = false;
@@ -516,21 +523,31 @@ bool VideoStream::openMovieCodec(const std::string filename, AVPixelFormat *pixF
 
     else if (playAudio)
     {
-        audioCodecCtx = oc->streams[audioStreamID]->codec;
-
-        audioCodec = avcodec_find_decoder(audioCodecCtx->codec_id);
-        if (audioCodec == NULL)
+        audioCodec = avcodec_find_decoder(oc->streams[audioStreamID]->codecpar->codec_id);
+        if (!audioCodec)
         {
-            fprintf(stderr, "Unsupported audio codec\n");
+            av_log(NULL, AV_LOG_ERROR, "Failed to find audio decoder for stream #%u\n", audioStreamID);
             playAudio = false;
+        }
+    }
+    if (playAudio)
+    {
+        audioCodecCtx = avcodec_alloc_context3(audioCodec);
+        if (!audioCodecCtx)
+        {
+            av_log(NULL, AV_LOG_ERROR, "Failed to allocate the decoder context for stream #%u\n", audioStreamID);
+            return false;
+        }
+        if (avcodec_parameters_to_context(codecCtx, oc->streams[audioStreamID]->codecpar) < 0)
+        {
+            av_log(NULL, AV_LOG_ERROR,
+                    "Failed to copy decoder parameters to input decoder context "
+                    "for stream #%u\n",
+                    audioStreamID);
             return false;
         }
 
-#if LIBAVCODEC_VERSION_MAJOR < 54
-        if (avcodec_open(audioCodecCtx, audioCodec) < 0)
-#else
         if (avcodec_open2(audioCodecCtx, audioCodec, NULL) < 0)
-#endif
         {
             fprintf(stderr, "Could not open audio codec\n");
             playAudio = false;
@@ -582,9 +599,10 @@ bool VideoStream::allocateRGBFrame(AVPixelFormat pixFormat)
 {
     dispFrameRGB = av_frame_alloc();
 
-    numBytesRGB = avpicture_get_size(pixFormat, codecCtx->width, codecCtx->height);
+    numBytesRGB = av_image_get_buffer_size(pixFormat, codecCtx->width, codecCtx->height, 1);
     uint8_t *frameRGBBuffer = new uint8_t[numBytesRGB];
-    numBytesRGB = avpicture_fill((AVPicture *)dispFrameRGB, frameRGBBuffer, pixFormat, codecCtx->width, codecCtx->height);
+    numBytesRGB = av_image_fill_arrays(dispFrameRGB->data, dispFrameRGB->linesize, frameRGBBuffer, pixFormat,
+                                       codecCtx->width, codecCtx->height, 1);
 
     if (numBytesRGB <= 0)
     {
@@ -645,48 +663,56 @@ int VideoStream::readFrame()
             AVPacket oldPacket = packet;
             do
             {
-                int size;
-#if LIBAVCODEC_VERSION_MAJOR < 53
-                size = avcodec_decode_video(codecCtx, pFrame, &frameFinished, packet.data, packet.size);
-#else
-                size = avcodec_decode_video2(codecCtx, pFrame, &frameFinished, &packet);
-#endif
-
-                if (first)
+                int ret = avcodec_send_packet(codecCtx, &packet);
+                if (ret == 0 || ret == AVERROR(EAGAIN))
                 {
-                    pts = (packet.pts - oc->streams[videoStreamID]->start_time) * av_q2d(oc->streams[videoStreamID]->time_base);
-                    first = false;
+                    int ret = avcodec_receive_frame(codecCtx, pFrame);
+                    if (ret != 0 && ret != AVERROR(EAGAIN))
+                    {
+                        return -1;
+                    }
+                    if (first)
+                    {
+                        pts = (packet.pts - oc->streams[videoStreamID]->start_time) *
+                              av_q2d(oc->streams[videoStreamID]->time_base);
+                        first = false;
+                    }
                 }
-
-                packet.data += size;
-                packet.size -= size;
+                else
+                {
+                    return -1;
+                }
             } while ((packet.size > 0) && !frameFinished);
 
             if (frameFinished)
             {
+#if 0
                 if (packet.dts != AV_NOPTS_VALUE)
                     pts = (packet.dts - oc->streams[videoStreamID]->first_dts) * av_q2d(oc->streams[videoStreamID]->time_base);
                 if (packet.dts == oc->streams[videoStreamID]->first_dts)
                     pts = synchronizeVideo(pts, true);
                 else
                     pts = synchronizeVideo(pts, false);
+#else
+                pts = synchronizeVideo(pts, false);
+#endif
 
                 sws_scale(swsConvertCtx, pFrame->data, pFrame->linesize, 0, codecCtx->height, dispFrameRGB->data, dispFrameRGB->linesize);
                 DisplayImage *dispImg = new DisplayImage(dispFrameRGB->data[0], pts, readBufferIndex, readBufferLinesize, readBufferLines, readBufferIncrement);
                 vq->putImage(dispImg);
 
                 first = true;
-                av_free_packet(&oldPacket);
+                av_packet_unref(&oldPacket);
                 return frameFinished;
             }
-            av_free_packet(&oldPacket);
+            av_packet_unref(&oldPacket);
         }
 #ifdef HAVE_SDL
         else if (playAudio && (packet.stream_index == audioStreamID))
             putAudio(&packet);
 #endif
         else
-            av_free_packet(&packet);
+            av_packet_unref(&packet);
     }
 
     return frameFinished;
@@ -764,14 +790,13 @@ void PacketQueue::clearPktList()
 
 bool VideoStream::putAudio(AVPacket *pkt)
 {
-    AVPacket newpkt;
-
     if (!pkt->data || (pkt->size <= 0))
     {
         fprintf(stderr, "Invalid packet data\n");
         return false;
     }
 
+#if 0
     if (av_dup_packet(pkt) < 0)
     {
         fprintf(stderr, "Packet not allocated\n");
@@ -780,14 +805,23 @@ bool VideoStream::putAudio(AVPacket *pkt)
 
     uint8_t *buffer = new uint8_t[pkt->size];
     memcpy(buffer, pkt->data, pkt->size);
-    newpkt = *pkt;
+    auto newpkt = av_packet_alloc();
+    *newpkt = *pkt;
     newpkt.data = buffer;
-    av_free_packet(pkt);
+#else
+    auto newpkt = av_packet_clone(pkt);
+    if (!newpkt)
+    {
+        fprintf(stderr, "Packet copy failed\n");
+        return false;
+    }
+#endif
+    av_packet_unref(pkt);
     SDL_LockMutex(pq->getMutex());
 
     std::list<AVPacket> *pList = pq->getPktList();
 
-    pList->push_back(newpkt);
+    pList->push_back(*newpkt);
 
     pq->setSize(pq->getSize() + pkt->size);
 

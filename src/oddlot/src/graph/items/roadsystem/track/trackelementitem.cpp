@@ -392,6 +392,14 @@ TrackElementItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
             getProjectGraph()->executeCommand(command);
             return;
         }
+        else if (tool == ODD::TTE_PROTO_FETCH)
+        {
+            ODD::ToolId paramToolId = getTrackEditor()->getCurrentParameterTool();
+
+            RSystemElementRoad* road = trackElement_->getParentRoad();
+            trackEditor_->fetchRoadPrototypes(road);
+            return;
+        }
         //  else if(tool == ODD::TTE_MOVE)
         //  {
         //   return; // does nothing
@@ -463,6 +471,21 @@ TrackElementItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
     // Parent //
     //
     TrackComponentItem::hoverLeaveEvent(event); // pass to baseclass
+}
+
+void 
+TrackElementItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+{
+    ODD::ToolId tool = getTrackEditor()->getCurrentTool();
+    if ((tool == ODD::TTE_ADD) || (tool == ODD::TTE_ROAD_NEW) || (tool == ODD::TTE_ADD_PROTO))
+    {
+        event->ignore();
+        return;
+    }
+
+    // Parent //
+    //
+    TrackComponentItem::contextMenuEvent(event);
 }
 
 //*************//

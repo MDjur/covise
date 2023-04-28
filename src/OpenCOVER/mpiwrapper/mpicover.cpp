@@ -31,6 +31,7 @@
 #include <covise/coTimer.h>
 #endif
 
+#include <OpenConfig/access.h>
 #include <config/CoviseConfig.h>
 #include <config/coConfigConstants.h>
 #include <cover/coCommandLine.h>
@@ -84,78 +85,11 @@ extern "C" COEXPORT int mpi_main(MPI_Comm comm, int shmGroupRoot, pthread_barrie
 
     covise::coConfigConstants::setRank(myID, shmGroupRoot);
     covise::coConfigConstants::setMaster(mastername);
-
-#ifdef _WIN32
-    // note: console has to be allocated after possible handling of argument '-d',
-    //    otherwise output of module definition is written onto a volatile console
-
-    if (covise::coCoviseConfig::isOn("COVER.Console", true))
+    opencover::config::Access config(my_hostname, mastername, myID);
+    if (auto covisedir = getenv("COVISEDIR"))
     {
-        std::string filebase = covise::coCoviseConfig::getEntry("file", "COVER.Console");
-        if (!filebase.empty())
-        {
-            char *filename = new char[strlen(filebase.c_str()) + 100];
-            sprintf(filename, "%s%d.err.txt", filebase.c_str(), 0);
-            freopen(filename, "w", stderr);
-            sprintf(filename, "%s%d.out.txt", filebase.c_str(), 0);
-            freopen("conout$", "w", stdout);
-            delete[] filename;
-        }
-        else
-        {
-
-            AllocConsole();
-
-            freopen("conin$", "r", stdin);
-            freopen("conout$", "w", stdout);
-            freopen("conout$", "w", stderr);
-        }
+        config.setPrefix(covisedir);
     }
-#else //_WIN32
-    if (covise::coCoviseConfig::isOn("COVER.Console", false))
-    {
-        std::string filename = covise::coCoviseConfig::getEntry("file", "COVER.Console");
-        if (!filename.empty())
-        {
-            if (!freopen((filename + ".stderr").c_str(), "w", stderr))
-            {
-                std::cerr << "error reopening stderr" << std::endl;
-            }
-            if (!freopen((filename + ".stdout").c_str(), "w", stdout))
-            {
-                std::cerr << "error reopening stdout" << std::endl;
-            }
-        }
-    }
-    else
-    {
-        int rank = 0;
-        MPI_Comm_rank(comm, &rank);
-
-        if (rank > 0)
-        {
-            std::string filename = covise::coCoviseConfig::getEntry("slavelog", "COVER.Console");
-            if (filename.empty())
-            {
-#if 0
-                fclose(stderr);
-                fclose(stdout);
-#endif
-            }
-            else
-            {
-                if (!freopen((filename + ".stderr").c_str(), "w", stderr))
-                {
-                    std::cerr << "error reopening stderr" << std::endl;
-                }
-                if (!freopen((filename + ".stdout").c_str(), "w", stdout))
-                {
-                    std::cerr << "error reopening stdout" << std::endl;
-                }
-            }
-        }
-    }
-#endif
 
 // timing printouts only if enabled in covise.config
 #ifdef DOTIMING

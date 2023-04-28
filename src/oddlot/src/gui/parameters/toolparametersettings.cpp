@@ -262,8 +262,19 @@ ToolParameterSettings::setComboBoxIndex(ToolParameter *p, const QString &text)
         QComboBox *comboBox = dynamic_cast<QComboBox *>(widget);
         if (comboBox)
         {
+            int oldindex = comboBox->currentIndex();
             int index = comboBox->findText(text);
-            comboBox->setCurrentIndex(index);
+            if (index != oldindex)
+            {
+                comboBox->setCurrentIndex(index);
+            }
+            else
+            {
+                currentParamId_ = memberWidgets_.key(comboBox).toInt();
+                ParameterToolAction* action = new ParameterToolAction(editorID_, p->getToolId(), p->getParamToolId(), index, false);
+                emit toolAction(action);
+                delete action;
+            }
             return;
         }
     }
@@ -730,7 +741,7 @@ ToolParameterSettings::onButtonPressed(int paramId)
         {
             QString name = button->objectName();
 
-            ParameterToolAction *action = new ParameterToolAction(editorID_, p->getToolId(), p->getParamToolId(), paramId, false);
+            ParameterToolAction* action = new ParameterToolAction(editorID_, p->getToolId(), p->getParamToolId(), paramId, false);
             emit toolAction(action);
             delete action;
 
@@ -814,6 +825,14 @@ ToolParameterSettings::setObjectSelected(int id, const QString &objectName, cons
 }
 
 void
+ToolParameterSettings::uncheckButton()
+{
+    buttonGroup_->setExclusive(false);
+    buttonGroup_->checkedButton()->toggle();
+    buttonGroup_->setExclusive(true);
+}
+
+void
 ToolParameterSettings::hide()
 {
     ParameterToolAction *action = new ParameterToolAction(editorID_, ODD::TNO_TOOL, ODD::TNO_TOOL, 0, false);
@@ -848,7 +867,7 @@ ToolParameterSettingsApplyBox::createDialogBox(QFrame *dBox)
     dialogLayout_ = new QGridLayout;
     dialogBox_ = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Apply | QDialogButtonBox::Cancel);
     setApplyButtonVisible(false);
-    dialogBox_->button(dialogBox_->Cancel)->setShortcut(QKeySequence(Qt::Key_Escape));
+//    dialogBox_->button(dialogBox_->Cancel)->setShortcut(QKeySequence(Qt::Key_Escape));
     ok_ = dialogBox_->button(dialogBox_->Ok);
     ok_->setShortcut(QKeySequence(Qt::Key_Enter));
     ok_->setObjectName("okButton");

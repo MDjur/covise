@@ -1,8 +1,8 @@
 FIND_PACKAGE(CUDPP)
 
 USING(CUDPP GLEW)
-IF(NOT CUDA_FOUND)
-  MESSAGE("Skipping OpenCOVER - cuCuttingSurface plugin since CUDA was not found")
+IF(COVISE_BUILD_ONLY_COVER OR NOT CUDA_FOUND OR NOT COVISE_USE_CUDA)
+  MESSAGE("Skipping OpenCOVER - cuTracer plugin since CUDA was not found")
   RETURN()
 ENDIF()
 
@@ -33,9 +33,7 @@ SET(SOURCES
 ADD_DEFINITIONS(-DUSE_VBO)
 ADD_DEFINITIONS(-DRENDER_STATE)
 
-CUDA_COMPILE(cuTracer_CUDA_OBJ ${cuTracer_CUDA_SOURCES} SHARED OPTIONS "-D__builtin_stdarg_start=__builtin_va_start")
-
 SET(EXTRA_LIBS ${EXTRA_LIBS} ${CUDA_LIBRARIES})
 
-cover_add_plugin(cuTracer ${cuTracer_CUDA_OBJ})
+cover_add_plugin(cuTracer ${SOURCES})
 TARGET_LINK_LIBRARIES(cuTracer coCore coOpenVRUI ${EXTRA_LIBS})

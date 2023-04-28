@@ -90,7 +90,7 @@ bool VariantBehavior::buildFromXML(QDomElement *behaviorElement)
         {
             Variant variant;
             // regexp
-            variant.regexp = QRegExp(variantElem.attribute("regexp", ""));
+            variant.regexp = QRegularExpression(variantElem.attribute("regexp", ""));
             variant.geoNameSpace = variantElem.attribute("namespace", "").toStdString();
             // add
             std::string name = variantElem.attribute("name", "").toStdString();
@@ -113,7 +113,9 @@ void VariantBehavior::findNodes(Variant *variant, osg::Node *node)
     {
         return;
     }
-    if (variant->regexp.exactMatch(QString(node->getName().c_str())))
+    QString nodeName = QString::fromStdString(node->getName());
+    auto match = variant->regexp.match(nodeName);
+    if (match.hasMatch() && match.capturedLength() == nodeName.length())
     {
         VariantNode vn;
         vn.node = node;
@@ -124,7 +126,7 @@ void VariantBehavior::findNodes(Variant *variant, osg::Node *node)
         osg::Group *g = node->asGroup();
         if (g != NULL)
         {
-            for (int i = 0; i < g->getNumChildren(); i++)
+            for (unsigned int i = 0; i < g->getNumChildren(); i++)
             {
                 findNodes(variant, g->getChild(i));
             }

@@ -1,9 +1,7 @@
 using(VRML)
-COVISE_FIND_PACKAGE(CUDPP)
-
-USING(CUDPP GLEW)
-IF(NOT CUDA_FOUND OR NOT COVISE_USE_CUDA)
-  MESSAGE("Skipping OpenCOVER - starDust plugin since CUDA was not found!")
+USING(CUDA GLEW)
+IF(COVISE_BUILD_ONLY_COVER OR NOT CUDA_FOUND OR NOT COVISE_USE_CUDA)
+  MESSAGE("Skipping OpenCOVER - startDust plugin since CUDA was not found")
   RETURN()
 ENDIF()
 
@@ -30,8 +28,6 @@ SET(SOURCES
   ${starDust_CUDA_SOURCES}
 )
 
-CUDA_COMPILE(starDust_CUDA_OBJ ${starDust_CUDA_SOURCES} SHARED OPTIONS "-D__builtin_stdarg_start=__builtin_va_start")
-  
-#message("starDust_CUDA_OBJ")
-#message(${starDust_CUDA_OBJ})
-cover_add_plugin(starDust ${starDust_CUDA_OBJ})
+cover_add_plugin(starDust ${SOURCES})
+REMOVE_COVISE_COMPILE_FLAGS(starDust "-wd4251")
+REMOVE_COVISE_COMPILE_FLAGS(starDust "-wd4335")

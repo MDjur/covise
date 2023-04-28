@@ -9,10 +9,10 @@
 #include "coHud.h"
 
 #include <cassert>
-#include <cctype>
 #include <chrono>
 #include <cstring>
-#include <stdlib.h>
+#include <cstdlib>
+#include <locale>
 #include <thread>
 
 #include "OpenCOVER.h"
@@ -28,6 +28,7 @@
 #include "coVRPluginList.h"
 #include "coVRPluginSupport.h"
 #include "coVRRenderer.h"
+#include "SidecarConfigBridge.h"
 #include "ui/Action.h"
 #include "ui/Button.h"
 #include "ui/FileBrowser.h"
@@ -45,6 +46,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/locale.hpp>
 #include <fcntl.h>
 #include <osg/Texture2D>
 #include <osgText/Font>
@@ -87,9 +89,10 @@ Url::Url(const std::string &url)
     if (!isalpha(*it))
         return;
 
+    std::locale C("C");
     for ( ; it != url.end(); ++it)
     {
-        if (std::isalnum(*it))
+        if (std::isalnum(*it, C))
             continue;
         if (*it == '+')
             continue;
@@ -727,11 +730,10 @@ osg::Node *coVRFileManager::loadFile(const char *fileName, coTUIFileBrowserButto
     {
         return nullptr;
     }
-
+    std::string validFileName(fileName);
     if (!parent)
         parent = cover->getObjectsRoot();
 
-	std::string validFileName(fileName);
 	convertBackslash(validFileName);
 
     auto duplicate = m_files.find(validFileName);
@@ -817,9 +819,21 @@ osg::Node *coVRFileManager::loadFile(const char *fileName, coTUIFileBrowserButto
     if (covise_key)
         fe->key = covise_key;
     fe->filebrowser = fb;
+    if (!OpenCOVER::instance()->visPlugin() && !m_settings && fe->url.valid() && fe->url.isLocal())
+    {
+        std::cerr << "Sidecar file for " << fe->url.str() << std::endl;
+        m_settings = std::make_unique<SidecarConfigBridge>(fe->url.str(), coVRMSController::instance()->isMaster());
+        cover->m_config.setWorkspaceBridge(m_settings.get());
+    }
 
     OpenCOVER::instance()->hud->setText2("loading");
-    OpenCOVER::instance()->hud->setText3(validFileName);
+
+#ifdef WIN32
+    std::string utf8_filename = boost::locale::conv::to_utf<char>(validFileName, "ISO-8859-1");
+#else
+    std::string utf8_filename = validFileName;
+#endif
+    OpenCOVER::instance()->hud->setText3(utf8_filename);
     OpenCOVER::instance()->hud->redraw();
 
     if (isRoot)
@@ -858,7 +872,8 @@ osg::Node *coVRFileManager::loadFile(const char *fileName, coTUIFileBrowserButto
 	bool isVRML = false;
 	for (auto ext : vrmlExtentions)
 	{
-		if (("." + ext) == lowXt || urlStr.substr(urlStr.size() - (ext.size() + strlen(ive))) == ext + ive)
+        size_t extlen = ext.size() + strlen(ive);
+		if (("." + ext) == lowXt ||(urlStr.size()> extlen) && (urlStr.substr(urlStr.size() - extlen) == ext + ive))
 		{
 			isVRML = true;
 			break;
@@ -1119,6 +1134,15 @@ void coVRFileManager::unloadFile(const char *file)
         }
         m_files.clear();
     }
+
+    if (m_files.empty())
+    {
+        if (m_settings)
+        {
+            cover->m_config.removeWorkspaceBridge(m_settings.get());
+            m_settings.reset();
+        }
+    }
 }
 
 coVRFileManager *coVRFileManager::instance()
@@ -1187,6 +1211,7 @@ coVRFileManager::coVRFileManager()
     }
 
     osgDB::Registry::instance()->addFileExtensionAlias("gml", "citygml");
+    osgDB::Registry::instance()->addFileExtensionAlias("3mxb", "3mx");
 
     options = new osgDB::ReaderWriter::Options;
     options->setOptionString(coCoviseConfig::getEntry("options", "COVER.File"));
@@ -2103,14 +2128,12 @@ std::string coVRFileManager::cutFileName(const std::string &fileName)
 }
 std::string coVRFileManager::reduceToAlphanumeric(const std::string &str)
 {
-
+    std::locale C("C");
     std::string red;
-    for (auto c : str)
+    for (auto c: str)
     {
-        if (isalnum(c) && c != '_' && c != '-')
-        {
-			red.push_back(c);
-        }
+        if (std::isalnum(c, C))
+            red.push_back(c);
     }
     return red;
 }

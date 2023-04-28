@@ -399,14 +399,22 @@ void MEMainHandler::init()
         localIP = QString::fromStdString(covise::Host::lookupIpAddress(messageHandler->getUIF()->get_hostname()));
 
         // send dummy message to tell the controller that it is safe now to send messages
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
         messageHandler->dataReceived(1);
+#else
+        messageHandler->dataReceived(QSocketDescriptor(1), QSocketNotifier::Type::Read);
+#endif
 
         // tell crb if we are ready for an embedded ViNCE renderer
         if (cfg_ImbeddedRenderer)
+        {
             embeddedRenderer();
-
+        }
         else
-            messageHandler->sendMessage(covise::COVISE_MESSAGE_MSG_OK, "");
+        {
+            QString tmp = "RENDERER_IMBEDDED_POSSIBLE\n" + localIP + "\n" + localUser + "\nFALSE";
+            messageHandler->sendMessage(covise::COVISE_MESSAGE_MSG_OK, tmp);
+        }
     }
 }
 
@@ -434,8 +442,9 @@ void MEMainHandler::embeddedRenderer()
     }
     else
     {
+        QString tmp = "RENDERER_IMBEDDED_POSSIBLE\n" + localIP + "\n" + localUser + "\nFALSE";
         qWarning() << "MEMainHandler::startRenderer err: lib not found";
-        messageHandler->sendMessage(covise::COVISE_MESSAGE_MSG_OK, "");
+        messageHandler->sendMessage(covise::COVISE_MESSAGE_MSG_OK, tmp);
     }
 }
 
@@ -878,8 +887,7 @@ void MEMainHandler::openNetworkFile(QString filename)
     {
         if (QMessageBox::question(0, "Map Editor",
                                   "The current dataflow network will be replaced. Do you want to continue?",
-                                  "Open", "Cancel", "",
-                                  0, -1) != 0)
+                                   (QMessageBox::StandardButton::Open | QMessageBox::StandardButton::Cancel), QMessageBox::StandardButton::Open) == QMessageBox::StandardButton::Cancel)
             return;
     }
 
@@ -913,8 +921,7 @@ void MEMainHandler::openNet()
     {
         if (QMessageBox::question(0, "Map Editor",
                                   "The current module network will be replaced. Do you want to continue?",
-                                  "Open", "Cancel", "",
-                                  0, -1) != 0)
+                                  (QMessageBox::StandardButton::Open | QMessageBox::StandardButton::Cancel), QMessageBox::StandardButton::Open) == QMessageBox::StandardButton::Cancel)
             return;
     }
 
@@ -1082,13 +1089,17 @@ void MEMainHandler::closeApplication(QCloseEvent *ce)
     // ask the user what to do with the modified network map
     if (m_loadedMapWasModified)
     {
-        switch (QMessageBox::question(0, framework + " Map Editor",
-                                      "Save your changes before closing the " + framework + " session?",
-                                      "Save && Quit", "Quit", "Cancel",
-                                      1, 2))
+        QMessageBox msgBox(QMessageBox::Question, framework + " Map Editor",  "Save your changes before closing the " + framework + " session?");
+        auto saveAndQuit = msgBox.addButton("Save && Quit", QMessageBox::ActionRole);
+        auto quit = msgBox.addButton("Quit", QMessageBox::AcceptRole);
+        auto cancel = msgBox.addButton("Cancel", QMessageBox::RejectRole);
+        msgBox.exec();
+        if (msgBox.clickedButton() == cancel)
+        {
+            ce->ignore();
+        } else if (msgBox.clickedButton() == saveAndQuit)
         {
 
-        case 0:
             storeSessionParam();
 
             // overwrite existing network
@@ -1096,7 +1107,7 @@ void MEMainHandler::closeApplication(QCloseEvent *ce)
             {
                 saveNetwork(m_mapName);
                 messageHandler->sendMessage(covise::COVISE_MESSAGE_QUIT, "");
-                cerr << "Map Editor ____ Close connection\n" << endl;
+                //cerr << "Map Editor ____ Close connection\n" << endl;
                 ce->accept();
             }
             // wait until user has saved the network
@@ -1106,18 +1117,12 @@ void MEMainHandler::closeApplication(QCloseEvent *ce)
                 saveAsNet();
                 ce->ignore();
             }
-            break;
-
-        case 1:
+        }else if(msgBox.clickedButton() == quit)
+        {
             storeSessionParam();
-            cerr << "Map Editor ____ Close connection\n" << endl;
+            //cerr << "Map Editor ____ Close connection\n" << endl;
             ce->accept();
             messageHandler->sendMessage(covise::COVISE_MESSAGE_QUIT, "");
-            break;
-
-        case 2:
-            ce->ignore();
-            break;
         }
     }
 
@@ -1127,7 +1132,7 @@ void MEMainHandler::closeApplication(QCloseEvent *ce)
         {
             storeSessionParam();
         }
-        cerr << "Map Editor ____ Close connection\n" << endl;
+        //cerr << "Map Editor ____ Close connection\n" << endl;
         ce->accept();
         messageHandler->sendMessage(covise::COVISE_MESSAGE_QUIT, "");
     }
@@ -1236,19 +1241,13 @@ void MEMainHandler::clearNet()
     // if canvas is not empty and not saved ask if the user will really do that
     if (m_loadedMapWasModified && !MENodeListHandler::instance()->isListEmpty())
     {
-        switch (QMessageBox::question(0, "Map Editor",
-                                      "All modules will be deleted. Do you want to continue?",
-                                      "Delete", "Cancel", "",
-                                      0, -1))
-        {
-        case 0:
-        {
+        QMessageBox deleteMsgBox(QMessageBox::Question, "Map Editor", "All modules will be deleted. Do you want to continue?");
+        auto deleteBtn = deleteMsgBox.addButton("Delete", QMessageBox::ApplyRole);
+        auto cancel = deleteMsgBox.addButton(QMessageBox::Cancel);
+        deleteMsgBox.exec();
+        if(deleteMsgBox.clickedButton() == deleteBtn)
             messageHandler->sendMessage(covise::COVISE_MESSAGE_UI, "NEW_ALL\n");
-        }
-        break;
-        }
     }
-
     // reset handler & userinterface
     else
     {

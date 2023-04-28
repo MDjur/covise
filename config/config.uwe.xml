@@ -39,10 +39,12 @@
 	</Device>
         <Valuator>
            <CaveJoyX device="joystick" valuatorIndex="0" />
+           <CaveJoyY device="joystick" valuatorIndex="1" />
         </Valuator>
 
         <Persons>
            <Person name="Dummy"  valuator0="CaveJoyX" />
+           <Person name="Dummy"  valuator0="CaveJoyY" />
         </Persons>
 
    </Input>
@@ -82,7 +84,7 @@
   
     <AnimationSpeed max="60" />
             <Plugin>
-                <Revit value="on" ignoreDepthOnly="false" >
+                <Revit value="on" ignoreDepthOnly="false"  textures="/data/revit/Textures" localTextures="/data/revit/Textures">
     </Revit>
                 <Midi value="Off" InPort="0" OutPort="2">
 					       <Store posX="0" posY="0" posZ="0"   />
@@ -94,6 +96,12 @@
 					   <Controller name="1" controllerID="3"   action="Shader1"   min="0"   max="125" minOut="0.0" maxOut="1.0"  />
 					   <Controller name="2" controllerID="58"   action="rAcceleration"   min="0"   max="125" minOut="0.0" maxOut="1.0"  />
 					   
+					   <Stream name="0" InPort="0" />
+					   <Stream name="1" InPort="1"/>
+					   <Stream name="2" InPort="2"/>
+					   <Stream name="3" InPort="3"/>
+					   <Stream name="4" InPort="4"/>
+					   <TriplePlay DeviceIn="5" DeviceOut="6"/>
 					   
 				       <Instrument name="0" type="Drumkit">
 					       <Key name="4"   r="1"   g="0"   b="0"  />
@@ -289,11 +297,11 @@
 </GLOBAL>
 
  <INCLUDE global="1" configname="general" >config.xml </INCLUDE>
- <INCLUDE global="1" configname="ar" >config-ar.xml </INCLUDE>
+ <!--INCLUDE global="1" configname="ar" >config-ar.xml </INCLUDE-->
  <INCLUDE global="1" configname="sumo" >config-sumo.xml </INCLUDE>
  
  <TRYINCLUDE global="1" configname="private" ARCH="unix" >/data/hlrs/config-hlrs-private.xml</TRYINCLUDE>
- <TRYINCLUDE global="1" configname="private" ARCH="windows" >c:/data/hlrs/config-hlrs-private.xml</TRYINCLUDE>
+ <!--TRYINCLUDE global="1" configname="private" ARCH="windows" >c:/data/hlrs/config-hlrs-private.xml</TRYINCLUDE-->
  <!-- this config is required by the ViNCE Renderer-->
  <!--INCLUDE global="1" configname="vince-base" >config-vince-base.xml </INCLUDE-->
 </COCONFIG>

@@ -65,9 +65,11 @@ public:
 
     static const float getVersion()
     {
-        char buf[100];
-        sprintf(buf, "%d%c%d", revMajor_, '.', revMinor_);
-        return (float)atof(buf);
+        float ver = getRevMinor();
+        while (ver > 0.95) {
+            ver /= 10.f;
+        }
+        return getRevMajor() + ver;
     }
 
     static const unsigned short getRevMinor()
@@ -161,6 +163,7 @@ public:
         TTE_PROTO_CROSSFALL,
         TTE_PROTO_ROADSHAPE,
         TTE_PROTO_ROADSYSTEM,
+        TTE_PROTO_FETCH,
 
 
         // Elevation Editor

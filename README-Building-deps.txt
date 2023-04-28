@@ -6,17 +6,23 @@ Visual Studio 2015, Cmake and Tortoise Git are installed
 #COVISE
 cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/GEOS;c:/src/externlibs/zebu/V8;c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/hdf5;c:/src/externlibs/zebu/netcdf
 
+#nlohmann/json
+git clone https://github.com/nlohmann/json.git
+cd json
+mkdir build
+cd build
+cmake -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/nlohmann_json 
 
 
 #Botan
-create C:\src\externlibs\zebu\botan\debug and C:\src\externlibs\zebu\botan\release
+create C:\src\externlibs\zebu\botan
 git clone https://github.com/randombit/botan
 cd botan 
-python configure.py --cc=msvc --os=windows --debug-mode --msvc-runtime=MDd --library-suffix=d --prefix=C:\src\externlibs\zebu\botan\debug
+python configure.py --cc=msvc --os=windows --debug-mode --msvc-runtime=MDd --library-suffix=d --prefix=C:\src\externlibs\zebu\botan
 nmake
 nmake check
 nmake install
-python configure.py --cc=msvc --os=windows --msvc-runtime=MD --prefix=C:\src\externlibs\zebu\botan\release
+python configure.py --cc=msvc --os=windows --msvc-runtime=MD --prefix=C:\src\externlibs\zebu\botan
 nmake
 nmake check
 nmake install
@@ -125,16 +131,46 @@ PATH=D:\src\gitbase\Python-3.5.2\externals\nasm-2.11.06;%PATH%
 perl Configure VC-WIN64A
 ms\do_win64a
 
-perl util\mk1mf.pl debug dll VC-WIN64A >ms\ntdebugdll.mak
-edit ntdebugdll.mak and add D to dll names 
-nmake -f ms\ntdll.mak
+#OpenSSL 1.1.1
+Download from https://www.openssl.org/source/
+install strawberry perl and NASM via installer and make shure they are in PATH
+From admin vs development prompt 
+perl Configure VC-WIN64A --prefix=c:/src/externlibs/zebu/OpenSSL --openssldir=c:/src/externlibs/zebu/OpenSSL
+nmake
+nmake test
+nmake install
 
-#qt
+#qt5
 set PATH=c:\src\externlibs\zebu\Python2\bin;%PATH%
 set PYTHONHOME=c:\src\externlibs\zebu\..\shared\Python2;c:\src\externlibs\zebu\Python2
-configure -prefix c:/src/externlibs/zebu/qt5 -opensource -debug-and-release -nomake tests -make libs -make tools -nomake examples -nomake tests -confirm-license -openssl -I c:/src/externlibs/zebu/OpenSSL/include  -icu -I c:/src/externlibs/zebu/icu/include -L c:/src/externlibs/zebu/icu/lib -openssl-linked  -L C:/src/externlibs/zebu/OpenSSL/lib -openssl -openssl-linked OPENSSL_LIBS="-lUser32 -lAdvapi32 -lGdi32" OPENSSL_LIBS_DEBUG="-lssleay32D -llibeay32D" OPENSSL_LIBS_RELEASE="-lssleay32 -llibeay32" -platform win32-msvc2015 -mp -opengl dynamic -angle
+configure -prefix c:/src/externlibs/zebu/qt5 -opensource -debug-and-release -make libs -make tools -nomake examples -nomake tests -confirm-license -openssl -I c:/src/externlibs/zebu/OpenSSL/include  -icu -I c:/src/externlibs/zebu/icu/include -L c:/src/externlibs/zebu/icu/lib -openssl-linked  -L C:/src/externlibs/zebu/OpenSSL/lib -openssl -openssl-linked OPENSSL_LIBS="-lUser32 -lAdvapi32 -lGdi32" OPENSSL_LIBS_DEBUG="-lssleay32D -llibeay32D" OPENSSL_LIBS_RELEASE="-lssleay32 -llibeay32" -platform win32-msvc2015 -mp -opengl dynamic -angle
 nmake
 nmake install
+
+#qt6 following https://wiki.qt.io/Building_Qt_6_from_Git
+fix compress_files.js C:\src\gitbase\qt6\qtwebengine\src\3rdparty\chromium\third_party\devtools-frontend\src\scripts\build\compress_files.js
+serialize file processing to fix compression
+  for(i=0;i<files.length;i++)
+  {
+	  await compressFile(files[i]);
+  }
+  
+use admin developer cmd
+cd build
+set PATH=c:\src\externlibs\zebu\Python2\bin;%PATH%
+##..\configure.bat -prefix c:\src\externlibs\zebu\qt6 -skip qtspeech -debug-and-release -qt-zlib -openssl-linked -- -D OPENSSL_ROOT_DIR=C:/src/externlibs/zebu/OpenSSL
+..\configure -prefix c:/src/externlibs/zebu/qt6 -opensource -debug-and-release -make tools -nomake examples -nomake tests -confirm-license -openssl  -icu -openssl-linked -opengl dynamic -- -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/md4c;c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/flex;c:/src/externlibs/zebu/bison;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal
+cmake --build . --parallel
+ninja qtdeclarative
+ninja
+ninja install
+
+#md4c
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/md4c -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/simage;c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal
+
+#3mx
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/3mx -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/simage;c:/src/externlibs/zebu/OpenSceneGraph;c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal
+
 
 #SoQT
 get old soqt Version 1.4.1
@@ -262,9 +298,9 @@ C:\src\externlibs\zebu\nvtt\lib\static\bc6hd.lib
 
 #boost
 bootstrap.bat
-set ZLIB_SOURCE=d:\src\gitbase\zlib-1.2.8
-b2 install address-model=64 architecture=x86 --prefix=c:\src\externlibs\zebu\boost --build-dir=build  variant=debug,release link=static,shared threading=multi runtime-link=shared --without-python --without-mpi -j8  --debug-configuration -d+2
-
+//set ZLIB_SOURCE=d:\src\gitbase\zlib-1.2.8
+//b2 install address-model=64 architecture=x86 --prefix=c:\src\externlibs\zebu\boost --build-dir=build  variant=debug,release link=static,shared threading=multi runtime-link=shared --without-python --without-mpi -j8  --debug-configuration -d+2
+b2 install address-model=64 architecture=x86 --prefix=c:\src\externlibs\zebu\boost --build-dir=build  variant=debug,release link=static,shared threading=multi runtime-link=shared --with-zlib --without-python --without-mpi -j8  --debug-configuration -d+2 -sZLIB_LIBRARY="c:\src\externlibs\zebu\zlib\lib" -sZLIB_INCLUDE="c:\src\externlibs\zebu\zlib\include"
 
 ## boost.Python and Boost.mpi not needed anymore, thus don't do this:
 
@@ -307,6 +343,10 @@ Edit pybind11.h and replace strdup with _strdup. Edit detail\common.h and replac
 #OpenCV3
 cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/OpenCV3
 set contrib/modules directory in cmake-gui
+disable performance tests and normal tests, build (be very patient) and install
+
+#OpenCV4
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/OpenCV4  -DCMAKE_DEBUG_POSTFIX=d -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules
 disable performance tests and normal tests, build (be very patient) and install
 
 #vtk
@@ -402,6 +442,9 @@ cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/extern
 
 #SISL
 cmake .. -G "Visual Studio 17 2022" -A x64  -Dsisl_INSTALL_PREFIX=c:/src/externlibs/zebu/sisl -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/GEOS;c:/src/externlibs/zebu/V8;c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv
+
+#libarchive
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/libarchive -DCMAKE_DEBUG_POSTFIX=d -DENABLE_WERROR=OFF  -DENABLE_TEST=OFF -DENABLE_COVERAGE=OFF -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/GEOS;c:/src/externlibs/zebu/V8;c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv
 
 #Protobuf https://github.com/protocolbuffers/protobuf.git
 git submodule update --init --recursive
@@ -570,7 +613,9 @@ manually copy to lib and include
 
 #xdmf
 git clone https://gitlab.kitware.com/xdmf/xdmf.git
-#copy libxml2static.lib to libxml2.lib so that the standard find finds the lib (should be already done in the latest externlibs
+#don't: copy libxml2static.lib to libxml2.lib so that the standard find finds the lib (should be already done in the latest externlibs
+#add  LIBXML_STATIC=TRUE to DEFINES for all projects
+#add C:\src\externlibs\zebu\libxml2\lib\libxml2staticD.lib to additionalLibraries
 cmake .. -G "Visual Studio 17 2022" -A x64 -DBOOST_ROOT=c:/src/externlibs/zebu/boost -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/xdmf -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/libxml2;c:/src/externlibs/zebu/hdf5;c:/src/externlibs/zebu/iconv
 
 
@@ -712,3 +757,12 @@ copy Release/libcef.ddl or Deubu/libcef.dll and contets of Resources to externli
 vrmlexp
 edit covise/src/cmake/Find3DSMAX.cmake add 20xx version
 cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Cal3d;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/xerces
+
+#####
+u3d https://github.com/ningfei/u3d
+cmake .. -G "Visual Studio 17 2022" -A x64  -DU3D_SHARED:BOOL=ON -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/u3d -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/OpenSceneGraph;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/png;c:/src/externlibs/zebu/jpeg
+
+
+###
+vistle
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/botan;c:/src/externlibs/zebu/proj4;c:/src/externlibs/zebu/zsd
