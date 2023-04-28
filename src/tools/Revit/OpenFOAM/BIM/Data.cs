@@ -1028,7 +1028,7 @@ namespace OpenFOAMInterface.BIM
             }
         }
 
-        private void InitOpenFOAMRefinementRegin(in FilteredElementCollector collector)
+        private void InitOpenFOAMRefinementRegion(in FilteredElementCollector collector)
         {
             var queryBoxRef = QueryElemByName("OpenFOAMRefinementRegin", collector);
             List<FamilyInstance> familyInstancesRefRegion = queryBoxRef.Cast<FamilyInstance>().ToList();
@@ -1073,7 +1073,7 @@ namespace OpenFOAMInterface.BIM
             InitOpenFOAM(collector);
 
             // Use Linq query to find family instances whose name is OpenFOAM
-            InitOpenFOAMRefinementRegin(collector);
+            InitOpenFOAMRefinementRegion(collector);
 
             // Cast found elements to family instances, 
             // this cast to FamilyInstance is safe because ElementClassFilter for FamilyInstance was used
