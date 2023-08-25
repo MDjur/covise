@@ -1,4 +1,4 @@
-# AUR covise-git package
+# covise PKGBUILD
 
 **makepgk -si**
 
