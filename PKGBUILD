@@ -91,6 +91,7 @@ build() {
     cmake -B "$_pkgBuildDir" -S "$_pkgname" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCOVISE_BUILD_DRIVINGSIM=off \
+        -DCOVISE_USE_QT5=off \
         -DCMAKE_INSTALL_PREFIX="$_installDir" \
         -G Ninja \
         -Wno-dev
