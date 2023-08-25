@@ -5,7 +5,7 @@ _pkgBuildDir=build.covise
 _installDir=/usr
 _gitRep=https://github.com/hlrs-vis/covise.git
 pkgname=$_pkgname-git
-pkgver=1.0.r6997.4d689e2d9
+pkgver=1.0.r7990.12f7ee4db
 pkgrel=1
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment for VR/AR - HLRS"
 arch=(x86_64)
@@ -13,35 +13,29 @@ url="https://www.hlrs.de/covise/"
 license=('LGPL')
 depends=(
     xerces-c
-    qt5-base
-    qt5-tools
-    qt5-connectivity
-    qt5-datavis3d
-    qt5-declarative
-    qt5-graphicaleffects
-    qt5-imageformats
-    qt5-location
-    qt5-multimedia
-    qt5-networkauth
-    qt5-quick3d
-    qt5-quickcontrols
-    qt5-quickcontrols2
-    qt5-script
-    qt5-sensors
-    qt5-serialbus
-    qt5-serialport
-    qt5-speech
-    qt5-svg
-    qt5-translations
-    qt5-virtualkeyboard
-    qt5-wayland
-    qt5-webchannel
-    qt5-webengine
-    qt5-webkit
-    qt5-websockets
-    qt5-webview
-    qt5-x11extras
-    qt5-xmlpatterns
+    qt6-base
+    qt6-tools
+    qt6-connectivity
+    qt6-datavis3d
+    qt6-declarative
+    qt6-imageformats
+    qt6-location
+    qt6-multimedia
+    qt6-networkauth
+    qt6-quick3d
+    qt6-quickcontrols2
+    qt6-sensors
+    qt6-serialbus
+    qt6-serialport
+    qt6-speech
+    qt6-svg
+    qt6-translations
+    qt6-virtualkeyboard
+    qt6-wayland
+    qt6-webchannel
+    qt6-webengine
+    qt6-websockets
+    qt6-webview
     boost
     boost-libs
     glew
@@ -88,7 +82,7 @@ pkgver() {
 
 prepare() {
     cd "$_pkgname"
-    git submodule sync
+    git submodule sync --recursive
     git submodule update --init --recursive
     source .covise.sh
 }
