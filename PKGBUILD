@@ -5,7 +5,7 @@ _pkgBuildDir=build.covise
 _installDir=/usr
 _gitRep=https://github.com/hlrs-vis/covise.git
 pkgname=$_pkgname-git
-pkgver=1.0.r7990.12f7ee4db
+pkgver=1.0.r8159.c10fc4a5c
 pkgrel=1
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment for VR/AR - HLRS"
 arch=(x86_64)
@@ -18,12 +18,15 @@ depends=(
     qt6-connectivity
     qt6-datavis3d
     qt6-declarative
+    # qt6-graphicaleffects
     qt6-imageformats
     qt6-location
     qt6-multimedia
     qt6-networkauth
     qt6-quick3d
+    # qt6-quickcontrols
     qt6-quickcontrols2
+    # qt6-script
     qt6-sensors
     qt6-serialbus
     qt6-serialport
@@ -34,8 +37,11 @@ depends=(
     qt6-wayland
     qt6-webchannel
     qt6-webengine
+    # qt6-webkit
     qt6-websockets
     qt6-webview
+    # qt6-x11extras
+    # qt6-xmlpatterns
     boost
     boost-libs
     glew
@@ -96,8 +102,10 @@ build() {
         -G Ninja \
         -Wno-dev
     ninja -C "$_pkgBuildDir" ${MAKEFLAGS} 
+    # make -C "$_pkgBuildDir" ${MAKEFLAGS} 
 }
 
 package() {
+    # DESTDIR="${pkgdir}" make -C "$_pkgBuildDir" install
     DESTDIR="${pkgdir}" ninja -C "$_pkgBuildDir" install
 }
