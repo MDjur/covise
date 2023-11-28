@@ -5,6 +5,8 @@
 
  * License: LGPL 2+ */
 
+#include <cstdlib>
+#include <iostream>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -181,6 +183,13 @@ bool setupEnvironment(int argc, char *argv[])
 {
     std::string covisedir;
     char *cdir = getenv("COVISEDIR");
+    std::cerr << "APPDIR " << getenv("APPDIR") << "APPIMAGE" << getenv("APPIMAGE") << std::endl;
+    // if( getenv("APPIMAGE") && getenv("APPDIR") )
+	// {
+    //     cdir = getenv("APPDIR");
+		// snprintf(buf, PATH_MAX, "%s/%s", getenv("APPDIR"), "usr/stepmania-5.1");
+		// printf("Appimage detected; CWD at: %s\n", buf);
+	// }
     if (cdir)
         covisedir = cdir;
 
@@ -309,6 +318,19 @@ bool setupEnvironment(int argc, char *argv[])
     if (!bundlepath.empty())
         covisedir = bundlepath + "/Contents/Resources";
 #endif
+    if( getenv("APPIMAGE") && getenv("APPDIR") )
+	{
+        std::cerr << "APPDIR " << getenv("APPDIR") << "APPIMAGE" << getenv("APPIMAGE") << std::endl;
+        covisedir = getenv("APPDIR");
+        auto exec_appimage = covisedir + "/bin/run_appimage";
+
+        setenv("COVISEDIR", covisedir.c_str(), 1);
+        setenv("LD_LIBRARY_PATH", (covisedir + "/" + ARCHSUFFIX + "/lib").c_str(), 1);
+        system(exec_appimage.c_str());
+        
+		// snprintf(buf, PATH_MAX, "%s/%s", getenv("APPDIR"), "/usr/bin/covise");
+		// printf("Appimage detected; CWD at: %s\n", buf);
+	}
 
     if (covisedir.empty())
     {

@@ -131,6 +131,12 @@ if [ "$basename" = "_exec_for_covise" \
     shift
 elif [ "$basename" = "_env_for_covise" ]; then
     :
+elif [ "$basename" = "run_appimage" ]; then
+    runcmd=$(find_executable $("covise" "$1"))
+    if [ -e "$1" -o ! -e "$runcmd" ]; then
+       runcmd="$1"
+    fi
+    shift
 else
     runcmd=$(find_executable $(basename "$0"))
     if [ ! -e "$runcmd" ]; then

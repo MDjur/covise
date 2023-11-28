@@ -1,0 +1,4 @@
+#! /usr/bin/env bash
+
+. ${COVISEDIR}/.covise.sh
+${COVISEDIR}/bin/_exec_for_covise

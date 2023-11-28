@@ -1,0 +1,11 @@
+
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=COVISE
+GenericName=Scientific Visualization
+Comment=View and process meshes
+Exec=covise %F
+Icon=covise
+Terminal=false
+Categories=Graphics;3DGraphics;Viewer;Qt
