@@ -8,9 +8,8 @@ if (NOT CURL_FOUND)
     message("CURL not found")
 endif()
 
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h" "core/*.cpp" "core/*.h")
+file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
 add_library(coGraphQL OBJECT ${SOURCES})
-add_dependencies(coGraphQL coCurlHTTPClient)
 target_link_libraries(
     coGraphQL 
     PRIVATE coCurlHTTPClient
