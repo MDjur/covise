@@ -1,0 +1,38 @@
+{
+  "subscription": {
+    "markerUpdated": {
+      "lat": 48.739486,
+      "lng": 9.097307
+    }
+  },
+  "query": {
+    "users": [
+      {
+        "age": 10,
+        "id": 1,
+        "name": "Peter"
+      },
+      {
+        "age": 50,
+        "id": 2,
+        "name": "Hans"
+      }
+    ],
+    "user": {
+      "age": 22,
+      "id": 1,
+      "name": "Denise"
+    }
+  },
+  "mutation": {
+    "updateMarker": {
+      "lat": 1.5,
+      "lng": 1.5
+    },
+    "createUser": {
+      "age": 28,
+      "id": 6,
+      "name": ""
+    }
+  }
+}
