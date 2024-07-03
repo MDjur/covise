@@ -3,7 +3,7 @@
 
 namespace graphql {
 template<typename... Types>
-std::string Query<Types...>::createGraphQlString() const
+std::string Query<Types...>::createGraphQLString() const
 {
     //example: query Test($userId: Int = 2) {
     //      user(id: $userId) {

@@ -9,7 +9,7 @@ class Query: public Type<Types...> {
 public:
     using Type<Types...>::Type;
 protected:
-    std::string createGraphQlString() const override;
+    std::string createGraphQLString() const override;
 };
 } // namespace graphql
 
