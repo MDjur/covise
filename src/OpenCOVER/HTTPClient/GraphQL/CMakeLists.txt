@@ -4,10 +4,6 @@ if (NOT nlohmann_json_FOUND)
     message("nlohmann_json not found")
 endif()
 
-if (NOT CURL_FOUND)
-    message("CURL not found")
-endif()
-
 set(SOURCES 
     core/query.cpp
     core/type.cpp
@@ -15,17 +11,20 @@ set(SOURCES
 )
 
 set(HEADERS
+    core/export.h
     core/query.h
     core/type.h
     core/field.h
     core/scalar.h
+    core/subscription.h
+    core/mutation.h
     graphql.h
 )
 
-add_library(coGraphQL OBJECT ${SOURCES} ${HEADERS})
+ADD_COVISE_LIBRARY(coGraphQL ${SOURCES} ${HEADERS})
 add_dependencies(coGraphQL coCurlHTTPClient)
 target_link_libraries(
     coGraphQL 
-    PRIVATE coCurlHTTPClient
-    PRIVATE nlohmann_json::nlohmann_json)
-set_target_properties(coGraphQL PROPERTIES LINKER_LANGUAGE CXX POSITION_INDEPENDENT_CODE ON)
+    coCurlHTTPClient
+    nlohmann_json::nlohmann_json)
+COVISE_INSTALL_TARGET(coGraphQL)

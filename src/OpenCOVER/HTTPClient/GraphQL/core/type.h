@@ -1,7 +1,8 @@
-#ifndef _LIB_CORE_TYPE_H
-#define _LIB_CORE_TYPE_H
+#ifndef HTTPCLIENT_GRAPHQL_CORE_TYPE_H
+#define HTTPCLIENT_GRAPHQL_CORE_TYPE_H
 
 #include "field.h"
+#include "export.h"
 #include <string>
 #include <nlohmann/json.hpp>
 
@@ -10,7 +11,7 @@ using json = nlohmann::json;
 namespace graphql {
 
 template<typename... Types>
-class Type {
+class GRAPHQLCLIENTEXPORT Type {
 public:
     Type() = delete;
     Type(const json &query);
@@ -18,13 +19,12 @@ public:
 
     const json &getVariables() const { return variables; };
     std::string toString() const;
+    virtual std::string createGraphQLString() const = 0;
 
 private:
     bool initVariables();
 
 protected:
-
-    virtual std::string createGraphQlString() const = 0;
     json variables;
     std::string name;
     Fields<Types...> fields;

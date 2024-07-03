@@ -1,20 +1,21 @@
-#ifndef _LIB_CORE_FIELD_H
-#define _LIB_CORE_FIELD_H
+#ifndef HTTPCLIENT_GRAPHQL_CORE_FIELD_H
+#define HTTPCLIENT_GRAPHQL_CORE_FIELD_H
 
 #include "scalar.h"
+#include "export.h"
 #include <variant>
 #include <vector>
 
 namespace graphql {
 
 template<typename T, typename = std::enable_if_t<is_graphql_type<T>::value>>
-struct Field {
+struct GRAPHQLCLIENTEXPORT Field {
     std::string name;
     T value;
 };
 
 template<typename... Types>
-class Fields {
+class GRAPHQLCLIENTEXPORT Fields {
 public:
     using FieldsType = std::vector<std::variant<Types...>>;
 
@@ -27,7 +28,7 @@ public:
     typename FieldsType::iterator end() { return m_fields.end(); }
 
 private:
-    template<typename T>
+    template<typename T, typename = std::enable_if_t<is_graphql_type<T>::value>>
     void push_back(const std::string &name, const T &val)
     {
         m_fields.push_back(Field<T>{name, val});

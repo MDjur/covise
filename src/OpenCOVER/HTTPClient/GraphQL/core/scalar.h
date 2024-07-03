@@ -1,12 +1,13 @@
-#ifndef _LIB_CORE_SCALAR_H
-#define _LIB_CORE_SCALAR_H
+#ifndef HTTPCLIENT_GRAPHQL_CORE_SCALAR_H
+#define HTTPCLIENT_GRAPHQL_CORE_SCALAR_H
 
 #include <string>
+#include "export.h"
 
 namespace graphql {
 
 template<class T>
-struct is_graphql_type
+struct GRAPHQLCLIENTEXPORT is_graphql_type
 {
     static constexpr bool value = false;
 };
@@ -14,7 +15,7 @@ struct is_graphql_type
 #define DEFINE_SCALAR_TYPE(TYPE, NAME) \
     typedef TYPE NAME; \
     template<> \
-    struct is_graphql_type<TYPE> \
+    struct GRAPHQLCLIENTEXPORT is_graphql_type<TYPE> \
     { \
         static constexpr bool value = true; \
     };

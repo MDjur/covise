@@ -34,6 +34,7 @@ bool Type<Types...>::initVariables()
 template <typename... Types>
 std::string Type<Types...>::toString() const
 {
-    return createGraphQlString();
+    return "Type: " + name;
+    // return createGraphQLString();
 }
 } // namespace graphql
