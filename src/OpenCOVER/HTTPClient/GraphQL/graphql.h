@@ -6,10 +6,7 @@
 #include "HTTPClient/CURL/request.h"
 #include "core/export.h"
 
-using json = nlohmann::json;
-
-namespace graphql {
-
+namespace opencover::httpclient::graphql {
 struct GRAPHQLCLIENTEXPORT ServerInfo {
     std::string url;
     int port;
@@ -24,13 +21,13 @@ public:
 
     const ServerInfo &getServer() const { return server; };
     void send();
-    void send(const std::string &queryStr, const json &variables, std::string &response);
+    void send(const std::string &queryStr, const nlohmann::json &variables, std::string &response);
 
 private:
     ServerInfo server;
     std::string endpoint;
-    json schema;
-    opencover::httpclient::curl::Request curlRequest;
+    nlohmann::json schema;
+    curl::Request curlRequest;
 };
 } // namespace graphql
 

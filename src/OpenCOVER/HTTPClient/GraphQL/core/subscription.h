@@ -4,12 +4,12 @@
 #include "type.h"
 #include "export.h"
 
-namespace graphql {
+namespace opencover::httpclient::graphql {
 template<typename... Types>
 class GRAPHQLCLIENTEXPORT Subscription: public Type<Types...> {
 public:
     using Type<Types...>::Type;
-    std::string createGraphQLString() const override{return "";};
+    // std::string createGraphQLString() const override{return "";};
 };
 } // namespace graphql
 

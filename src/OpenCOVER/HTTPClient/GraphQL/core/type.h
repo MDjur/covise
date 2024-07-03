@@ -8,27 +8,27 @@
 
 using json = nlohmann::json;
 
-namespace graphql {
+namespace opencover::httpclient::graphql {
 
 template<typename... Types>
 class GRAPHQLCLIENTEXPORT Type {
 public:
     Type() = delete;
-    Type(const json &query);
+    // Type(const json &query);
     Type(const std::string &name, const Types &...types): name(name), fields(types...){};
 
     const json &getVariables() const { return variables; };
-    std::string toString() const;
-    virtual std::string createGraphQLString() const = 0;
+    std::string toString() const { return createGraphQLString(); };
 
 private:
     bool initVariables();
 
 protected:
+    virtual std::string createGraphQLString() const = 0;
     json variables;
     std::string name;
     Fields<Types...> fields;
 };
 
-} // namespace graphql
+} // namespace opencover::httpclient::graphql
 #endif

@@ -5,7 +5,7 @@
 
 using json = nlohmann::json;
 
-namespace graphql {
+namespace opencover::httpclient::graphql {
 
 template <typename... Types>
 bool Type<Types...>::initVariables()
@@ -30,11 +30,4 @@ bool Type<Types...>::initVariables()
 //         std::cout << "Variables not initialized" << std::endl;
 // }
 
-
-template <typename... Types>
-std::string Type<Types...>::toString() const
-{
-    return "Type: " + name;
-    // return createGraphQLString();
-}
 } // namespace graphql

@@ -6,7 +6,7 @@
 #include <variant>
 #include <vector>
 
-namespace graphql {
+namespace opencover::httpclient::graphql {
 
 template<typename T, typename = std::enable_if_t<is_graphql_type<T>::value>>
 struct GRAPHQLCLIENTEXPORT Field {

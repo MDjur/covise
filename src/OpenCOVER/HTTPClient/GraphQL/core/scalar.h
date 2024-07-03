@@ -4,9 +4,9 @@
 #include <string>
 #include "export.h"
 
-namespace graphql {
+namespace opencover::httpclient::graphql {
 
-template<class T>
+template<typename T>
 struct GRAPHQLCLIENTEXPORT is_graphql_type
 {
     static constexpr bool value = false;

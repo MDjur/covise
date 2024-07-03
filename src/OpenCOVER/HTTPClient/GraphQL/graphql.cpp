@@ -5,7 +5,10 @@
 #include <fstream>
 #include <iostream>
 
-namespace graphql {
+using json = nlohmann::json;
+
+namespace opencover::httpclient::graphql {
+
 GraphQLClient::GraphQLClient(const ServerInfo &server, const std::string &schemaPath,
                              const std::string &_endpoint = "/graphql")
 : server(server), endpoint(_endpoint)
@@ -43,8 +46,6 @@ void GraphQLClient::send(const std::string &queryStr, const json &variables, std
     // json requestBody = {{"query", queryStr_new}};
     json requestBody = {{"query", queryStr}};
     requestBody["variables"] = variables;
-    Query<Float, Int, String> test("test", 1.0, 2, "wurstbrot");
-    std::cout << test.toString() << "\n";
 
     // Convert the JSON object to a string
     opencover::httpclient::curl::POST post(url, requestBody.dump());
@@ -54,4 +55,4 @@ void GraphQLClient::send(const std::string &queryStr, const json &variables, std
     if (curlRequest.httpRequest(post, response))
         std::cout << "Response: " << response << std::endl;
 }
-} // namespace graphql
+} // namespace opencover::httpclient::graphql
