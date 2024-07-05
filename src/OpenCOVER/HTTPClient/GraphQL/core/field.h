@@ -8,13 +8,14 @@
 
 namespace opencover::httpclient::graphql {
 
-template<typename T>
-using FieldType = typename std::pair<std::string, T>;
+template<typename T, typename name = std::string, typename is_nullable = bool>
+using FieldType = std::tuple<name, T, is_nullable>;
 
 template<typename T, typename = std::enable_if<is_graphql_type<T>::value>>
 struct GRAPHQLCLIENTEXPORT Field {
     std::string name;
     T value;
+    bool nullable = false;
 };
 
 template<typename... Types>
@@ -40,8 +41,8 @@ private:
     template<typename T>
     void pushback(const FieldType<T> &field)
     {
-        const auto &[name, value] = field;
-        m_fields.push_back(Field<Scalar>{name, value});
+        const auto &[name, value, nullable] = field;
+        m_fields.push_back(Field<Scalar>{name, value, nullable});
     }
     FieldsType m_fields;
 };
