@@ -11,27 +11,30 @@ namespace opencover::httpclient::graphql {
 template<typename... Types>
 class GRAPHQLCLIENTEXPORT Type {
 public:
-    Type() = delete;
-    Type(const Type &) = delete;
-    Type(Type &&) = delete;
-    Type &operator=(const Type &) = delete;
-    Type &operator=(Type &&) = delete;
     Type(const std::string &name, const FieldType<Types> &...fields): m_name(name), m_fields(fields...)
     {
         initVariables();
     };
+    Type() = delete;
+    Type(Type &&) = delete;
+    Type &operator=(Type &&) = delete;
+
+    virtual ~Type() = default;
+    Type(const Type &) = delete;
+    Type &operator=(const Type &) = delete;
 
     json &getVariables() { return m_variables; };
     const Fields<Types...> &getFields() const { return m_fields; };
     std::string toString() { return createGraphQLString(); };
 
 private:
+    virtual std::string createGraphQLString() = 0;
     bool initVariables()
     {
         if (m_fields.empty())
             return false;
 
-        for (const auto &f : m_fields)
+        for (const auto &f: m_fields)
             // m_variables[f.name] = f.value;
             std::visit([&](const auto &v) { m_variables[f.name] = v; }, f.value);
 
@@ -39,7 +42,6 @@ private:
     };
 
 protected:
-    virtual std::string createGraphQLString() = 0;
     json m_variables;
     std::string m_name;
     Fields<Types...> m_fields;

@@ -20,12 +20,15 @@ public:
         // auto visitor = [](auto &&f) { std::cout << f.name << ": "<< f.value<<"\n";};
         for (const auto &field: BaseType::m_fields)
             queryFmtStr += field.name + " ";
-            // queryFmtStr += field.name + " " + field.value;
-            // std::visit([&](auto&& v) {ss << field.name << " " << v << " ";}, field.value);
+        // queryFmtStr += field.name + " " + field.value;
+        // std::visit([&](auto&& v) {ss << field.name << " " << v << " ";}, field.value);
         // queryFmtStr += ss.str();
         queryFmtStr += "}}";
         m_queryFmt = boost::format(queryFmtStr);
     };
+    ~Query() = default;
+    Query(const Query &) = delete;
+    Query &operator=(const Query &) = delete;
 
 private:
     using BaseType = Type<Types...>;

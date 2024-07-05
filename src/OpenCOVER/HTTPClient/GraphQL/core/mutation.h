@@ -11,7 +11,12 @@ public:
     using Type<Types...>::Type;
     // std::string createGraphQLString() const override{return "";};
     // std:: string queryStr_new = R"(mutation Test($lat: Float!, $lon:Float!){ updateMarker(lat: $lat, lng: $lon){lat lng}})";
+    ~Mutation() = default;
+    Mutation(const Mutation &) = delete;
+    Mutation &operator=(const Mutation &) = delete;
+private:
+    std::string createGraphQLString() override {};
 };
-} // namespace graphql
+} // namespace opencover::httpclient::graphql
 
 #endif
