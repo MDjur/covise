@@ -5,7 +5,6 @@ if (NOT nlohmann_json_FOUND)
 endif()
 
 set(SOURCES 
-    core/type.cpp
     graphql.cpp
 )
 
