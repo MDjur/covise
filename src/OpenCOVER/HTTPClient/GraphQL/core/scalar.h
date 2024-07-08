@@ -27,6 +27,25 @@ DEFINE_SCALAR_TYPE(std::string, String)
 // TODO: Add custom types
 
 typedef std::variant<Int, Float, Boolean, String> Scalar;
+
+inline constexpr const char * scalarTypeToString(const Scalar &s)
+{
+    auto visitor = [](const auto &v) -> const char * { 
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, Int>) {
+            return "Int";
+        } else if constexpr (std::is_same_v<T, Float>) {
+            return "Float";
+        } else if constexpr (std::is_same_v<T, Boolean>) {
+            return "Boolean";
+        } else if constexpr (std::is_same_v<T, String>) {
+            return "String";
+        } else {
+            return "Unknown";
+        }
+    };
+    return std::visit(visitor, s);
+}
 } // namespace opencover::httpclient::graphql
 
 #endif
