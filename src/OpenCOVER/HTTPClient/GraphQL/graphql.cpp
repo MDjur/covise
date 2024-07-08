@@ -22,21 +22,6 @@ GraphQLClient::GraphQLClient(const ServerInfo &server, const std::string &schema
     // std::cout << "Schema loaded: " << schema.dump(4) << std::endl;
 }
 
-// used for testing GET
-// void GraphQLClient::send()
-// {
-//     std::string url = server.url + ":" + std::to_string(server.port) + endpoint;
-//     std::string queryStr = "{users{name}}";
-
-//     url += "?query=" + queryStr;
-//     std::string response = "";
-//     opencover::httpclient::curl::GET get(url);
-
-//     std::cout << get.to_string() << "\n";
-//     if (curlRequest.httpRequest(get, response))
-//         std::cout << "Response: " << response << std::endl;
-// }
-
 void GraphQLClient::send(const std::string &queryStr, const json &variables, std::string &response)
 {
     std::string url = server.url + ":" + std::to_string(server.port) + endpoint;
