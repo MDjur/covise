@@ -17,6 +17,9 @@ struct GRAPHQLCLIENTEXPORT Field {
     std::string name;
     T value;
     bool nullable = false;
+    Field(const std::string &_name, const T &_value, bool _nullable = false)
+    : name(_name), value(_value), nullable(_nullable)
+    {}
 };
 
 template<typename... Types>
