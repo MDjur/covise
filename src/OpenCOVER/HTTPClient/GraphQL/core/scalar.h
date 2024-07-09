@@ -24,6 +24,7 @@ DEFINE_SCALAR_TYPE(int, Int)
 DEFINE_SCALAR_TYPE(float, Float)
 DEFINE_SCALAR_TYPE(bool, Boolean)
 DEFINE_SCALAR_TYPE(std::string, String)
+// TODO: define ID later
 // TODO: Add custom types
 
 typedef std::variant<Int, Float, Boolean, String> Scalar;
