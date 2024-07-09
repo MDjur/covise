@@ -1,6 +1,5 @@
 #include "graphql.h"
 #include "HTTPClient/CURL/methods.h"
-#include "core/query.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
@@ -27,8 +26,6 @@ void GraphQLClient::send(const std::string &queryStr, const json &variables, std
     std::string url = server.url + ":" + std::to_string(server.port) + endpoint;
 
     // Create a JSON object to hold the query and variables
-    // std:: string queryStr_new = R"(mutation Test($lat: Float!, $lon:Float!){ updateMarker(lat: $lat, lng: $lon){lat lng}})";
-    // json requestBody = {{"query", queryStr_new}};
     json requestBody = {{"query", queryStr}};
     requestBody["variables"] = variables;
 
