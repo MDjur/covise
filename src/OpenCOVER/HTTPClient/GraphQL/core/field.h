@@ -4,12 +4,13 @@
 #include "scalar.h"
 #include "export.h"
 #include <vector>
+#include <tuple>
 #include <iostream>
 
 namespace opencover::httpclient::graphql {
 
-template<typename T, typename name = std::string, typename is_nullable = bool>
-using FieldType = std::tuple<name, T, is_nullable>;
+template<typename T>
+using FieldType = std::tuple<std::string, T, bool>;
 
 template<typename T, typename = std::enable_if<is_graphql_type<T>::value>>
 struct GRAPHQLCLIENTEXPORT Field {
@@ -25,7 +26,7 @@ public:
     Fields(const FieldType<Types> &...fields)
     {
         m_fields.reserve(sizeof...(fields));
-        (pushback(fields), ...);
+        (add(fields), ...);
     }
     typename FieldsType::iterator begin() { return m_fields.begin(); }
     typename FieldsType::iterator end() { return m_fields.end(); }
@@ -39,14 +40,12 @@ public:
 
 private:
     template<typename T>
-    void pushback(const FieldType<T> &field)
+    void add(const FieldType<T> &field)
     {
         const auto &[name, value, nullable] = field;
-        m_fields.push_back(Field<Scalar>{name, value, nullable});
+        m_fields.emplace_back(name, value, nullable);
     }
     FieldsType m_fields;
 };
-
 } // namespace opencover::httpclient::graphql
-
 #endif
