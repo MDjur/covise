@@ -6,10 +6,9 @@
 
 namespace opencover::httpclient::graphql {
 template<typename... Types>
-class GRAPHQLCLIENTEXPORT Mutation: public Type<Types...> {
+class GRAPHQLCLIENTEXPORT Mutation: public ObjectType<Types...> {
 public:
-    using Type<Types...>::Type;
-    // std::string createGraphQLString() const override{return "";};
+    using ObjectType<Types...>::Type;
     // std:: string queryStr_new = R"(mutation Test($lat: Float!, $lon:Float!){ updateMarker(lat: $lat, lng: $lon){lat lng}})";
     ~Mutation() = default;
     Mutation(const Mutation &) = delete;

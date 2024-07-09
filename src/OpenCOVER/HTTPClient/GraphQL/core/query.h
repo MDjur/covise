@@ -1,68 +1,41 @@
 #ifndef HTTPCLIENT_GRAPHQL_CORE_QUERY_H
 #define HTTPCLIENT_GRAPHQL_CORE_QUERY_H
 
-#include "scalar.h"
 #include "type.h"
 #include "export.h"
-#include <boost/format.hpp>
-// #include <sstream>
-#include <variant>
-#include <iostream>
+#include <nlohmann/json.hpp>
+
+namespace {
+std::string json_type_to_string(const nlohmann::json &j)
+{
+    if (j.is_string()) {
+        return "String";
+    } else if (j.is_number_integer()) {
+        return "Int!";
+    } else if (j.is_number_float()) {
+        return "Float";
+    } else if (j.is_boolean()) {
+        return "Boolean";
+    } else {
+        return "Unknown";
+    }
+}
+} // namespace
 
 namespace opencover::httpclient::graphql {
 template<typename... Types>
-class GRAPHQLCLIENTEXPORT Query: public Type<Types...> {
+class GRAPHQLCLIENTEXPORT Query: public ObjectType<Types...> {
 public:
-    Query(const std::string &name, const FieldType<Types> &...fields): BaseTypeConstructor(name, fields...){};
+    Query(const std::string &name, const nlohmann::json &variables, const FieldType<Types> &...fields)
+    : BaseType(name, fields...), m_variables(variables){};
     ~Query() = default;
     Query(const Query &) = delete;
     Query &operator=(const Query &) = delete;
+    nlohmann::json &getVariables() { return m_variables; };
 
 private:
-    using BaseType = Type<Types...>;
-    using BaseTypeConstructor = typename BaseType::Type;
-
-    std::string createGraphQLString() override
-    {
-        boost::format m_queryFmt;
-        std::string queryFmtStr = "query %s{ " + BaseType::m_name + " %s{ ";
-        for (const auto &field: BaseType::m_fields)
-            queryFmtStr += field.name + " ";
-        queryFmtStr += "}}";
-        m_queryFmt = boost::format(queryFmtStr);
-        auto header = boost::format("Test(%s)");
-        auto headerParameter = boost::format("$%s: %s");
-        auto queryFunction = boost::format("(%s)");
-        auto queryFunctionParameter = boost::format("%s: $%s");
-        std::string queryFunctionParameterList = "";
-        std::string headerParameterList = "";
-        for (const auto &field: BaseType::m_fields) {
-            headerParameter % field.name % scalarTypeToString(field.value);
-            queryFunctionParameter % field.name % field.name;
-            headerParameterList += headerParameter.str() + ", ";
-            queryFunctionParameterList += queryFunctionParameter.str() + ", ";
-            queryFunctionParameter.clear();
-            headerParameter.clear();
-        }
-        header % headerParameterList.substr(0, headerParameterList.size() - 2);
-        queryFunction % queryFunctionParameterList.substr(0, queryFunctionParameterList.size() - 2);
-        m_queryFmt % header % queryFunction;
-
-        json query;
-        query["query"] = m_queryFmt.str();
-        query["variables"] = BaseType::m_variables;
-        return query.dump(4);
-    };
-
-    //example: query Test($userId: Int = 2) {
-    //      user(id: $userId) {
-    //          id
-    //          name
-    //          age
-    //      }
-    // }";
-    // curl -X POST http://127.0.0.1:8081/graphql -H "Content-Type: application/json" -d '{"query":"query Test($userId: Int = 2){ user(id: $userId) { id name age }}", "variables": { "userId":3 }}'
-    // boost::format m_queryFmt;
+    using BaseType = ObjectType<Types...>;
+    nlohmann::json m_variables;
 };
 } // namespace opencover::httpclient::graphql
 

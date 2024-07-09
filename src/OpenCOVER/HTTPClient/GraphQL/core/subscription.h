@@ -6,10 +6,9 @@
 
 namespace opencover::httpclient::graphql {
 template<typename... Types>
-class GRAPHQLCLIENTEXPORT Subscription: public Type<Types...> {
+class GRAPHQLCLIENTEXPORT Subscription: public ObjectType<Types...> {
 public:
-    using Type<Types...>::Type;
-    // std::string createGraphQLString() const override{return "";};
+    using ObjectType<Types...>::Type;
     ~Subscription() = default;
     Subscription(const Subscription &) = delete;
     Subscription &operator=(const Subscription &) = delete;

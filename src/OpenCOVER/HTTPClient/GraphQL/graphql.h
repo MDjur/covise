@@ -21,7 +21,7 @@ public:
 
     const ServerInfo &getServer() const { return server; };
     template<typename... Types>
-    void send(Type<Types...> &type, std::string &response)
+    void send(ObjectType<Types...> &type, std::string &response)
     {
         std::string url = server.url + ":" + std::to_string(server.port) + endpoint;
         auto query = type.toString();
