@@ -14,5 +14,4 @@ SET(SOURCES
   AnnotationSensor.cpp
 )
 
-add_subdirectory(lib)
-cover_add_plugin(Annotation $<TARGET_OBJECTS:coGraphQL> coCurlHTTPClient)
+cover_add_plugin(Annotation coGraphQL)
