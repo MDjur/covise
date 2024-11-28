@@ -12,9 +12,7 @@
 /.settings
 /.vs
 /*/bin
-/*/build.cover
 /*/build.covise
-/*/cover-exports.cmake
 /*/covise-exports.cmake
 /*/CoviseOptions.cmake
 /*/lib
@@ -39,6 +37,8 @@
 /rhel7opt
 /rhel8
 /rhel8opt
+/rhel9
+/rhel9opt
 /darwin
 /darwinopt
 /libc++
@@ -47,8 +47,6 @@
 /macosopt
 /freebsd
 /freebsdopt
-/spack
-/spackopt
 /win32
 /win32opt
 /vista
@@ -285,7 +283,10 @@
 /leopardopt
 /lion
 /lionopt
+/spack*
+/.spack
 .vscode/*     
 !.vscode/configureCovise
 !.vscode/tasks.json
 compile_commands.json
+/share/covise/jsbsim/geometry/A50.wrl

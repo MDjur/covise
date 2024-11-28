@@ -23,19 +23,8 @@
  **                                                                          **
 \****************************************************************************/
 #include <cover/coVRPlugin.h>
-#ifdef VRUI
-#include <OpenVRUI/coMenuItem.h>
-#include <OpenVRUI/coCheckboxMenuItem.h>
-#include <OpenVRUI/coPotiMenuItem.h>
-#include <OpenVRUI/coSubMenuItem.h>
-#include <OpenVRUI/coRowMenu.h>
-#include <OpenVRUI/coButtonMenuItem.h>
-#include <OpenVRUI/coCheckboxGroup.h>
-#include <OpenVRUI/coLabelMenuItem.h>
-#else
 #include <cover/ui/Owner.h>
 #include <cover/ui/Menu.h>
-#endif
 #include <cover/coVRSelectionManager.h>
 #include <util/coExport.h>
 #include <cover/coTabletUI.h>
@@ -44,9 +33,11 @@
 
 #include <osg/NodeVisitor>
 #include "Variant.h"
+#ifdef USE_QT
 #include <QtCore>
 #include <qdom.h>
 #include <QDir>
+#endif
 #include "coVRBoxOfInterest.h"
 #include <config/CoviseConfig.h>
 #include <cover/MarkerTracking.h>
@@ -84,9 +75,6 @@ public:
     virtual bool selectionChanged() override;
     virtual bool pickedObjChanged() override;
 
-#ifdef VRUI
-    void menuEvent(coMenuItem *menu_VariantPluginitem);
-#endif
     // this will be called if a COVISE object arrives
     bool init() override;
     void addNode(osg::Node *, const RenderObject *) override;
@@ -119,6 +107,17 @@ public:
     void printMatrix(osg::Matrix ma);
     void HideAllVariants();
 
+    struct VariantGroup
+    {
+        std::string name;
+        std::set<Variant *> variants;
+        ui::ButtonGroup *group = nullptr;
+    };
+    VariantGroup *getVariantGroup(std::string groupName);
+    VariantGroup *addVariantToGroup(std::string groupName, Variant *var);
+    void removeVariantFromGroup(std::string groupName, Variant *var);
+    std::string getGroupFromName(const std::string &name);
+
 private:
     coSensorList sensorList;
     ui::Menu *variant_menu=nullptr;
@@ -141,13 +140,16 @@ private:
     std::map<std::string, bool> deletedVisibility;
     std::list<VariantMarker> variantMarkers;
     const VariantMarker *activatedMarker = nullptr;
+    std::map<std::string, VariantGroup> variantGroups;
 
     std::map<osg::Node *, Variant *> varmap;
 
     osg::BoundingBox box;
 
+#ifdef USE_QT
     QDomDocument *xmlfile;
     QDomElement qDE_Variant;
+#endif
 
     coVRBoxOfInterest *boi;
     bool interActing;

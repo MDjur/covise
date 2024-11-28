@@ -36,7 +36,6 @@ SET(MAPEDITOR_SOURCES
   widgets/MEDialogTools.cpp
   material/MEMaterialChooser.cpp
   material/MEMaterialDisplay.cpp
-  color/MEColorChooser.cpp
   color/MEColorSelector.cpp
   color/MEColorMap.cpp
   hosts/MEDaemon.cpp
@@ -107,7 +106,6 @@ SET(MAPEDITOR_HEADERS
 )
 
 SET(MAPEDITOR_MOC_HEADERS
-  color/MEColorChooser.h
   color/MEColorSelector.h
   color/MEColorMap.h
   widgets/MEUserInterface.h
@@ -223,6 +221,10 @@ ADD_COVISE_EXECUTABLE(${TARGETNAME} MACOSX_BUNDLE
   ${MAPEDITOR_MOC_HEADERS} ${MAPEDITOR_MOC_SRCS}
   ${MAPEDITOR_RCC_FILES} ${MAPEDITOR_UI_SRCS}
   ${ME_TUI_SOURCES} ${ME_TUI_HEADERS} ${ME_TUI_MOC_SRCS} ${ME_TUI_MOC_HEADERS}
+)
+set_target_properties(${TARGETNAME} PROPERTIES 
+    MACOSX_BUNDLE_BUNDLE_NAME COVISE
+    MACOSX_BUNDLE_GUI_IDENTIFIER de.hlrs.covise
 )
 qt_use_modules(${TARGETNAME} Widgets Xml Network OpenGL Svg SvgWidgets UiTools PrintSupport Quick)
 if (COVISE_USE_WEBENGINE)

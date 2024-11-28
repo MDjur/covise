@@ -45,6 +45,7 @@
 
 #include <config/CoviseConfig.h>
 #include "coVRConfig.h"
+#include "coVRPluginSupport.h"
 
 #include "InitGLOperation.h"
 
@@ -117,6 +118,19 @@ void InitGLOperation::operator()(osg::GraphicsContext* gc)
     }
 #endif
 
+#define PRINT_STRING(s) std::cerr << "GL_" #s << ": " << glGetString(GL_ ## s) << std::endl
+    if (cover->debugLevel(2))
+    {
+        PRINT_STRING(RENDERER);
+        PRINT_STRING(VENDOR);
+        PRINT_STRING(VERSION);
+    }
+    if (cover->debugLevel(3))
+    {
+        PRINT_STRING(EXTENSIONS);
+    }
+#undef PRINT_STRING
+
     const bool glDebug = covise::coCoviseConfig::isOn("COVER.GLDebug", false);
     bool glDebugLevelExists = false;
     int glDebugLevel = covise::coCoviseConfig::getInt("level", "COVER.GLDebug", 1, &glDebugLevelExists);
@@ -156,23 +170,28 @@ void InitGLOperation::operator()(osg::GraphicsContext* gc)
         }
         else
         {
-            std::cerr << "enableGLDebugExtension: no supported GL extension found for context " << contextId << std::endl;
-            return;
+            std::cerr << "enableGLDebugExtension: no supported GL extension found for context " << contextId
+                      << std::endl;
         }
 
-        if(glDebugMessageCallback == NULL || glDebugMessageControl == NULL)
+        if (!ext.empty())
         {
-            std::cerr << "enableGLDebugExtension: did not find required function for GL extension " << ext << " for context " << contextId << std::endl;
-            return;
+            if (glDebugMessageCallback == NULL || glDebugMessageControl == NULL)
+            {
+                std::cerr << "enableGLDebugExtension: did not find required function for GL extension " << ext
+                          << " for context " << contextId << std::endl;
+            }
+            else
+            {
+                m_callbackData = {contextId, glDebugLevel, abortOnError};
+                glEnable(GL_DEBUG_OUTPUT);
+                glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+                glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
+                glDebugMessageCallback(InitGLOperation::debugCallback, reinterpret_cast<void *>(&m_callbackData));
+
+                std::cerr << "enableGLDebugExtension: " << ext << " enabled on context " << contextId << std::endl;
+            }
         }
-
-        m_callbackData = { contextId, glDebugLevel, abortOnError };
-        glEnable(GL_DEBUG_OUTPUT);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
-        glDebugMessageCallback(InitGLOperation::debugCallback, reinterpret_cast<void *>(&m_callbackData));
-
-        std::cerr << "enableGLDebugExtension: " << ext << " enabled on context " << contextId << std::endl;
     }
 
     bool sRGB = covise::coCoviseConfig::isOn("COVER.FramebufferSRGB", false);
@@ -217,11 +236,30 @@ void InitGLOperation::operator()(osg::GraphicsContext* gc)
         }
     }
 #endif
+
+    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(m_mutex);
+    int contextId = gc->getState()->getContextID();
+    osg::GLExtensions *glext = gc->getState()->get<osg::GLExtensions>();
+    if (m_extensions.size() <= contextId)
+    {
+        m_extensions.resize(contextId + 1);
+    }
+    m_extensions[contextId] = glext;
 }
 
 bool InitGLOperation::boundSwapBarrier() const
 {
     return m_boundSwapBarrier;
+}
+
+osg::GLExtensions *InitGLOperation::getExtensions(int contextId) const
+{
+    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(m_mutex);
+    if (m_extensions.size() <= contextId)
+    {
+        return nullptr;
+    }
+    return m_extensions[contextId].get();
 }
 
 void InitGLOperation::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity,

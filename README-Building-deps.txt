@@ -59,7 +59,7 @@ get SGI Inventor
 change include directories and lib directories to externlibs/freetype and zlib
 replace abs with fabs in source code
 remove #ifndef Win32 from image.h
-compile debug and release and manually copy to externlibs/zebu/inventor
+compile c anityd release and manually copy to externlibs/zebu/inventor
 
 #Coin 3.1.3
 set COINDIR=c:\src\externlibs\zebu\coin3d
@@ -568,6 +568,13 @@ cd D:\src\gitbase\lamure\build\build
 cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/lamure -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/freeglut;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/schism;c:/src/externlibs/zebu/glfw;c:/src/externlibs/zebu/freeimage;c:/src/externlibs/zebu/cgal;c:/src/externlibs/zebu/gmp;c:/src/externlibs/zebu/mpfr;c:/src/externlibs/zebu/glew;c:/src/externlibs/zebu/glm
 manualy changed glut to freeglut in cmake-gui
 
+#GMP
+#download from https://github.com/gx/gmp
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/gmp -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/freeglut;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/schism;c:/src/externlibs/zebu/glfw;c:/src/externlibs/zebu/freeimage;c:/src/externlibs/zebu/cgal;c:/src/externlibs/zebu/gmp;c:/src/externlibs/zebu/mpfr;c:/src/externlibs/zebu/glew;c:/src/externlibs/zebu/glm
+#mpfr
+#https://github.com/gx/mpfr
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/mpfr -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/freeglut;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/schism;c:/src/externlibs/zebu/glfw;c:/src/externlibs/zebu/freeimage;c:/src/externlibs/zebu/cgal;c:/src/externlibs/zebu/gmp;c:/src/externlibs/zebu/mpfr;c:/src/externlibs/zebu/glew;c:/src/externlibs/zebu/glm
+
 https://github.com/glfw/glfw
 cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/glfw -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/schism
 
@@ -740,7 +747,7 @@ cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/extern
 ##########
 IFC++
 https://github.com/ifcquery/ifcplusplus.git
-cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/ifcpp -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/schism;c:/src/externlibs/zebu/OpenSceneGraph;c:/src/externlibs/zebu/eigen3;c:/src/externlibs/zebu/ccd;c:/src/externlibs/zebu/fcl;c:/src/externlibs/zebu/assimp;c:/src/externlibs/zebu/boost;c:/src/externlibs/zebu/octomap;c:/src/externlibs/zebu/tinyxml2
+cmake .. -G "Visual Studio 17 2022" -A x64  -DBUILD_VIEWER_APPLICATION=OFF -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/ifcpp -DCMAKE_DEBUG_POSTFIX=d -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/Coin3D;c:/src/externlibs/zebu/curl;c:/src/externlibs/zebu/ffmpeg;c:/src/externlibs/zebu/freetype;c:/src/externlibs/zebu/giflib;c:/src/externlibs/zebu/glut;c:/src/externlibs/zebu/icu;c:/src/externlibs/zebu/jpeg;c:/src/externlibs/zebu/libpng;c:/src/externlibs/zebu/nvtt;c:/src/externlibs/zebu/OpenEXR;c:/src/externlibs/zebu/OpenSSL;c:/src/externlibs/zebu/Python;c:/src/externlibs/zebu/qt5;c:/src/externlibs/zebu/SDL;c:/src/externlibs/zebu/tiff;c:/src/externlibs/zebu/xerces;c:/src/externlibs/zebu/zlib;c:/src/externlibs/zebu/gdal;c:/src/externlibs/zebu/opencv;c:/src/externlibs/zebu/schism;c:/src/externlibs/zebu/OpenSceneGraph;c:/src/externlibs/zebu/eigen3;c:/src/externlibs/zebu/ccd;c:/src/externlibs/zebu/fcl;c:/src/externlibs/zebu/assimp;c:/src/externlibs/zebu/boost;c:/src/externlibs/zebu/octomap;c:/src/externlibs/zebu/tinyxml2
 
 ##########
 openNURBS
@@ -760,7 +767,7 @@ cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/extern
 change runtime library to Debug DLL or DLL -->in visual studio right click libcef_dll_wrapper->properties->c/c++->Code Generation->Runtime Library to Md/MDd
 remove _HAS_ITERATOR_DEBUGGING=0 from preprocessor definitions in the debug config ->properties->c/c++ -> Preprocessor -> Preprocessor Definitions -> remove _HAS_ITERATOR_DEBUGGING=0
 Build 
-copy Release/libcef.ddl or Deubu/libcef.dll and contets of Resources to externlibs/zebu/all
+copy Release/libcef.ddl or Deubu/libcef.dll and contents of Resources to externlibs/zebu/all
 
 ########
 vrmlexp
@@ -774,7 +781,7 @@ cmake .. -G "Visual Studio 17 2022" -A x64  -DU3D_SHARED:BOOL=ON -DCMAKE_INSTALL
 
 ###
 vistle
-cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/botan;c:/src/externlibs/zebu/proj4;c:/src/externlibs/zebu/zsd
+cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/botan;c:/src/externlibs/zebu/proj4;c:/src/externlibs/zebu/zsd;c:/src/externlibs/zebu/gmp;c:/src/externlibs/zebu/mpfr;c:/src/externlibs/zebu/tbb
 
 
 
@@ -792,3 +799,26 @@ cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_INSTALL_PREFIX=c:/src/externl
 Open Audio Server
 cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/OpenAS -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/fltk;c:/src/externlibs/zebu/mxml;"c:/Progra~2/OpenAL 1.1 SDK";c:/src/externlibs/zebu/alut
 
+
+##########
+OpenXR-SDK
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/OpenXR -DCMAKE_DEBUG_POSTFIX=d
+
+##########
+osgXR
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/osgXR -DCMAKE_DEBUG_POSTFIX=d  -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/OpenXR;c:/src/externlibs/zebu/OpenSceneGraph
+
+##########
+glfw
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/glfw -DCMAKE_DEBUG_POSTFIX=d  -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/OpenXR;c:/src/externlibs/zebu/OpenSceneGraph
+
+##########
+anari
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/anari -DCMAKE_DEBUG_POSTFIX=d  -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/glfw;c:/src/externlibs/zebu/OpenSceneGraph
+
+############
+###
+cesium native
+
+git clone https://github.com/CesiumGS/cesium-native.git --recurse-submodules
+cmake .. -G "Visual Studio 17 2022" -A x64  -DCMAKE_INSTALL_PREFIX=c:/src/externlibs/zebu/cesium -DCMAKE_DEBUG_POSTFIX=d  -DCESIUM_TESTS_ENABLED=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_PREFIX_PATH=c:/src/externlibs/zebu/glfw;c:/src/externlibs/zebu/OpenSceneGraph

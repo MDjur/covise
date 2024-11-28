@@ -28,33 +28,6 @@ find_path(COVER_INCLUDE_DIR "cover/coVRPluginSupport.h"
    DOC "COVER - Headers"
 )
 
-if (NOT COVER_EXPORTS_INCLUDED)
-    find_path(COVISE_OPTIONS_FILEPATH "CoviseOptions.cmake"
-        PATHS
-        ${COVISEDIR}/${COVISE_ARCHSUFFIX}
-        DOC "COVER - COVISE CMake options"
-    )
-    if (COVISE_OPTIONS_FILEPATH)
-        include("${COVISE_OPTIONS_FILEPATH}/CoviseOptions.cmake")
-        if (COVISE_OPENCOVER_INTERNAL_PROJECT)
-            message("COVER: using CMake library exports file for COVISE")
-            #include("${COVER_EXPORTS_FILEPATH}/covise-exports.cmake")
-        else()
-            find_path(COVER_EXPORTS_FILEPATH "cover-exports.cmake"
-                PATHS
-                ${COVISEDIR}/${COVISE_ARCHSUFFIX}
-                DOC "COVER - CMake library exports"
-            )
-            if (COVER_EXPORTS_FILEPATH)
-                include("${COVER_EXPORTS_FILEPATH}/cover-exports.cmake")
-            else()
-                message("COVER: CMake library exports file not found")
-            endif()
-        endif()
-    endif()
-    set (COVER_EXPORTS_INCLUDED TRUE)
-endif()
-
 covise_find_library(COVER coOpenCOVER)
 covise_find_library(COVER_CONFIG coOpenConfig)
 covise_find_library(COVER_VRUI coOpenVRUI)
@@ -137,11 +110,9 @@ MACRO(COVER_ADD_PLUGIN_TARGET targetname)
     SET_TARGET_PROPERTIES(${targetname} PROPERTIES PREFIX "")
   ENDIF(MINGW)
 
-  IF(APPLE)
-     COVISE_ADD_LINK_FLAGS(${targetname} "-undefined error")
-  ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       COVISE_ADD_LINK_FLAGS(${targetname} "-Wl,--no-undefined")
-  ENDIF(APPLE)
+  ENDIF()
     
   TARGET_LINK_LIBRARIES(${targetname} ${COVER_PLUGINUTIL_LIBRARY}
      ${COVER_LIBRARY} ${COVER_VRUI_LIBRARY} ${COVER_OSGVRUI_LIBRARY} ${COVER_CONFIG_LIBRARY}

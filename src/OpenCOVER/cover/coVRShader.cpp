@@ -50,6 +50,8 @@
 using namespace opencover;
 using namespace covise;
 
+static std::array<int, 13> glslVersions{110, 120, 130, 140, 150, 330, 400, 410, 420, 430, 440, 450, 460};
+
 coVRUniform::coVRUniform(const coVRShader *s, const std::string &n, const std::string &t, const std::string &v)
 {
     shader = s;
@@ -371,7 +373,7 @@ coVRAttribute::~coVRAttribute()
 {
 }
 
-coVRShader::coVRShader(const std::string &n, const std::string &d)
+coVRShader::coVRShader(const std::string &n, const std::string &d, const std::string &defines): defines(defines)
 {
     wasCloned = false;
     name = n;
@@ -392,6 +394,7 @@ coVRShader::coVRShader(const coVRShader &other)
 : name(other.name)
 , fileName(other.fileName)
 , dir(other.dir)
+, defines(other.defines)
 , wasCloned(true)
 , geometryShader(other.geometryShader)
 , transparent(other.transparent)
@@ -432,32 +435,23 @@ public:
     XmlAttribute(const std::string& attribute, xercesc::DOMElement *node)
     {
         XMLCh *t1 = nullptr;
-        m_value = xercesc::XMLString::transcode(node->getAttribute(t1 = xercesc::XMLString::transcode(attribute.c_str())));
+        auto s =
+            xercesc::XMLString::transcode(node->getAttribute(t1 = xercesc::XMLString::transcode(attribute.c_str())));
+        if (s)
+        {
+            m_value = s;
+        }
         xercesc::XMLString::release(&t1);
+        xercesc::XMLString::release(&s);
     }
-    ~XmlAttribute()
-    {
-        xercesc::XMLString::release(&m_value);
-    }
-    bool operator==(const std::string& other) const
-    {
-        return m_value ? m_value == other : other.empty();
-    }
-    operator bool() const
-    {
-        return m_value != nullptr && m_value[0] != '\0';
-    }
-    operator std::string() const
-    {
-        return m_value ? m_value : "";
-    }
-    const char *c_str() const
-    {
-        return m_value ? m_value : "";
-    }
+    ~XmlAttribute() {}
+    bool operator==(const std::string &other) const { return m_value == other; }
+    operator bool() const { return !m_value.empty(); }
+    operator std::string() const { return m_value; }
+    const char *c_str() const { return m_value.c_str(); }
 
 private:
-    char *m_value = nullptr;
+    std::string m_value;
 };
 
 std::ostream &operator<<(std::ostream &os, const XmlAttribute &attr)
@@ -466,7 +460,71 @@ std::ostream &operator<<(std::ostream &os, const XmlAttribute &attr)
     return os;
 }
 
-std::string parseProgram(xercesc::DOMElement *node, const std::function<std::string(const std::string&)> &findAsset)
+std::string prependPreamble(std::string code, const std::string &preamble)
+{
+    // prepend defines and fragment shader library, but keep #version on first line
+    size_t start = code.find_first_not_of(" \t\n\r");
+    code = code.substr(start);
+
+    std::string::size_type lineend = code.find_first_of("\n\r");
+    if (lineend != std::string::npos)
+    {
+        // retain space/newline after #version
+        ++lineend;
+    }
+    std::string version = code.substr(0, lineend);
+    if (version.find("#version") == std::string::npos)
+    {
+        version.clear();
+    }
+    else
+    {
+        code = code.substr(lineend);
+    }
+
+    return version + preamble + code;
+}
+
+struct VersionInfo
+{
+    int min = -1;
+    int max = -1;
+    std::string profile;
+};
+
+VersionInfo parseVersion(xercesc::DOMElement *node, const std::string &name)
+{
+    VersionInfo info;
+    std::string code = "";
+    XmlAttribute value("value", node);
+    XmlAttribute min("min", node);
+    XmlAttribute max("max", node);
+    XmlAttribute profile("profile", node);
+    if (value)
+    {
+        info.min = info.max = atoi(value.c_str());
+        if (min || max)
+        {
+            std::cerr << "WARNING: ignoring min/max attributes for version as value is set in shader " << name
+                      << std::endl;
+        }
+    }
+    else
+    {
+        if (min)
+            info.min = atoi(min.c_str());
+        if (max)
+            info.max = atoi(max.c_str());
+    }
+    if (profile)
+    {
+        info.profile = profile.c_str();
+    }
+    return info;
+}
+
+std::string parseProgram(xercesc::DOMElement *node, const std::function<std::string(const std::string &)> &findAsset,
+                         const std::string &name, const std::string &programType)
 {
     std::string code = "";
     XmlAttribute value("value", node);
@@ -480,11 +538,13 @@ std::string parseProgram(xercesc::DOMElement *node, const std::function<std::str
             buffer << t.rdbuf();
             code = buffer.str();
             if (code.empty())
-                cerr << "WARNING: empty fragment program in " << filename << std::endl;
+                cerr << "WARNING: empty " << programType << " program in " << filename << " for shader " << name
+                     << std::endl;
         }
         else
         {
-            cerr << "WARNING: could not find fragment program " << filename << std::endl;
+            cerr << "WARNING: could not find " << programType << " program " << filename << " for shader " << name
+                 << std::endl;
         }
     }
     if (code == "")
@@ -494,6 +554,8 @@ std::string parseProgram(xercesc::DOMElement *node, const std::function<std::str
             code = c;
 
         xercesc::XMLString::release(&c);
+        if (code.empty())
+            cerr << "WARNING: empty " << programType << " program for shader " << name << std::endl;
     }
     return code;
 }
@@ -586,7 +648,94 @@ void coVRShader::loadMaterial()
             {
                 if (strcmp(tagName, "preamble") == 0)
                 {
-                    preamble = parseProgram(node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1));
+                    preamble = parseProgram(node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1), name,
+                                            "preamble");
+                }
+                if (strcmp(tagName, "version") == 0)
+                {
+                    auto info = parseVersion(node, name);
+                    if (info.min > 0)
+                    {
+                        versionMin = info.min;
+                        if (versionMax < versionMin)
+                            versionMax = versionMin;
+                    }
+                    if (info.max > 0)
+                    {
+                        versionMax = info.max;
+                        if (versionMin > versionMax)
+                            versionMin = versionMax;
+                    }
+                    profile = info.profile;
+                }
+            }
+            xercesc::XMLString::release(&tagName);
+        }
+
+        if (versionMin > 0 || versionMax > 0)
+        {
+            if (versionMin < 0)
+                versionMin = 110;
+            if (versionMax < 0)
+                versionMax = 460;
+
+            std::stringstream ss;
+            auto versionRange = coVRShaderList::instance()->glslVersion();
+            int ver = 110;
+            if (versionMin > versionRange.second)
+            {
+                ver = versionMin;
+                std::cerr << "Shader " << name << " not supported by OpenGL version " << versionRange.first << " to "
+                          << versionRange.second << std::endl;
+            }
+            else if (versionMax < versionRange.first)
+            {
+                ver = versionMax;
+                std::cerr << "Shader " << name << " not supported by OpenGL version " << versionRange.first << " to "
+                          << versionRange.second << std::endl;
+            }
+            else
+            {
+                for (auto &v: glslVersions)
+                {
+                    if (v < versionRange.first)
+                        continue;
+                    if (v < versionMin)
+                        continue;
+                    if (v > versionRange.second)
+                        break;
+                    if (v > versionMax)
+                        break;
+                    ver = v;
+                }
+            }
+            ss << "#version " << ver;
+            if (ver >= 330 && !profile.empty())
+            {
+                ss << " " << profile;
+            }
+            ss << "\n";
+            std::string version = ss.str();
+            preamble = version + defines + preamble;
+        }
+        else
+        {
+            preamble = defines + preamble;
+        }
+
+        for (size_t i = 0; i < nodeList->getLength(); ++i)
+        {
+            xercesc::DOMElement *node = dynamic_cast<xercesc::DOMElement *>(nodeList->item(i));
+            if (!node)
+                continue;
+            char *tagName = xercesc::XMLString::transcode(node->getTagName());
+            if (tagName)
+            {
+                if (strcmp(tagName, "preamble") == 0)
+                {
+                }
+                else if (strcmp(tagName, "version") == 0)
+                {
                 }
                 else if (strcmp(tagName, "attribute") == 0)
                 {
@@ -615,7 +764,7 @@ void coVRShader::loadMaterial()
                         u->setMin(minValue);
                         u->setMax(maxValue);
                         u->setOverwrite(overwrite == "true");
-                        u->setUnique(unique =="true");
+                        u->setUnique(unique == "true");
                         if (wm)
                             u->setWrapMode(wm);
                         if (textureName)
@@ -634,9 +783,11 @@ void coVRShader::loadMaterial()
                 }
                 else if (strcmp(tagName, "fragmentProgram") == 0)
                 {
-                    std::string code = preamble + parseProgram(node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1));
+                    std::string code = parseProgram(
+                        node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1), name, "fragment");
                     if (!code.empty())
                     {
+                        code = prependPreamble(code, preamble);
                         fragmentShader = new osg::Shader(osg::Shader::FRAGMENT, code);
                         fragmentShader->setName(name);
                     }
@@ -672,39 +823,55 @@ void coVRShader::loadMaterial()
                     else
                         geomParams[2] = GL_TRIANGLE_STRIP;
 
-                    std::string code = preamble + parseProgram(node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1));
+                    std::string code = parseProgram(
+                        node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1), name, "geometry");
                     if (!code.empty())
                     {
+                        code = prependPreamble(code, preamble);
                         geometryShader = new osg::Shader(osg::Shader::GEOMETRY, code);
                         geometryShader->setName(name);
                     }
                 }
                 else if (strcmp(tagName, "vertexProgram") == 0)
                 {
-                    std::string code = preamble + parseProgram(node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1));
+                    std::string code = parseProgram(
+                        node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1), name, "vertex");
                     if (!code.empty())
                     {
+                        code = prependPreamble(code, preamble);
                         vertexShader = new osg::Shader(osg::Shader::VERTEX, code);
                         vertexShader->setName(name);
                     }
                 }
                 else if (strcmp(tagName, "tessControlProgram") == 0)
                 {
-                    char *code = xercesc::XMLString::transcode(node->getTextContent());
-                    if (code && code[0] != '\0')
+                    std::string code = parseProgram(
+                        node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1), name, "tessControl");
+                    if (!code.empty())
+                    {
+                        code = prependPreamble(code, preamble);
                         tessControlShader = new osg::Shader(osg::Shader::TESSCONTROL, code);
-					xercesc::XMLString::release(&code);
+                        tessControlShader->setName(name);
+                    }
                 }
                 else if (strcmp(tagName, "tessEvalProgram") == 0)
                 {
-                    char *code = xercesc::XMLString::transcode(node->getTextContent());
-                    if (code && code[0] != '\0')
+                    std::string code = parseProgram(
+                        node, std::bind(&coVRShader::findAsset, this, std::placeholders::_1), name, "tessEval");
+                    if (!code.empty())
+                    {
+                        code = prependPreamble(code, preamble);
                         tessEvalShader = new osg::Shader(osg::Shader::TESSEVALUATION, code);
-					xercesc::XMLString::release(&code);
+                        tessEvalShader->setName(name);
+                    }
                 }
             }
+            else
+            {
+                std::cerr << "ignoring unknown tag" << tagName << " in " << fileName << std::endl;
+            }
 
-			xercesc::XMLString::release(&tagName);
+            xercesc::XMLString::release(&tagName);
         }
     }
 }
@@ -1306,6 +1473,7 @@ void coVRShader::apply(osg::StateSet *stateset)
     if (program.get() == NULL)
     {
         program = new osg::Program;
+        program->setName(name);
         if (fragmentShader.get())
             program->addShader(fragmentShader.get());
         if (geometryShader.get())
@@ -1395,6 +1563,7 @@ coVRShaderInstance *coVRShader::apply(osg::Geode *geode, osg::Drawable *drawable
         if (program.get() == NULL)
         {
             program = new osg::Program;
+            program->setName(name);
             if (fragmentShader.get())
                 program->addShader(fragmentShader.get());
             if (geometryShader.get())
@@ -1594,6 +1763,7 @@ coVRShaderInstance *coVRShader::apply(osg::Geode *geode, osg::Drawable *drawable
         if (program.get() == NULL)
         {
             program = new osg::Program;
+            program->setName(name);
             if (fragmentShader.get())
                 program->addShader(fragmentShader.get());
             if (geometryShader.get())
@@ -1738,6 +1908,11 @@ coVRShaderList::~coVRShaderList()
     s_instance = NULL;
 }
 
+std::pair<int, int> coVRShaderList::glslVersion() const
+{
+    return glslVersionRange;
+}
+
 void coVRShaderList::loadMaterials()
 {
     const char *coviseDir = getenv("COVISEDIR");
@@ -1754,13 +1929,34 @@ void coVRShaderList::loadMaterials()
         {
             if (dir->match(dir->name(i), "*.xml"))
             {
-                new coVRShader(dir->name(i), "");
+                new coVRShader(dir->name(i), dir->path());
             }
         }
     }
 }
-void coVRShaderList::init()
+
+void coVRShaderList::init(osg::GLExtensions *glext)
 {
+    int glslVersion = -1;
+    if (glext)
+    {
+        std::cerr << "GLSL supported: " << glext->isGlslSupported << std::endl;
+        std::cerr << "GLSL version: " << glext->glslLanguageVersion << std::endl;
+        if (glext->isGlslSupported)
+        {
+            glslVersion = static_cast<int>(glext->glslLanguageVersion * 100.0 + 0.5);
+        }
+    }
+    else
+    {
+        std::cerr << "coVRShaderList::init: no information on GL extensions available" << std::endl;
+    }
+
+    glslVersionRange.first = coCoviseConfig::getInt("versionMin", "COVER.GLSL", 110);
+    glslVersionRange.second = coCoviseConfig::getInt("versionMax", "COVER.GLSL", glslVersion);
+
+    loadMaterials();
+
     osg::Geode *geodeShaderL = new osg::Geode;
     geodeShaderL->setNodeMask(Isect::Left);
     ShaderNode *shaderL;
@@ -1783,9 +1979,9 @@ void coVRShaderList::init()
     cover->getScene()->addChild(geodeShaderR);
 }
 
-coVRShader *coVRShaderList::add(const std::string &name, std::string &dirName)
+coVRShader *coVRShaderList::add(const std::string &name, const std::string &dirName, const std::string &defines)
 {
-    return new coVRShader(name, dirName);
+    return new coVRShader(name, dirName, defines);
 }
 
 void coVRShaderList::applyParams(coVRShader *shader, std::map<std::string, std::string> *params)
@@ -1813,14 +2009,15 @@ void coVRShaderList::applyParams(coVRShader *shader, std::map<std::string, std::
     }
 }
 
-coVRShader *coVRShaderList::getUnique(const std::string &n, std::map<std::string, std::string> *params)
+coVRShader *coVRShaderList::getUnique(const std::string &n, std::map<std::string, std::string> *params,
+                                      const std::string &defines)
 {
     coVRShader *shader = get(n);
     if (!shader)
     {
         return NULL;
     }
-    coVRShader *clone = add(shader->fileName, shader->dir);
+    coVRShader *clone = add(shader->fileName, shader->dir, defines);
     clone->wasCloned = true;
     applyParams(clone, params);
     return clone;
@@ -1851,7 +2048,6 @@ coVRShaderList *coVRShaderList::instance()
     if (!s_instance)
     {
         s_instance = new coVRShaderList;
-        s_instance->loadMaterials();
     }
     return s_instance;
 }

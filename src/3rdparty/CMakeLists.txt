@@ -1,6 +1,6 @@
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${COVISEDIR}/${ARCHSUFFIX}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${COVISEDIR}/${ARCHSUFFIX}/lib")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${COVISEDIR}/${ARCHSUFFIX}/lib")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${COVISEDIR}/${COVISE_ARCHSUFFIX}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${COVISEDIR}/${COVISE_ARCHSUFFIX}/lib")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${COVISEDIR}/${COVISE_ARCHSUFFIX}/lib")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${COVISEDIR}/${DBG_ARCHSUFFIX}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_DEBUG "${COVISEDIR}/${DBG_ARCHSUFFIX}/lib")
@@ -18,44 +18,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${COVISEDIR}/${DBG_ARCHSUFFIX}opt
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${COVISEDIR}/${DBG_ARCHSUFFIX}opt/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL "${COVISEDIR}/${DBG_ARCHSUFFIX}opt/lib")
 
-if (COVISE_USE_VISIONARAY)
-   using(Boost optional)
-   using(TBB optional)
-   set(VSNRAY_ENABLE_CUDA ${COVISE_USE_CUDA} CACHE BOOL "CUDA for Visionaray" FORCE)
-   set(VSNRAY_ENABLE_EXAMPLES FALSE CACHE BOOL "Visionaray examples" FORCE)
-   set(VSNRAY_ENABLE_VIEWER FALSE CACHE BOOL "Visionaray viewer" FORCE)
-   if(COVISE_USE_VISIBILITY)
-      if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
-         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
-      endif()
-
-      if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
-         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
-      endif()
-   endif()
-
-   IF(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fabi-version=0")
-       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fabi-version=0")
-   ENDIF()
-
-   add_subdirectory(visionaray)
-   if(MSVC)
-      set_target_properties(visionaray PROPERTIES OUTPUT_NAME "libvisionaray")
-      set(VISIONARAY_LIBRARY "${COVISEDIR}/${DBG_ARCHSUFFIX}/lib/libvisionaray${CMAKE_STATIC_LIBRARY_SUFFIX}")
-      set(VISIONARAY_LIBRARY_RELEASE "${COVISEDIR}/${ARCHSUFFIX}/lib/libvisionaray${CMAKE_STATIC_LIBRARY_SUFFIX}")
-   else()
-     if(BUILD_SHARED_LIBS)
-        set(VISIONARAY_LIBRARY "${COVISEDIR}/${ARCHSUFFIX}/lib/libvisionaray${CMAKE_SHARED_LIBRARY_SUFFIX}")
-     else()
-        set(VISIONARAY_LIBRARY "${COVISEDIR}/${ARCHSUFFIX}/lib/libvisionaray${CMAKE_STATIC_LIBRARY_SUFFIX}")
-     endif()
-   endif()
-
-endif()
-
+SET(DESKVOX_USE_VISIONARAY ${COVISE_USE_VISIONARAY} CACHE BOOL "Visionaray for Virvo" FORCE)
 SET(DESKVOX_USE_CUDA ${COVISE_USE_CUDA} CACHE BOOL "CUDA for Virvo" FORCE)
 SET(DESKVOX_USE_QT4 OFF CACHE BOOL "Qt4 for Virvo" FORCE)
 SET(DESKVOX_BUILD_VOX_DESK OFF CACHE BOOL "Qt GUI for Deskvox" FORCE)
@@ -71,7 +34,7 @@ if (COVISE_USE_VIRVO)
    # avoids the problem that Virvo does not find Boost in $EXTERNLIBS
    using(Boost optional)
    if (COVISE_USE_VISIONARAY)
-      using(Visionaray)
+      set(visionaray_DIR "${CMAKE_CURRENT_LIST_DIR}/visionaray/cmake")
    endif()
    if (NOT Boost_FOUND)
       message("Cannot build Virvo: no Boost - maybe disable COVISE_USE_VIRVO?")
@@ -92,3 +55,28 @@ if (COVISE_USE_VIRVO)
       message("Cannot build virvo_osg: no OpenSceneGraph - maybe disable COVISE_USE_VIRVO?")
    endif()
 endif()
+
+add_library(exprtk INTERFACE)
+target_include_directories(exprtk INTERFACE ${CMAKE_CURRENT_LISTS_DIR}/exprtk)
+target_include_directories(exprtk INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/exprtk>
+    $<INSTALL_INTERFACE:include>
+)
+if(MSVC)
+  target_compile_options(exprtk INTERFACE /bigobj)
+endif()
+
+# Export the exprtk target
+install(TARGETS exprtk EXPORT exprtkTargets)
+
+# Install exprtk header file
+COVISE_INSTALL_HEADERS(${CMAKE_CURRENT_LISTS_DIR}/exprtk/exprtk.hpp)
+
+# Export the exprtkTargets export set
+install(EXPORT exprtkTargets
+    FILE exprtkTargets.cmake
+    NAMESPACE exprtk::
+    DESTINATION lib/cmake/exprtk
+)
+
+covise_export_target(exprtk)

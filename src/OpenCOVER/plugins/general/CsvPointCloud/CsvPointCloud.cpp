@@ -9,6 +9,7 @@
 
 #include "ColorMapShader.h"
 #include "CsvPointCloud.h"
+#include "OctUtils.h"
 #include "RenderObject.h"
 #include "SurfacePrimitiveSet.h"
 
@@ -38,6 +39,7 @@
 #include <vrml97/vrml/VrmlNodeTransform.h>
 #include <vrml97/vrml/VrmlNodeType.h>
 #include <vrml97/vrml/VrmlNamespace.h>
+#include <vrml97/vrml/System.h>
 
 #include <boost/filesystem.hpp>
 
@@ -65,7 +67,12 @@ public:
     {
         return new MachineNode(scene);
     }
-    MachineNode(VrmlScene *scene) : VrmlNodeChild(scene), m_index(machineNodes.size())
+
+    static const char *name() { return "CsvPointCloud"; }
+
+    MachineNode(VrmlScene *scene) 
+    : VrmlNodeChild(scene, name())
+    , m_index(machineNodes.size())
     {
 
         std::cerr << "vrml Machine node created" << std::endl;
@@ -76,30 +83,16 @@ public:
         machineNodes.erase(machineNodes.begin() + m_index);
     }
     // Define the fields of XCar nodes
-    static VrmlNodeType *defineType(VrmlNodeType *t = 0)
-    {
-        static VrmlNodeType *st = 0;
-
-        if (!t)
+    static void initFields(MachineNode *node, VrmlNodeType *t){
+        VrmlNodeChild::initFields(node, t);
+        if(t)
         {
-            if (st)
-                return st; // Only define the type once.
-            t = st = new VrmlNodeType("CsvPointCloud", creator);
+            t->addEventOut("x", VrmlField::SFVEC3F);
+            t->addEventOut("y", VrmlField::SFVEC3F);
+            t->addEventOut("z", VrmlField::SFVEC3F);            
         }
-
-        VrmlNodeChild::defineType(t); // Parent class
-
-        t->addEventOut("x", VrmlField::SFVEC3F);
-        t->addEventOut("y", VrmlField::SFVEC3F);
-        t->addEventOut("z", VrmlField::SFVEC3F);
-
-        return t;
     }
-    virtual VrmlNodeType *nodeType() const { return defineType(); };
-    VrmlNode *cloneMe() const
-    {
-        return new MachineNode(*this);
-    }
+
     void move(VrmlSFVec3f &position)
     {
         auto t = System::the->time();
@@ -111,11 +104,6 @@ public:
 private:
     size_t m_index = 0;
 };
-
-VrmlNode *creator(VrmlScene *scene)
-{
-    return new MachineNode(scene);
-}
 
 namespace fs = boost::filesystem;
 
@@ -154,6 +142,7 @@ CsvPointCloudPlugin::CsvPointCloudPlugin()
     , m_applyBtn(new ui::Button(m_advancedGroup, "Apply"))
     , m_colorInteractor(new CsvInteractor())
 {
+    VrmlNamespace::addBuiltIn(VrmlNode::defineType<MachineNode>());
     std::cerr << "getName: " << getName() << std::endl;
     m_config->setSaveOnExit(true);
     m_dataSelector->ui()->setShared(true);
@@ -280,13 +269,13 @@ bool CsvPointCloudPlugin::init()
     if (m_plugin)
         return false;
     m_plugin = this;
-
+    std::cerr << "init CsvPointCloudPlugin" << std::endl;
     m_handler[0] = FileHandler{nullptr, CsvPointCloudPlugin::load, CsvPointCloudPlugin::unload, "csv"};
     m_handler[1] = FileHandler{ nullptr, CsvPointCloudPlugin::load, CsvPointCloudPlugin::unload, "oct"};
 
     coVRFileManager::instance()->registerFileHandler(&m_handler[0]);
     coVRFileManager::instance()->registerFileHandler(&m_handler[1]);
-    VrmlNamespace::addBuiltIn(MachineNode::defineType());
+    VrmlNamespace::addBuiltIn(VrmlNode::defineType<MachineNode>());
     return true;
 }
 
@@ -352,6 +341,7 @@ bool CsvPointCloudPlugin::compileSymbol(DataTable &symbols, const std::string &s
     if (!expr.parser.compile(symbol, expr()))
     {
         std::cerr << "failed to parse symbol " << symbol << std::endl;
+        std::cerr << expr.parser.error() << std::endl;
         return false;
     }
     return true;
@@ -507,34 +497,6 @@ ref_ptr<Vec3Array> CsvPointCloudPlugin::getCoords(DataTable &symbols)
 constexpr unsigned int allPointsPrimitiveIndex = 0;
 constexpr unsigned int reducedPointsPrimitiveIndex = 1;
 
-Vec3 getNormal(const Vec3Array& vertices, size_t vertexIndex, size_t numPointsPerCycle)
-{
-    std::array<Vec3, 4> neigbors = {vertexIndex >= 1 ? vertices[vertexIndex - 1] : vertices[vertexIndex],
-                                    vertexIndex  + 1 < vertices.size() ? vertices[vertexIndex + 1] : vertices[vertexIndex],
-                                    vertexIndex + numPointsPerCycle < vertices.size() ? vertices[vertexIndex + numPointsPerCycle] : vertices[vertexIndex],
-                                    vertexIndex >= numPointsPerCycle ? vertices[vertexIndex - numPointsPerCycle] : vertices[vertexIndex]};
-    Vec3 normal;
-
-    for (size_t i = 0; i < neigbors.size(); i++)
-    {
-        auto last = i == 0 ? 3 : i - 1;
-        auto x = vertices[vertexIndex] - neigbors[i] ^ vertices[vertexIndex] - neigbors[last];
-        x.normalize();
-        normal += x;
-    }
-
-    return normal;
-}
-
-ref_ptr<Vec3Array> calculateNormals(ref_ptr<Vec3Array> &vertices, size_t numPointsPerCycle)
-{
-    ref_ptr<Vec3Array> normals = new Vec3Array;
-    
-    for (size_t i = 0; i < vertices->size() - numPointsPerCycle - 1; i++)
-        normals->push_back(getNormal(*vertices, i, numPointsPerCycle));
-    return normals;
-}
-
 void CsvPointCloudPlugin::createGeometries(DataTable &symbols)
 {
     try
@@ -550,7 +512,7 @@ void CsvPointCloudPlugin::createGeometries(DataTable &symbols)
     if (!colors.data || !coords)
         return;
 
-    auto normals = calculateNormals(coords, m_numPointsPerCycle);
+    auto normals = oct::calculateNormals(coords, m_numPointsPerCycle);
     ref_ptr<StateSet> stateSet = VRSceneGraph::instance()->loadDefaultPointstate();
     ref_ptr<StateSet> stateSet2 = VRSceneGraph::instance()->loadDefaultGeostate();
 

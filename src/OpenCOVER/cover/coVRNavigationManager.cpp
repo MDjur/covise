@@ -411,7 +411,16 @@ void coVRNavigationManager::initMenu()
     m_viewAll->setPriority(ui::Element::Toolbar);
     m_viewAll->setIcon("zoom-fit-best");
 
-
+    m_viewVisible = new ui::Action(navMenu_, "ViewVisible");
+    m_viewVisible->setText("View visible");
+    m_viewVisible->setShortcut("Shift+Alt+V");
+    m_viewVisible->setCallback([this, protectNav](){
+        protectNav([](){
+            VRSceneGraph::instance()->viewAll(false, true);
+        });
+    });
+    m_viewVisible->setPriority(ui::Element::Toolbar);
+    m_viewVisible->setIcon("zoom-to-visible");
 
 
     centerViewButton = new ui::Action(navMenu_, "centerView");
@@ -515,10 +524,11 @@ void coVRNavigationManager::initMenu()
 
     driveSpeedSlider_ = new ui::Slider(navMenu_, "DriveSpeed");
     driveSpeedSlider_->setText("Drive speed");
-    driveSpeedSlider_->setBounds(0., 30.);
+    driveSpeedSlider_->setBounds(.01, 100.);
+    driveSpeedSlider_->setScale(ui::Slider::Logarithmic);
     driveSpeedSlider_->setValue(driveSpeed);
-    ;
     driveSpeedSlider_->setCallback([this](double val, bool released) { driveSpeed = val; });
+
     collisionButton_ = new ui::Button(navMenu_, "Collision");
     collisionButton_->setText("Collision detection");
     collisionButton_->setState(collision);
@@ -1117,8 +1127,13 @@ coVRNavigationManager::update()
 
 	if (interactionRel->isRunning())
 	{
-		osg::Matrix relMat = Input::instance()->getRelativeMat();
-		coCoord co(relMat);
+        auto viewer = cover->getViewerMat();
+        viewer.setTrans(osg::Vec3(0, 0, 0));
+        auto viewerInv = osg::Matrix::inverse(viewer);
+
+        osg::Matrix relMat = Input::instance()->getRelativeMat();
+        relMat = viewerInv * relMat * viewer;
+        coCoord co(relMat);
 		osg::Matrix tf = VRSceneGraph::instance()->getTransform()->getMatrix();
 		auto tr = applySpeedFactor(relMat.getTrans());
 
@@ -1135,10 +1150,11 @@ coVRNavigationManager::update()
 			osg::Vec3 center = getCenter();
 
 			relMat.makeTranslate(-tr);
-			tf *= relMat;
 
-			MAKE_EULER_MAT(relMat, -co.hpr[0], -co.hpr[1], -co.hpr[2]);
-			osg::Matrix originTrans, invOriginTrans;
+            tf *= relMat;
+
+            MAKE_EULER_MAT(relMat, -co.hpr[0], -co.hpr[1], -co.hpr[2]);
+            osg::Matrix originTrans, invOriginTrans;
 			originTrans.makeTranslate(center); // rotate arround the center of the objects in objectsRoot
 			invOriginTrans.makeTranslate(-center);
 			relMat = invOriginTrans * relMat * originTrans;
@@ -1155,22 +1171,22 @@ coVRNavigationManager::update()
 		case Walk:
 		{
 			MAKE_EULER_MAT(relMat, co.hpr[0], 0, 0);
-			relMat.setTrans(tr);
-			tf *= relMat;
-			break;
-		}
-		default:
-		{
-			break;
-		}
-		}
+            relMat.setTrans(tr);
+            tf *= relMat;
+            break;
+        }
+        default:
+        {
+            break;
+        }
+        }
 
-		if (tf != VRSceneGraph::instance()->getTransform()->getMatrix())
-		{
-			VRSceneGraph::instance()->getTransform()->setMatrix(tf);
+        if (tf != VRSceneGraph::instance()->getTransform()->getMatrix())
+        {
+            VRSceneGraph::instance()->getTransform()->setMatrix(tf);
 			coVRCollaboration::instance()->SyncXform();
-		}
-	}
+        }
+    }
 
 	if (interactionRel->wasStopped())
 	{
@@ -1183,7 +1199,7 @@ coVRNavigationManager::update()
 			break;
 		}
 	}
-    
+
 
     // was ist wenn mehrere Objekte geladen sind???
 
@@ -2008,9 +2024,8 @@ void coVRNavigationManager::doMouseXform()
 
             osg::Matrix doTrans, rot, doRot, doRotObj;
             dcs_mat = VRSceneGraph::instance()->getTransform()->getMatrix();
-
             //Rotation um beliebigen Punkt -> Mauszeiger, Viewer-Position, ...
-            doTrans.makeTranslate(-transXRel, (-transYRel), -transZRel);
+            doTrans.makeTranslate(-transRel);
             doRotObj.mult(dcs_mat, doTrans);
             VRSceneGraph::instance()->getTransform()->setMatrix(doRotObj);
             dcs_mat = VRSceneGraph::instance()->getTransform()->getMatrix();
@@ -2052,7 +2067,7 @@ void coVRNavigationManager::doMouseXform()
 
             relx0 = mouseX() - originX;
             rely0 = mouseY() - originY;
-            doTrans.makeTranslate(transXRel, (transYRel), transZRel);
+            doTrans.makeTranslate(transRel);
             doRotObj.mult(doRot, doTrans);
             VRSceneGraph::instance()->getTransform()->setMatrix(doRotObj);
         }
@@ -2136,7 +2151,7 @@ void coVRNavigationManager::doMouseScale(float newScaleFactor)
 
     VRSceneGraph::instance()->getTransform()->setMatrix(xform_mat);
     VRSceneGraph::instance()->setScaleFactor(newScaleFactor);
-    coVRCollaboration::instance()->SyncXform();
+    
 }
 
 void coVRNavigationManager::doMouseScale()
@@ -2240,21 +2255,11 @@ void coVRNavigationManager::startMouseNav()
     //float newxTrans = relx0;  //declared but never referenced
     //float newyTrans = rely0;  //dito
 
-    osg::Vec3 transRel = cover->getIntersectionHitPointWorld();
 
     if (isViewerPosRotation)
-    {
-        osg::Vec3 viewerPos = cover->getViewerMat().getTrans();
-        transXRel = viewerPos[0];
-        transYRel = viewerPos[1];
-        transZRel = viewerPos[2];
-    }
+        transRel = cover->getViewerMat().getTrans();
     else
-    {
-        transXRel = transRel[0];
-        transYRel = transRel[1];
-        transZRel = transRel[2];
-    }
+        transRel = cover->getIntersectionHitPointWorld();
 }
 
 void coVRNavigationManager::startXform()
@@ -2747,7 +2752,7 @@ void coVRNavigationManager::doWalkMoveToFloor()
 
     // do not sync with remote, they will do the same
     // on their side SyncXform();
-	
+
     // coVRCollaboration::instance()->SyncXform();
 }
 

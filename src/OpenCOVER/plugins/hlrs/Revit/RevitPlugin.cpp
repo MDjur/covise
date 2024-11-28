@@ -692,7 +692,8 @@ void ARMarkerInfo::setValues(int id, int docID, int mid, std::string& n, double 
 		offsetMat *= invMarker;
 	}
 	
-	marker = MarkerTracking::instance()->getOrCreateMarker((markerType+std::to_string(MarkerID)), std::to_string(MarkerID), size, offsetMat, true, markerType == "ObjectMarker");
+	if (!marker)
+		marker = MarkerTracking::instance()->getOrCreateMarker((markerType+std::to_string(MarkerID)), std::to_string(MarkerID), size, offsetMat, true, markerType == "ObjectMarker");
 
 	fprintf(stderr, "ObjectMarkerPos in feet: %d %d   %f %f %f\n", this->MarkerID, ID, mat.getTrans().x() / (1000 * REVIT_FEET_TO_M), mat.getTrans().y() / (1000 * REVIT_FEET_TO_M), mat.getTrans().z() / (1000 * REVIT_FEET_TO_M));
 }
@@ -953,9 +954,8 @@ void RevitViewpointEntry::activate()
 	mat(2, 1) = upDirection[1];
 	mat(2, 2) = upDirection[2];
 
-
 	osg::Matrix ivMat;
-	ivMat.invert(mat* myPlugin->RevitScale * myPlugin->NorthRotMat * myPlugin->RevitGeoRefference); // viewpoint positions are in the master project coordinate system, not in the local one.
+	ivMat.invert(mat* myPlugin->RevitScale  * myPlugin->RevitGeoRefference * myPlugin->NorthRotMat); // viewpoint positions are in the master project coordinate system, not in the local one.
 	//ivMat.invert(mat*myTransform->getMatrix());
     ivMat =  ivMat * osg::Matrix::scale(REVIT_FEET_TO_M, REVIT_FEET_TO_M, REVIT_FEET_TO_M);
 
@@ -1096,6 +1096,7 @@ ObjectInfo::ObjectInfo(TokenBuffer& tb)
 
 	TypeNameLabel = new ui::Label(RevitPlugin::instance()->objectInfoMenu, TypeName + "_TNLabel");
 	TypeNameLabel->setText(CategoryName);
+
 	for (int i = 0; i < numTypes; i++)
 	{
 		types.push_back(new FamilyType(tb));
@@ -1109,8 +1110,15 @@ ObjectInfo::ObjectInfo(TokenBuffer& tb)
 		[](const FamilyType* LHS, const FamilyType* RHS)
 		{ if (LHS->FamilyName == RHS->FamilyName) return (LHS->Name < RHS->Name); return (LHS->FamilyName < RHS->FamilyName); });
 	std::string lastFamilyName;
+	int numMenuEntries = 0;
 	for (FamilyType*& ft : types)
 	{
+		numMenuEntries++;
+		if (numMenuEntries > 20)
+		{
+			std::cerr << "too many Types" << std::endl;
+			break;
+		}
 		if (lastFamilyName != ft->FamilyName)
 		{
 			lastFamilyName = ft->FamilyName;
@@ -1481,7 +1489,7 @@ bool RevitPlugin::init()
 	currentGroup.push(revitGroup.get());
 	cover->getObjectsRoot()->addChild(revitGroup.get());
 	createMenu();
-	VrmlNamespace::addBuiltIn(VrmlNodePhases::defineType());
+	VrmlNamespace::addBuiltIn(VrmlNode::defineType<VrmlNodePhases>());
 
 
 	return true;
@@ -1918,7 +1926,8 @@ RevitPlugin::handleMessage(Message *m)
 		osg::MatrixTransform *newTrans = new osg::MatrixTransform();
 		newTrans->setName(name);
 		currentGroup.top()->addChild(newTrans);
-		doors.push_back(new DoorInfo(ID, name, newTrans, tb));
+		DoorInfo* di = new DoorInfo(ID, name, newTrans, tb);
+		doors.push_back(di);
 		RevitInfo *info = new RevitInfo();
 		info->ObjectID = ID;
 		info->DocumentID = docID;
@@ -2390,17 +2399,17 @@ RevitPlugin::handleMessage(Message *m)
     {
         TokenBuffer tb(m);	
         const char *fileName;
-        tb >> fileName;
-		tb >> TrueNorthAngle;
-		tb >> ProjectHeight;
-		ProjectHeight *= REVIT_FEET_TO_M;
 		double eastWest;
 		double northSouth;
-		double xo=0.0, yo = 0.0, zo = 0.0;
-		double pox=0.0, poy = 0.0, poz = 0.0;
+		double xo = 0.0, yo = 0.0, zo = 0.0;
+		double pox = 0.0, poy = 0.0, poz = 0.0;
+        tb >> fileName;
+		tb >> TrueNorthAngle;
 		int GeoReference;
 		tb >> eastWest;
 		tb >> northSouth;
+		tb >> ProjectHeight;
+		ProjectHeight *= REVIT_FEET_TO_M;
 		tb >> xo;
 		tb >> yo;
 		tb >> zo;
@@ -2413,15 +2422,16 @@ RevitPlugin::handleMessage(Message *m)
             firstDocument = false;
             NorthRotMat = osg::Matrix::rotate(TrueNorthAngle, osg::Vec3(0, 0, 1));
             RevitScale = osg::Matrix::scale(REVIT_FEET_TO_M, REVIT_FEET_TO_M, REVIT_FEET_TO_M);
-			if (GeoReference == 1)
+			/*if (GeoReference == 1)
 			{
 				RevitGeoRefference = osg::Matrix::translate((xo + pox * 1000.0) * REVIT_FEET_TO_M, (yo  + poy * 1000.0) * REVIT_FEET_TO_M, (zo + poz * 1000.0) * REVIT_FEET_TO_M);
 			}
 			else
 			{
 				RevitGeoRefference.makeIdentity();
-			}
-            revitGroup->setMatrix(RevitScale * NorthRotMat * RevitGeoRefference);
+			}*/
+			RevitGeoRefference = osg::Matrix::translate(xo * REVIT_FEET_TO_M, yo * REVIT_FEET_TO_M, zo * REVIT_FEET_TO_M);
+            revitGroup->setMatrix(RevitScale  * RevitGeoRefference* NorthRotMat);
 		}
         if (fileName != currentRevitFile)
         {
@@ -3394,6 +3404,7 @@ RevitPlugin::update()
 					Message message(stb);
 					message.type = (int)RevitPlugin::MSG_ObjectInfo;
 					RevitPlugin::instance()->sendMessage(message);
+					break;
 				}
 			}
 
@@ -3480,13 +3491,11 @@ RevitPlugin::preFrame()
 		if (toRevit)
 		{
 			static double lastTime = 0;
-			if (abs(cover->frameTime()- lastTime) >   4)
+			if (abs(cover->frameTime()- lastTime) >   2)
 			{
 				TokenBuffer stb;
 				
-				osg::Matrix projectHeightMatrix;
-				projectHeightMatrix.makeTranslate(osg::Vec3(0,0,ProjectHeight));
-				osg::Matrix mat = RevitScale * NorthRotMat * projectHeightMatrix * RevitGeoRefference * cover->getBaseMat();
+				osg::Matrix mat = RevitScale * RevitGeoRefference * NorthRotMat * cover->getBaseMat() ;
 				osg::Matrix invMat;
 				invMat.invert(mat);
 				osg::Matrix viewerTrans = cover->getViewerMat() * invMat;
@@ -3500,7 +3509,7 @@ RevitPlugin::preFrame()
 				viewDir.normalize();
 				
 				static osg::Vec3 oldEyePos(0, 0, 0);
-				if ((eyePos - oldEyePos).length() > 0.3) // if distance to old pos > 30cm
+				if ((eyePos - oldEyePos).length() > 0.3) // if distance to old pos > 30"
 				{
 					oldEyePos = eyePos;
 					lastTime = cover->frameTime();
@@ -3514,6 +3523,7 @@ RevitPlugin::preFrame()
 					viewDirection[0] = viewDir[0];
 					viewDirection[1] = viewDir[1];
 					viewDirection[2] = viewDir[2];
+					fprintf(stderr, "pos %f %f %f\n", eyePosition[0], eyePosition[1], eyePosition[2]);
 					
 
 					stb << (double)eyePosition[0];
@@ -3529,8 +3539,11 @@ RevitPlugin::preFrame()
 				}
 			}
 		}
+		double startTime = cover->currentTime();
 		while (toRevit && toRevit->check_for_input())
 		{
+			if (cover->currentTime() > startTime + 1)
+				break;
 			toRevit->recv_msg(msg);
 			if (msg)
 			{
@@ -4002,6 +4015,7 @@ DoorInfo::DoorInfo(int id, const char *Name, osg::MatrixTransform *tn, TokenBuff
 	tb >> BBMin;
 	tb >> BBMax;
 	tb >> maxDistance;
+	tb >> openingPercentage;
 	boundingBox.set(BBMin, BBMax);
 	if (isSliding != SlidingDirection::dirNone)
 	{
@@ -4078,6 +4092,7 @@ DoorInfo::DoorInfo(int id, const char *Name, osg::MatrixTransform *tn, TokenBuff
 	isActive = false;
 	left = false;
 	entered = false;
+	translateDoor(0);
 }
 
 void DoorInfo::checkStart(osg::Vec3 &viewerPosition)
@@ -4099,7 +4114,7 @@ void DoorInfo::translateDoor(float fraction)
 {
 	if (isSliding)
 	{
-		transformNode->setMatrix(osg::Matrix::translate(Direction*maxDistance*fraction));
+		transformNode->setMatrix(osg::Matrix::translate((Direction*fraction)-(Direction * (openingPercentage/100.0))));
 	}
 	else
 	{

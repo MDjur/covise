@@ -36,21 +36,20 @@ using namespace covise;
 coVRAnimationManager *coVRAnimationManager::s_instance;
 
 coVRAnimationManager::coVRAnimationManager()
-    : ui::Owner("AnimationManager", cover->ui)
-    , m_animSliderMin(-25.)
-    , m_animSliderMax(25.)
-    , m_timeState(m_animSliderMax) // slider value of animation slider
-    , m_numFrames(0)
-    , m_startFrame(0)
-    , m_stopFrame(0)
-    , m_oldFrame(-1)
-    , m_animRunning(true)
-    , m_lastAnimationUpdate(0.0)
-    , m_currentAnimationFrame(-1)
-    , m_requestedAnimationFrame(-1)
-    , m_timestepScale(1.0)
-    , m_timestepBase(0.0)
-    , m_timestepUnit("Time step")
+: ui::Owner("AnimationManager", cover->ui)
+, m_animSliderMin(-25.)
+, m_animSliderMax(25.)
+, m_numFrames(0)
+, m_startFrame(0)
+, m_stopFrame(0)
+, m_oldFrame(-1)
+, m_animRunning(true)
+, m_lastAnimationUpdate(0.0)
+, m_currentAnimationFrame(-1)
+, m_requestedAnimationFrame(-1)
+, m_timestepScale(1.0)
+, m_timestepBase(0.0)
+, m_timestepUnit("Time step")
 {
     assert(!s_instance);
 
@@ -277,6 +276,9 @@ coVRAnimationManager::requestAnimationFrame(int currentFrame)
         change = true;
     }
 
+    if (change)
+        m_lastAnimationUpdate = cover->frameTime();
+
     return change;
 }
 
@@ -325,7 +327,6 @@ coVRAnimationManager::setAnimationFrame(int currentFrame)
         coVRPluginList::instance()->setTimestep(currentFrame);
         if (animFrameItem && m_numFrames != 0)
             animFrameItem->setValue(m_timestepBase + m_timestepScale * currentFrame);
-        m_lastAnimationUpdate = cover->frameTime();
     }
 }
 

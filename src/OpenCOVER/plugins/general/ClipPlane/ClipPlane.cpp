@@ -32,6 +32,8 @@
 #include <cover/ui/Button.h>
 #include <cover/ui/Menu.h>
 #include <cover/ui/SelectionList.h>
+#include <cover/ui/EditField.h>
+#include <cover/ui/View.h>
 
 using namespace osg;
 using covise::coCoviseConfig;
@@ -152,26 +154,30 @@ bool ClipPlanePlugin::init()
         sprintf(name, "Plane%d", i);
         //SharedState update functions
         sharedPlanes[i].reset(new vrb::SharedState<std::vector<double>>(("ClipPlane_Plane_" + std::to_string(i)), std::vector<double>{0, 0, 0, 0}, vrb::USE_COUPLING_MODE));
-        sharedPlanes[i]->setUpdateFunction([this, i]() {
-            std::cerr << "ClipPlane: updating equation for " << i << " from SharedState" << std::endl;
-            std::vector<double> v = sharedPlanes[i]->value();
-            Vec4d eq(v[0], v[1], v[2], v[3]);
-            plane[i].set(eq);
-        });
+        sharedPlanes[i]->setUpdateFunction(
+            [this, i]()
+            {
+                //std::cerr << "ClipPlane: updating equation for " << i << " from SharedState" << std::endl;
+                std::vector<double> v = sharedPlanes[i]->value();
+                Vec4d eq(v[0], v[1], v[2], v[3]);
+                plane[i].set(eq);
+            });
 
         plane[i].enabled = configBool("plane" + std::to_string(i), "enabled", false, config::Flag::PerModel);
-        plane[i].enabled->setUpdater([this, i](bool val) {
-            std::cerr << "ClipPlane: updating enabled for " << i << " from config" << std::endl;
-            if (plane[i].EnableButton)
-                plane[i].EnableButton->setState(val);
-            if (auto *cn = plane[i].getClipNode())
+        plane[i].enabled->setUpdater(
+            [this, i](bool val)
             {
-                if (val)
-                    cn->addClipPlane(plane[i].clip.get());
-                else
-                    cn->removeClipPlane(plane[i].clip.get());
-            }
-        });
+                //std::cerr << "ClipPlane: updating enabled for " << i << " from config" << std::endl;
+                if (plane[i].EnableButton)
+                    plane[i].EnableButton->setState(val);
+                if (auto *cn = plane[i].getClipNode())
+                {
+                    if (val)
+                        cn->addClipPlane(plane[i].clip.get());
+                    else
+                        cn->removeClipPlane(plane[i].clip.get());
+                }
+            });
 
         std::vector<double> veq(4);
         if (i >= 3)
@@ -186,8 +192,8 @@ bool ClipPlanePlugin::init()
         plane[i].equation->setUpdater([this, i]() {
             if (plane[i].inLocalUpdate)
                 return;
-            std::cerr << "ClipPlane: updating equation for " << i << " from config" << std::endl;
-            std::cerr << "ClipPlane: equation " << i << " size: " << plane[i].equation->size() << std::endl;
+            //std::cerr << "ClipPlane: updating equation for " << i << " from config" << std::endl;
+            //std::cerr << "ClipPlane: equation " << i << " size: " << plane[i].equation->size() << std::endl;
             if (plane[i].equation->size() != 4)
             {
                 std::cerr << "ClipPlane: NOT updating equation, size=" << plane[i].equation->size() << std::endl;
@@ -302,6 +308,20 @@ bool ClipPlanePlugin::init()
 
         plane[i].directInteractor = new vrui::coTrackerButtonInteraction(coInteraction::ButtonA, "sphere");
         plane[i].relativeInteractor = new vrui::coRelativeInputInteraction("spacemouse");
+
+        sprintf(name, "Edit values for plane %d", i);        
+        plane[i].ClipEditField = new ui::EditField(group, "Edit"+std::to_string(i));
+        plane[i].ClipEditField->setText(name);
+        plane[i].ClipEditField->setShared(true);
+        plane[i].ClipEditField->setVisible(false, ui::View::VR);
+        plane[i].ClipEditField->setVisible(false, ui::View::WindowMenu);
+        plane[i].ClipEditField->setCallback([this, i] (std::string text){
+            double a,b,c,d;
+            sscanf(text.c_str(), "%lf %lf %lf %lf", &a, &b, &c, &d);
+            osg::Vec3d abc(a,b,c);
+            abc.normalize();
+            plane[i].set(osg::Vec4d(abc[0],abc[1],abc[2],d));
+        });
 
         osg::Matrix m;
         // default size for all interactors
@@ -494,6 +514,12 @@ void ClipPlanePlugin::preFrame()
                 plane[i].pickInteractor->enableIntersection();
             }
         }
+
+        //update textedits
+        osg::Vec4d eq = plane[i].get();
+        char buf[100];
+        sprintf(buf,"%f %f %f %f", eq[0], eq[1], eq[2], eq[3]);
+        plane[i].ClipEditField->setValue(std::string(buf));
     }
 }
 
@@ -716,6 +742,15 @@ void ClipPlanePlugin::Plane::set(const osg::Vec4d &eq)
         clip->setClipPlane(eq);
         valid = true;
     }
+}
+
+osg::Vec4d ClipPlanePlugin::Plane::get(){
+    if(clip)
+    {
+        return clip->getClipPlane();
+    }
+
+    return osg::Vec4d(0, 0, 0, 0);
 }
 
 osg::ClipNode *ClipPlanePlugin::Plane::getClipNode() const

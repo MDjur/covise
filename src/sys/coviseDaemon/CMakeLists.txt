@@ -1,3 +1,6 @@
+if (NOT COVISE_USE_QT)
+    return()
+endif()
 
 USING(BOOST)
 
@@ -48,6 +51,7 @@ target_link_libraries(coviseDaemon
                        coQtUtil
                        coUtil
                        coVRBClient
+                       coConfigNew
                        ) 
 qt_use_modules(coviseDaemon Core Gui Widgets)
 

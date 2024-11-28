@@ -52,12 +52,27 @@ QString sliderText(const Slider *slider)
 QString sliderWidthText(const Slider *slider)
 {
     int digits = std::max(QString::number(slider->min()).size(), QString::number(slider->max()).size());
-    double value = 0;
+#if 0
+    // really err on the safe side
+    static char wide = 'W';
+    std::string w = "-";
     for (int d=0; d<digits; ++d) {
+        w.push_back(wide);
+    }
+
+    QString text;
+    QTextStream(&text) << QString::fromStdString(slider->text()) << ": " << QString::fromStdString(w);
+    return text;
+#else
+    // just assume that 8 is the widest digit
+    double value = 0;
+    for (int d = 0; d < digits; ++d)
+    {
         value *= 10;
         value += 8;
     }
-    return sliderText(slider, value, digits);
+    return sliderText(slider, -value, digits);
+#endif
 }
 
 }
@@ -743,6 +758,13 @@ void QtViewElement::markForDeletion(QObject *obj)
 QtLabelAction::QtLabelAction(QObject *parent)
 : QWidgetAction(parent)
 {
+    connect(this, &QAction::changed, this, &QtLabelAction::actionChanged);
+}
+
+void QtLabelAction::actionChanged()
+{
+    for (auto w: createdWidgets())
+        w->setVisible(isVisible());
 }
 
 void QtLabelAction::setText(const QString &text)
@@ -757,7 +779,9 @@ void QtLabelAction::setText(const QString &text)
 
 QWidget *QtLabelAction::createWidget(QWidget *parent)
 {
-    return new QLabel(parent);
+    auto l = new QLabel(parent);
+    l->setVisible(isVisible());
+    return l;
 }
 
 QtSliderWidget::QtSliderWidget(QBoxLayout::Direction dir, QWidget *parent)

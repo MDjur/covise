@@ -111,33 +111,31 @@ VRSceneGraph *VRSceneGraph::instance()
 }
 
 VRSceneGraph::VRSceneGraph()
-    : ui::Owner("VRSceneGraph", cover->ui)
-    , m_vectorInteractor(0)
-    , m_pointerDepth(0.f)
-    , m_floorHeight(-1250.0)
-    , m_wireframe(Disabled)
-    , m_textured(true)
-    , m_showMenu(true)
-    , m_showObjects(true)
-    , m_pointerType(0)
-    , m_scaleMode(-1.0)
-    , m_scaleFactor(1.0f)
-    , m_scaleFactorButton(0.1f)
-    , m_scaleRestrictFactorMin(0.0f)
-    , m_scaleRestrictFactorMax(0.0f)
-    , m_transRestrictMinX(0.0f)
-    , m_transRestrictMinY(0.0f)
-    , m_transRestrictMinZ(0.0f)
-    , m_transRestrictMaxX(0.0f)
-    , m_transRestrictMaxY(0.0f)
-    , m_transRestrictMaxZ(0.0f)
-    , m_scalingAllObjects(false)
-    , m_scaleTransform(NULL)
-    , isScenegraphProtected_(false)
-    , m_enableHighQualityOption(true)
-    , m_switchToHighQuality(false)
-    , m_highQuality(false)
-    , m_interactionHQ(NULL)
+: ui::Owner("VRSceneGraph", cover->ui)
+, m_vectorInteractor(0)
+, m_pointerDepth(0.f)
+, m_floorHeight(-1250.0)
+, m_wireframe(Disabled)
+, m_textured(true)
+, m_pointerType(0)
+, m_scaleMode(-1.0)
+, m_scaleFactor(1.0f)
+, m_scaleFactorButton(0.1f)
+, m_scaleRestrictFactorMin(0.0f)
+, m_scaleRestrictFactorMax(0.0f)
+, m_transRestrictMinX(0.0f)
+, m_transRestrictMinY(0.0f)
+, m_transRestrictMinZ(0.0f)
+, m_transRestrictMaxX(0.0f)
+, m_transRestrictMaxY(0.0f)
+, m_transRestrictMaxZ(0.0f)
+, m_scalingAllObjects(false)
+, m_scaleTransform(NULL)
+, isScenegraphProtected_(false)
+, m_enableHighQualityOption(true)
+, m_switchToHighQuality(false)
+, m_highQuality(false)
+, m_interactionHQ(NULL)
 {
     assert(!s_instance);
 }
@@ -277,16 +275,20 @@ void VRSceneGraph::init()
     });
 
 
-    auto tm = new ui::Button(cover->viewOptionsMenu, "ShowMenu");
+    auto tm = new ui::Action(cover->viewOptionsMenu, "ToggleMenu");
     cover->viewOptionsMenu->add(tm);
-    tm->setText("Show VR menu");
-    tm->setState(m_showMenu);
+    tm->setText("Toggle VR menu");
     tm->addShortcut("m");
-    tm->setCallback([this](bool state){
-            setMenu(state);
-            });
+    tm->setCallback([this]() { toggleMenu(); });
     tm->setVisible(false);
-    m_showMenuButton = tm;
+
+    auto sm = new ui::Button(cover->viewOptionsMenu, "ShowMenu");
+    cover->viewOptionsMenu->add(sm);
+    sm->setText("Show VR menu");
+    sm->setState(m_showMenu);
+    sm->setCallback([this](bool state) { setMenu(state ? MenuAndObjects : MenuHidden); });
+    sm->setVisible(false);
+    m_showMenuButton = sm;
 
     auto fc = new ui::Action(cover->viewOptionsMenu, "ForceCompile");
     fc->setText("Force display list compilation");
@@ -369,7 +371,9 @@ int VRSceneGraph::readConfigFile()
     wiiPos = coCoviseConfig::getFloat("COVER.WiiPointerPos", -250.0);
 
     bool configured = false;
-    m_showMenu = coCoviseConfig::isOn("visible", "COVER.UI.VRUI", m_showMenu, &configured);
+    m_showMenu = coCoviseConfig::isOn("visible", "COVER.UI.VRUI", m_showMenu == MenuAndObjects, &configured)
+                     ? MenuAndObjects
+                     : MenuHidden;
 
     return 0;
 }
@@ -630,8 +634,12 @@ void
 VRSceneGraph::setObjects(bool state)
 {
     m_showObjects = state;
+    applyObjectVisibility();
+}
 
-    if (m_showObjects)
+void VRSceneGraph::applyObjectVisibility()
+{
+    if (m_showObjects && m_showMenu != MenuOnly)
     {
         if (m_objectsTransform->getNumParents() == 1)
         {
@@ -648,23 +656,24 @@ VRSceneGraph::setObjects(bool state)
     }
 }
 
-void
-VRSceneGraph::setMenu(bool state)
+void VRSceneGraph::setMenu(MenuMode state)
 {
     m_showMenu = state;
-    m_showMenuButton->setState(state);
+    m_showMenuButton->setState(state != MenuHidden);
 
-    if (m_showMenu)
+    if (m_showMenu == MenuHidden)
+    {
+        m_scene->removeChild(m_menuGroupNode.get());
+    }
+    else
     {
         if (m_menuGroupNode->getNumParents() == 0)
         {
             m_scene->addChild(m_menuGroupNode.get());
         }
     }
-    else
-    {
-        m_scene->removeChild(m_menuGroupNode.get());
-    }
+
+    applyObjectVisibility();
 }
 
 bool
@@ -778,9 +787,24 @@ void VRSceneGraph::toggleHeadTracking(bool state)
 void
 VRSceneGraph::toggleMenu()
 {
-    m_showMenu = !m_showMenu;
+    switch (m_showMenu)
+    {
+    case MenuOnly:
+        m_showMenu = MenuAndObjects;
+        break;
+    case MenuAndObjects:
+        m_showMenu = MenuHidden;
+        break;
+    case MenuHidden:
+        if (cover->frameTime() - m_menuToggleTime < 3.)
+            m_showMenu = MenuOnly;
+        else
+            m_showMenu = MenuAndObjects;
+        break;
+    }
 
     setMenu(m_showMenu);
+    m_menuToggleTime = cover->frameTime();
 }
 
 void VRSceneGraph::setScaleFactor(float s, bool sync)
@@ -807,6 +831,7 @@ void VRSceneGraph::setScaleFactor(float s, bool sync)
         scale_mat.mult(temp, trans);
     }
     m_scaleTransform->setMatrix(scale_mat);
+    coVRCollaboration::instance()->SyncXform();
 }
 
 void
@@ -909,9 +934,6 @@ VRSceneGraph::update()
             trans[1] = wiiPos;
 
             handMat.setTrans(trans);
-#ifdef OLDINPUT
-            VRTracker::instance()->setHandMat(handMat);
-#endif
             m_handTransform->setMatrix(handMat);
         }
     }
@@ -937,18 +959,6 @@ VRSceneGraph::update()
     // static osg::Vec3Array *coord = new osg::Vec3Array(4*6);
     osg::Matrix dcs_mat, rot_mat, tmpMat;
     //int collided[6] = {0, 0, 0, 0, 0, 0}; /* front,back,right,left,up,down */
-
-#ifdef OLDINPUT
-    if (VRTracker::instance()->getCameraSensorStation() != -1)
-    {
-        osg::Matrix viewerTrans;
-        osg::Vec3 viewerPos = -VRViewer::instance()->getInitialViewerPos();
-        viewerTrans.makeTranslate(viewerPos);
-        osg::Matrix newWorld = viewerTrans * VRTracker::instance()->getCameraMat();
-        newWorld.invert(newWorld);
-        m_objectsTransform->setMatrix(newWorld);
-    }
-#endif
 
     // update the viewer axis dcs with tracker not viewer mat
     // otherwise it is not updated when freeze is on
@@ -1512,9 +1522,9 @@ VRSceneGraph::getBoundingSphere()
     return bsphere;
 }
 
-void VRSceneGraph::scaleAllObjects(bool resetView)
+void VRSceneGraph::scaleAllObjects(bool resetView, bool simple)
 {
-    osg::BoundingSphere bsphere = getBoundingSphere();
+    osg::BoundingSphere bsphere = simple ? m_objectsRoot->computeBound() : getBoundingSphere();
     if (bsphere.radius() <= 0.f)
         bsphere.radius() = 1.f;
 
@@ -1643,11 +1653,11 @@ VRSceneGraph::manipulateCallback(void *sceneGraph, buttonSpecCell *spec)
 #endif
 
 void
-VRSceneGraph::viewAll(bool resetView)
+VRSceneGraph::viewAll(bool resetView, bool simple)
 {
     coVRNavigationManager::instance()->enableViewerPosRotation(false);
 
-    scaleAllObjects(resetView);
+    scaleAllObjects(resetView, simple);
 
     coVRCollaboration::instance()->SyncXform();
 }
@@ -2049,7 +2059,6 @@ void VRSceneGraph::setColor(osg::Geode *geode, int *color, float transparency)
         for (unsigned int i = 0; i < geode->getNumDrawables(); i++)
         {
             drawable = geode->getDrawable(i);
-            drawable->ref();
             //bool mtlOn = false;
             /*if (geode->getStateSet())
             mtlOn = (geode->getStateSet()->getMode(StateAttribute::MATERIAL) == StateAttribute::ON) || (geode->getStateSet()->getMode(StateAttribute::MATERIAL) == StateAttribute::INHERIT);
@@ -2111,7 +2120,6 @@ void VRSceneGraph::setColor(osg::Geode *geode, int *color, float transparency)
             }
          }*/
             drawable->dirtyBound();
-            drawable->unref();
         }
     }
 }
@@ -2337,13 +2345,10 @@ void VRSceneGraph::setMaterial(osg::Geode *geode, const int *ambient, const int 
     if (cover->debugLevel(3))
         fprintf(stderr, "VRSceneGraph::setMaterial 2 %f\n", transparency);
 
-    ref_ptr<Drawable> geoset;
-    ref_ptr<StateSet> gstate;
     if (geode != NULL)
     {
         //set the material
         ref_ptr<Material> mtl = new Material();
-        mtl->ref();
         mtl->setColorMode(Material::AMBIENT_AND_DIFFUSE);
         mtl->setAmbient(Material::FRONT_AND_BACK, Vec4(ambient[0] / 255.0, ambient[1] / 255.0, ambient[2] / 255.0, transparency));
         mtl->setDiffuse(Material::FRONT_AND_BACK, Vec4(diffuse[0] / 255.0, diffuse[1] / 255.0, diffuse[2] / 255.0, transparency));
@@ -2353,12 +2358,10 @@ void VRSceneGraph::setMaterial(osg::Geode *geode, const int *ambient, const int 
         mtl->setShininess(Material::FRONT_AND_BACK, shininess);
         for (unsigned int i = 0; i < geode->getNumDrawables(); i++)
         {
-            geoset = geode->getDrawable(i);
-            geoset->ref();
+            ref_ptr<Drawable> geoset = geode->getDrawable(i);
             storeMaterial(geoset);
             geoset->asGeometry()->setColorBinding(Geometry::BIND_OFF);
-            gstate = geoset->getOrCreateStateSet();
-            gstate->ref();
+            ref_ptr<StateSet> gstate = geoset->getOrCreateStateSet();
             gstate->setAttributeAndModes(mtl.get(), StateAttribute::ON);
             gstate->setNestRenderBins(false);
             if (transparency < 1.0)
@@ -2385,10 +2388,7 @@ void VRSceneGraph::setMaterial(osg::Geode *geode, const int *ambient, const int 
             }
 
             geoset->setStateSet(gstate.get());
-            geoset->unref();
-            gstate->unref();
         }
-        mtl->unref();
     }
 }
 

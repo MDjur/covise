@@ -67,6 +67,13 @@ public:
         HiddenLineWhite,
         Points,
     };
+
+    enum MenuMode
+    {
+        MenuHidden,
+        MenuAndObjects,
+        MenuOnly,
+    };
     VRSceneGraph();
     virtual ~VRSceneGraph();
     static VRSceneGraph *instance();
@@ -91,7 +98,7 @@ public:
     }
     bool menuVisible() const;
     void toggleMenu();
-    void setMenu(bool state);
+    void setMenu(MenuMode state);
     void setMenuMode(bool state);
     void applyMenuModeToMenus();
     void toggleHeadTracking(bool state);
@@ -134,7 +141,7 @@ public:
     osg::StateSet *loadGlobalGeostate();
     osg::StateSet *loadUnlightedGeostate(osg::Material::ColorMode mode = osg::Material::OFF);
     osg::StateSet *loadTransparentGeostate(osg::Material::ColorMode mode = osg::Material::OFF);
-    osg::StateSet *loadDefaultPointstate(float pointSize = 4, osg::Material::ColorMode mode = osg::Material::OFF); 
+    osg::StateSet *loadDefaultPointstate(float pointSize = 4, osg::Material::ColorMode mode = osg::Material::OFF);
     void setWireframe(WireframeMode mode);
     void setPointerType(int pointerType);
     int getPointerType()
@@ -199,7 +206,7 @@ public:
         return m_scaleFactor;
     }
     void setScaleFactor(float scaleFactor, bool sync = true);
-    void scaleAllObjects(bool resetView = false);
+    void scaleAllObjects(bool resetView = false, bool simple = false);
     bool isScalingAllObjects() const
     {
         return m_scalingAllObjects;
@@ -210,7 +217,7 @@ public:
 
     void toggleAxis(bool state);
     void toggleHighQuality(bool state);
-    void viewAll(bool resetView = false);
+    void viewAll(bool resetView = false, bool simple = false);
     float floorHeight()
     {
         return m_floorHeight;
@@ -258,6 +265,7 @@ private:
     void initMatrices();
     void initSceneGraph();
     bool saveScenegraph(bool withMenu);
+    void applyObjectVisibility();
 
 #ifdef PHANTOM_TRACKER
     int m_forceFeedbackON;
@@ -297,7 +305,8 @@ private:
     bool m_textured = true; /* =true: textures are drawn as intended */
     bool m_shaders = true; /* =true: shaders are applied */
     bool m_coordAxis = false; /* =true: coord Axis will be drawn */
-    bool m_showMenu = true;
+    MenuMode m_showMenu = MenuAndObjects;
+    double m_menuToggleTime = 0.;
     bool m_showObjects = true;
     bool m_firstTime = true;
     bool m_pointerVisible = false;

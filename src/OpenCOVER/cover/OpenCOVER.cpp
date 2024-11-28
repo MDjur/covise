@@ -59,6 +59,7 @@
 #include <osg/ShapeDrawable>
 #include <osg/MatrixTransform>
 #include <osgGA/GUIActionAdapter>
+#include <osgDB/WriteFile>
 
 #include <vrb/client/SharedStateManager.h>
 #include <vrb/client/VRBClient.h>
@@ -292,9 +293,6 @@ bool OpenCOVER::run()
         return false;
     }
 
-    if (dl >= 1)
-        fprintf(stderr, "OpenCOVER: Shutting down\n\n");
-
     return true;
 }
 
@@ -360,7 +358,9 @@ bool OpenCOVER::init()
 
     int c = 0;
     std::string collaborativeOptionsFile, viewpointsFile;
-    while ((c = getopt(coCommandLine::argc(), coCommandLine::argv(), "hdC:s:v:c:::g:")) != -1)
+    bool saveAndExit = false;
+    int saveFormat = 0;
+    while ((c = getopt(coCommandLine::argc(), coCommandLine::argv(), "SIhdC:s:v:c:::g:")) != -1)
     {
         switch (c)
         {
@@ -373,6 +373,14 @@ bool OpenCOVER::init()
             break;
         case 'v':
             viewpointsFile = optarg;
+            break;
+        case 'S':
+            saveFormat = 0;
+            saveAndExit = true;;
+            break;
+        case 'I':
+            saveFormat = 1;
+            saveAndExit = true;;
             break;
         case 'C':
         {
@@ -576,8 +584,12 @@ bool OpenCOVER::init()
     const char *vistlePlugin = getenv("VISTLE_PLUGIN");
     bool loadVistlePlugin = vistlePlugin;
     m_loadVistlePlugin = coVRMSController::instance()->syncBool(loadVistlePlugin);
+    if (m_loadVistlePlugin)
+    {
+        m_vistlePlugin = coVRMSController::instance()->syncString(vistlePlugin);
+    }
 
-	coVRCommunication::instance();
+    coVRCommunication::instance();
     interactionManager.initializeRemoteLock();
     cover = new coVRPluginSupport();
     coVRCommunication::instance()->init();
@@ -670,13 +682,20 @@ bool OpenCOVER::init()
     cover->ui->addView(cover->vruiView);
 
     hud = coHud::instance();
+
+    VRViewer::instance()->config();
+    coVRShaderList::instance()->init(VRViewer::instance()->getExtensions());
+
+    hud->setText2("loading plugins");
+    hud->redraw();
+
     if (m_loadVistlePlugin)
     {
         loadFiles = false;
-        m_visPlugin = coVRPluginList::instance()->addPlugin("Vistle", coVRPluginList::Vis);
+        m_visPlugin = coVRPluginList::instance()->addPlugin(m_vistlePlugin.c_str(), coVRPluginList::Vis);
         if (!m_visPlugin)
         {
-            fprintf(stderr, "failed to load Vistle plugin\n");
+            fprintf(stderr, "failed to load Vistle plugin %s\n", m_vistlePlugin.c_str());
             exit(1);
         }
     }
@@ -693,11 +712,6 @@ bool OpenCOVER::init()
             }
         }
     }
-
-    VRViewer::instance()->config();
-
-    hud->setText2("loading plugins");
-    hud->redraw();
 
     coVRPluginList::instance()->loadDefault(); // vive and other tracking system plugins have to be loaded before Input is initialized
 
@@ -745,8 +759,6 @@ bool OpenCOVER::init()
 #endif
 
     beginAppTraversal = VRViewer::instance()->elapsedTime();
-
-    coVRShaderList::instance()->init();
 
     m_quitGroup = new ui::Group(cover->fileMenu, "QuitGroup");
     m_quitGroup->setText("");
@@ -828,6 +840,21 @@ bool OpenCOVER::init()
             {
                 //fprintf(stderr,"Arg %d : %s",optind, coCommandLine::argv(optind));
                 coVRMSController::instance()->loadFile(coCommandLine::argv(optind));
+                if (saveAndExit)
+                {
+                    std::string saveFile = coCommandLine::argv(optind);
+                    if(saveFormat == 0)
+                    saveFile = saveFile.substr(0,saveFile.length() - 3) + "obj";
+                    else if(saveFormat == 1)
+                        saveFile = saveFile.substr(0, saveFile.length() - 3) + "ive";
+                    else
+                        saveFile = saveFile.substr(0, saveFile.length() - 3) + "osg";
+                    osgDB::writeNodeFile(*cover->getObjectsRoot(), saveFile.c_str());
+                }
+            }
+            if (saveAndExit)
+            {
+                exit(0);
             }
         }
         else
@@ -937,6 +964,9 @@ void OpenCOVER::loop()
             break;
         frame();
     }
+
+    if (cover->debugLevel(1))
+        fprintf(stderr, "OpenCOVER: Shutting down\n\n");
 
     VRViewer::instance()->disableSync();
 
@@ -1421,6 +1451,7 @@ OpenCOVER::~OpenCOVER()
     delete coVRTui::instance();
 
     cover->intersectedNode = NULL;
+    VRViewer::instance()->unconfig();
     delete VRSceneGraph::instance();
     delete coVRShaderList::instance();
     delete coVRLighting::instance();

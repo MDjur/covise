@@ -1,0 +1,26 @@
+[General]
+offset = [-507048.0, -5398554.0, 0.0]
+projFrom = "+proj=latlong"
+projTo = "+proj=utm +zone=32 +ellps=GRS80 +units=m +no_defs"
+
+[Billboard]
+fontFilePath = "DroidSans-Bold.ttf"
+charSize = 2
+width = 60.0
+height = 63.0
+boundingBoxColor = [0.0, 0.0, 0.0, 0.5]
+boundingBoxMargin = 2.0
+
+[CSV]
+filename = '/data/DiTEnS/campus/db_building_measurements.csv'
+
+[Ennovatis]
+jsonPath = '/data/DiTEnS/ennovatis/channelids.json'
+csvPath = '/data/DiTEnS/ennovatis/channelids.csv'
+projEid = '00-2914207990135212101590650999999998_1'
+restUrl = 'http://129.69.40.93:4029/ControllingService/DataManagement/ReadData'
+defaultColorCylinder = [0.753, 0.443, 0.816, 1.0]
+maxColorCylinder = [1.0, 0.1, 0.0, 1.0]
+minColorCylinder = [0.0, 1.0, 0.5, 1.0]
+defaultHeightCylinder = 100.0
+radiusCylinder = 3.0

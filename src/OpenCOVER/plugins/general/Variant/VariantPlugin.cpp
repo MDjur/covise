@@ -90,7 +90,7 @@ VariantPlugin::VariantPlugin()
     }
 
     
-    VrmlNamespace::addBuiltIn(VrmlNodeVariant::defineType());
+    VrmlNamespace::addBuiltIn(VrmlNode::defineType<VrmlNodeVariant>());
 }
 //------------------------------------------------------------------------------------------------------------------------------
 
@@ -194,6 +194,7 @@ bool VariantPlugin::init()
     tui_header_trans[lbl_Y->getName()] = lbl_Y;
     tui_header_trans[lbl_Z->getName()] = lbl_Z;
 
+#ifdef USE_QT
     //XML Section
 
     xmlfile = new QDomDocument;
@@ -205,6 +206,8 @@ bool VariantPlugin::init()
     QDomElement xmlshowLabels = xmlfile->createElement("showLabels");
     xmloptions.appendChild(xmlshowLabels);
     setQDomElemLabels(true);
+#endif
+
     //Box of Interest
     boi = new coVRBoxOfInterest(plugin, _interactionA);
     boi->showHide(false);
@@ -470,8 +473,13 @@ void VariantPlugin::addNode(osg::Node *node, const RenderObject *render)
                     if (node)
                         parents = node->getParents();
 
+#ifdef USE_QT
                     var = new Variant(this, var_att, node, parents, variant_menu, VariantPluginTab, varlist.size() + 1,
                                       xmlfile, &qDE_Variant, boi, set_default ? default_state : true);
+#else
+                    var = new Variant(this, var_att, node, parents, variant_menu, VariantPluginTab, varlist.size() + 1,
+                                      nullptr, nullptr, boi, set_default ? default_state : true);
+#endif
                     var->AddToScenegraph();
                     varlist.push_back(var);
                     var->hideVRLabel();
@@ -570,7 +578,46 @@ void VariantPlugin::setVariant(std::string var)
             cover->sendMessage(this, coVRPluginSupport::TO_ALL, PluginMessageTypes::VariantShow, tb.getData().length(), tb.getData().data());
         }
 }
+
+std::string VariantPlugin::getGroupFromName(const std::string &name)
+{
+    auto colon = name.find_first_of(":");
+    if (colon != std::string::npos)
+    {
+        std::string group = name.substr(0, colon);
+        return group;
+    }
+    return "";
+}
+
 //------------------------------------------------------------------------------------------------------------------------------
+VariantPlugin::VariantGroup *VariantPlugin::getVariantGroup(std::string groupName)
+{
+    auto it = variantGroups.find(groupName);
+    if (it == variantGroups.end())
+        return nullptr;
+    return &it->second;
+}
+
+VariantPlugin::VariantGroup *VariantPlugin::addVariantToGroup(std::string groupName, Variant *var)
+{
+    auto &group = variantGroups[groupName];
+    group.variants.insert(var);
+    return &group;
+}
+
+void VariantPlugin::removeVariantFromGroup(std::string groupName, Variant *var)
+{
+    auto *g = getVariantGroup(groupName);
+    if (!g)
+        return;
+    g->variants.erase(var);
+    if (g->variants.empty())
+    {
+        variantGroups.erase(groupName);
+        delete g;
+    }
+}
 
 Variant *VariantPlugin::getVariantbyAttachedNode(osg::Node *node)
 {
@@ -662,7 +709,7 @@ void VariantPlugin::message(int toWhom, int type, int len, const void *buf)
 
 void VariantPlugin::setMenuItem(Variant *var, bool state)
 {
-    var->ui->getVRUI_Item()->setState(state);
+    var->ui->getVRUI_Item()->setState(state, false);
     var->ui->getTUI_Item()->setState(state);
 }
 //------------------------------------------------------------------------------------------------------------------------------
@@ -833,6 +880,7 @@ void VariantPlugin::showAllLabel()
 
 int VariantPlugin::saveXmlFile()
 {
+#ifdef USE_QT
     std::string filename = saveXML->getSelectedPath().c_str();
     size_t spos = filename.find("file://");
     if (spos != std::string::npos)
@@ -845,11 +893,15 @@ int VariantPlugin::saveXmlFile()
     QTextStream out(&file);
     out << xmlfile->toString();
     return 1;
+#else
+    return 0;
+#endif
 }
 //------------------------------------------------------------------------------------------------------------------------------
 
 int VariantPlugin::readXmlFile()
 {
+#ifdef USE_QT
     QString errmessage;
     int errorLine, errorColumn;
     std::string filename = readXML->getSelectedPath().c_str();
@@ -869,23 +921,28 @@ int VariantPlugin::readXmlFile()
     file.close();
     parseXML(xmlfile);
     return 1;
+#else
+    return 0;
+#endif
 }
 //------------------------------------------------------------------------------------------------------------------------------
 
 void VariantPlugin::setQDomElemState(Variant *var, bool state)
 {
-
+#ifdef USE_QT
     QDomNodeList qdl = xmlfile->elementsByTagName("visible");
     for (int i = 0; i < qdl.size(); i++)
     {
         if (qdl.item(i).parentNode().toElement().tagName() == var->getVarname().c_str())
             qdl.item(i).toElement().setAttribute("state", state);
     }
+#endif
 }
 //------------------------------------------------------------------------------------------------------------------------------
 
 int VariantPlugin::parseXML(QDomDocument *qxmlDoc)
 {
+#ifdef USE_QT
     QDomElement root = qxmlDoc->documentElement();
     if (root.tagName() != "Variant")
         return 0;
@@ -956,18 +1013,22 @@ int VariantPlugin::parseXML(QDomDocument *qxmlDoc)
         cout << "TagName:    " << e.tagName().toStdString() << endl;
     }
     return 1;
+#else
+    return 0;
+#endif
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
 
 void VariantPlugin::setQDomElemLabels(bool state)
 {
-
+#ifdef USE_QT
     QDomNodeList qdl = xmlfile->elementsByTagName("showLabels");
     for (int i = 0; i < qdl.size(); i++)
     {
         qdl.item(i).toElement().setAttribute("showLabels", state);
     }
+#endif
 }
 //------------------------------------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------------------------------------

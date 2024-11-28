@@ -14,19 +14,8 @@ class CuttingSurfacePlugin;
 class CuttingSurfacePlane;
 class CuttingSurfaceCylinder;
 class CuttingSurfaceSphere;
+class CuttingSurfaceBox;
 
-#ifdef VRUI
-#include <OpenVRUI/coMenu.h>
-#include <OpenVRUI/coMenuItem.h>
-
-namespace vrui
-{
-class coRowMenu;
-class coSubMenuItem;
-class coCheckboxGroup;
-class coSliderMenuItem;
-}
-#else
 namespace opencover
 {
 namespace ui
@@ -38,7 +27,6 @@ class ButtonGroup;
 class SelectionList;
 }
 }
-#endif
 
 
 namespace opencover
@@ -84,12 +72,9 @@ private:
     bool planeOptionsInMenu_;
 
     // create/update/delete the contents of the tracer submenu
-    void createMenu();
+    void createMenu(bool invertClip);
     void updateMenu();
     void deleteMenu();
-#ifdef VRUI
-    void menuEvent(vrui::coMenuItem *menuItem);
-#endif
 
     void getParameters();
 
@@ -108,19 +93,16 @@ private:
         OPTION_CYLX,
         OPTION_CYLY,
         OPTION_CYLZ,
+        OPTION_BOX,
         NumSurfaceStyles
     };
     int option_ = OPTION_NONE;
-#if 0
-    ui::Menu *optionMenu_=nullptr;
-    ui::Button *optionPlane_=nullptr, *optionCylX_=nullptr, *optionCylY_=nullptr, *optionCylZ_=nullptr, *optionSphere_=nullptr;
-    ui::ButtonGroup *optionGroup_=nullptr;
-#endif
     ui::SelectionList *optionChoice_=nullptr;
 
     CuttingSurfacePlane *csPlane_;
     CuttingSurfaceCylinder *csCylX_, *csCylY_, *csCylZ_;
     CuttingSurfaceSphere *csSphere_;
+    CuttingSurfaceBox *csBox_;
 
     int activeClipPlane_;
     ui::Menu *clipPlaneMenu_=nullptr;
@@ -129,6 +111,7 @@ private:
     ui::Button *clipPlaneIndexCheckbox_[6]={nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
     ui::Slider *clipPlaneOffsetSlider_=nullptr;
     ui::Button *clipPlaneFlipCheckbox_=nullptr;
+    ui::Button *clipInvertCheckbox_ = nullptr;
     CuttingSurfacePlugin *plugin=nullptr;
 
     void sendClipPlaneToGui();

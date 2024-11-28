@@ -181,6 +181,9 @@ private:
     std::string name;
     std::string fileName;
     std::string dir;
+    std::string defines;
+    int versionMin = -1, versionMax = -1;
+    std::string profile;
     bool wasCloned;
     std::list<coVRUniform *> uniforms;
     std::list<coVRAttribute *> attributes;
@@ -250,7 +253,7 @@ public:
     {
         return wasCloned;
     }
-    coVRShader(const std::string &name, const std::string &d);
+    coVRShader(const std::string &name, const std::string &d, const std::string &defines = "");
     coVRShader(const coVRShader &other);
     void setData(covise::TokenBuffer &tb);
     void setMatrixUniform(const std::string &name, osg::Matrixd m);
@@ -293,11 +296,13 @@ private:
     osg::ref_ptr<osg::Uniform> stereoUniform; // 0 = LEFT, 1 = RIGHT
     void applyParams(coVRShader *shader, std::map<std::string, std::string> *params);
     std::map<std::string,osg::Uniform*> globalUniforms;
+    std::pair<int, int> glslVersionRange{-1, -1};
+
 public:
     ~coVRShaderList();
     coVRShader *get(const std::string &name, std::map<std::string, std::string> *params = NULL);
-    coVRShader *getUnique(const std::string &n, std::map<std::string, std::string> *params = NULL);
-    coVRShader *add(const std::string &name, std::string &dirName);
+    coVRShader *getUnique(const std::string &n, std::map<std::string, std::string> *params = NULL, const std::string &defines = "");
+    coVRShader *add(const std::string &name, const std::string &dirName, const std::string &defines="");
     static coVRShaderList *instance();
     void setData(covise::TokenBuffer &tb);
     void addGlobalUniform(const std::string &, osg::Uniform *);
@@ -315,8 +320,10 @@ public:
     osg::Uniform *getStereo();
     void update();
 
-    void init();
+    void init(osg::GLExtensions *glext = nullptr);
     void remove(osg::Node *);
+
+    std::pair<int, int> glslVersion() const;
 };
 
 class COVEREXPORT ShaderNode : public osg::Drawable

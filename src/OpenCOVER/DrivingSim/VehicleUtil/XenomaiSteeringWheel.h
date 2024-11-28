@@ -72,7 +72,7 @@ protected:
     double Kdrill;
     double drillElasticity;
 	
-	int32_t current;
+	int32_t current=0;
 	
 	XenomaiMutex positionMutex;
 	XenomaiMutex currentMutex;
@@ -81,7 +81,7 @@ protected:
     const double speedRes = 1875.0 / 262144.0; // = 1 bit
     const double homingSpeed = 10; //revs/min
     const int32_t limitSwitchPosition = -369000; //was -380432;
-    const int32_t zeroMarkPosition = -331000; 
+    const int32_t zeroMarkPosition = -301000; 
 };
 
 inline unsigned long XenomaiSteeringWheel::getPeriodicTaskOverruns()
@@ -138,6 +138,7 @@ inline void XenomaiSteeringWheel::getPositionSpeed(int32_t &position, int32_t &s
 
 inline void XenomaiSteeringWheel::setCurrent(int32_t inCurrent)
 {
+        //std::cerr << "setCurrent "  << inCurrent << std::endl;
 	currentMutex.acquire(1000000);
 	current =  inCurrent;
 	currentMutex.release();

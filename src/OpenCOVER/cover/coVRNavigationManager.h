@@ -296,7 +296,7 @@ private:
     float x0, y0, relx0, rely0;
     float oldRotx, newRotx, oldRoty, newRoty;
     float modifiedVSize, modifiedHSize, yValViewer, yValObject;
-    float transXRel, transYRel, transZRel;
+    osg::Vec3 transRel;
     float originX, originY;
 
     int wiiFlag;
@@ -351,7 +351,7 @@ private:
     vrui::coRowMenu *nameMenu_;
     vrui::coButtonMenuItem *nameButton_;
     ui::Menu *navMenu_ = nullptr;
-    ui::Action *m_viewAll=nullptr, *m_resetView=nullptr;
+    ui::Action *m_viewAll=nullptr, *m_resetView=nullptr, *m_viewVisible=nullptr;
     ui::Group *navModes_ = nullptr;
     ui::ButtonGroup *navGroup_ = nullptr;
     ui::Button *noNavButton_=nullptr;
@@ -378,7 +378,7 @@ private:
     void initMenu();
     void initShowName();
     void initMeasure();
-    
+
     osg::Vec3 getCenter() const;
     void centerView();
     osg::Vec3 mouseNavCenter;

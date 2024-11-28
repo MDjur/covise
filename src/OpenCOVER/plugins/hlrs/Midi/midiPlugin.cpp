@@ -963,6 +963,15 @@ device_list();
 
 
 
+#ifdef WIN32
+	const UINT_PTR nMidiIn = midiInGetNumDevs();
+	for (UINT_PTR iMidiIn = 0; iMidiIn < nMidiIn; ++iMidiIn) {
+		MIDIINCAPS mic{};
+		midiInGetDevCaps(iMidiIn, &mic, sizeof(mic));
+		midiDeviceNames.push_back(mic.szPname);
+		printf("MIDI Inp#%2d [%s]\n", (int)iMidiIn, mic.szPname);
+	}
+#endif
 
 
 	if (coVRMSController::instance()->isMaster())
@@ -975,6 +984,7 @@ device_list();
 			    std::string DeviceName = coCoviseConfig::getEntry("DeviceName", configEntry);
 			    if(DeviceName.length()>0)
 			    {
+					streamDeviceNames.push_back(DeviceName);
 			    #ifdef HAVE_ALSA
 			    if(DeviceName == triplePlay->DeviceName)
 			    {
@@ -992,6 +1002,8 @@ device_list();
 			    else
 			    {
 			        int midiPort = coCoviseConfig::getInt("InPort", configEntry, -1);
+
+					streamDeviceNames.push_back(std::to_string(midiPort));
 				if (midiPort >= 0)
 				{
 					if(openMidiIn(streamNum, midiPort) == false)
@@ -1636,8 +1648,8 @@ void MidiPlugin::handleController(MidiEvent& me)
 	}
 	if ((controllerID == 61) || (controllerID == 34))
 	{
-		sphereScale = 0.1+((value/127.0)*10.0);
-		sphereScaleSlider->setValue(sphereScale);
+		//sphereScale = 0.1+((value/127.0)*10.0);
+		//sphereScaleSlider->setValue(sphereScale);
 	}
 	if ((controllerID == 56) || (controllerID == 69))
 	{
@@ -1850,12 +1862,22 @@ void MidiPlugin::MIDItab_create(void)
 		inputDevice[i] = new ui::SelectionList(MIDITab, name);
 
 #ifdef WIN32
-		const UINT_PTR nMidiIn = midiInGetNumDevs();
-		for (UINT_PTR iMidiIn = 0; iMidiIn < nMidiIn; ++iMidiIn) {
-			MIDIINCAPS mic{};
-			midiInGetDevCaps(iMidiIn, &mic, sizeof(mic));
-			printf("MIDI Inp#%2d [%s]\n", (int)iMidiIn, mic.szPname);
-			inputDevice[i]->append(mic.szPname);
+		inputDevice[i]->append("None");
+		for (const auto& name : midiDeviceNames)
+		{
+			inputDevice[i]->append(name);
+			if (midiDeviceNames.size()>i && name == midiDeviceNames[i])
+			{
+				inputDevice[i]->select(i + 1, true);
+				if (openMidiIn(i, i) == false)
+				{
+					fprintf(stderr, "openMidiIn %d, %s failed\n", i,name.c_str());
+				}
+				else
+				{
+					fprintf(stderr, "opened openMidiIn %d %s\n", i, name.c_str());
+				}
+			}
 		}
 #else
 
@@ -1869,8 +1891,10 @@ void MidiPlugin::MIDItab_create(void)
 #else
 			close(midifd[i]);
 #endif
-			openMidiIn(i, newInDev);
-			fprintf(stderr, "openMidiIn %d failed\n", newInDev);
+			if (openMidiIn(i, newInDev - 1) == false)
+			{
+				fprintf(stderr, "openMidiIn %d failed\n", newInDev - 1);
+			}
 		});
 	}
 
@@ -2236,7 +2260,7 @@ void Track::update()
 				int i, length=0;
 				unsigned short revents;
 				int err;
-				if(MidiPlugin::instance()->hMidiDevice[trackNumber]>0)
+				if(MidiPlugin::instance()->hMidiDevice[trackNumber]!=nullptr)
 				{
 
 				     numRead=1;

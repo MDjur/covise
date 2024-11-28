@@ -31,21 +31,15 @@ class PLUGINEXPORT VrmlNodeJoystick : public vrml::VrmlNodeChild
 {
 public:
     // Define the fields of SteeringWheel nodes
-    static vrml::VrmlNodeType* defineType(vrml::VrmlNodeType* t = 0);
-    virtual vrml::VrmlNodeType* nodeType() const;
+    static void initFields(VrmlNodeJoystick* node, vrml::VrmlNodeType* t);
+    static const char* name(); 
 
     VrmlNodeJoystick(vrml::VrmlScene* scene = 0);
     VrmlNodeJoystick(const VrmlNodeJoystick& n);
-    virtual ~VrmlNodeJoystick();
-
-    virtual VrmlNode* cloneMe() const;
 
     virtual VrmlNodeJoystick* toSteeringWheel() const;
 
-    virtual ostream& printFields(ostream& os, int indent);
-
-    virtual void setField(const char* fieldName, const vrml::VrmlField& fieldValue);
-    const vrml::VrmlField* getField(const char* fieldName);
+    const vrml::VrmlField* getField(const char* fieldName) const override;
 
     void eventIn(double timeStamp, const char* eventName,
         const vrml::VrmlField* fieldValue);
@@ -67,6 +61,7 @@ private:
     vrml::VrmlMFFloat d_sliders;
     vrml::VrmlMFFloat d_POVs;
     vrml::VrmlMFInt d_buttons;
+    
 };
 namespace vrui
 {
@@ -103,5 +98,15 @@ public:
 
     // this will be called in PreFrame
     bool update();
+	size_t numLocalJoysticks=0;
+	size_t joystickNumber=0;
+	unsigned char number_buttons[MAX_NUMBER_JOYSTICKS];
+	int *buttons[MAX_NUMBER_JOYSTICKS];
+	unsigned char number_axes[MAX_NUMBER_JOYSTICKS];
+	float *axes[MAX_NUMBER_JOYSTICKS];
+	unsigned char number_sliders[MAX_NUMBER_JOYSTICKS];
+	float *sliders[MAX_NUMBER_JOYSTICKS];
+	unsigned char number_POVs[MAX_NUMBER_JOYSTICKS];
+	float *POVs[MAX_NUMBER_JOYSTICKS];
 };
 #endif

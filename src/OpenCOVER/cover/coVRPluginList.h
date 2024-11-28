@@ -133,8 +133,8 @@ public:
     //! call setTimestep method of all plugins
     void setTimestep(int timestep);
     //! send a message to all plugins
-    void message(int toWhom, int t, int l, const void *b) const;
-	//! send a UDPmessage to all plugins
+    void message(int toWhom, int t, int l, const void *b, const coVRPlugin *exclude = nullptr) const;
+    //! send a UDPmessage to all plugins
 	void UDPmessage(covise::UdpMessage* msg) const;
     //! add new plugins, if not already loaded
     //! unpack and distribute a Message
@@ -147,8 +147,6 @@ public:
     bool becomeCollaborativeMaster() const;
     //! for visualisation system plugins: wait for message, return NULL if no such plugin
     covise::Message *waitForVisMessage(int messageType) const;
-    //! for visualisation system plugins: execute data flow network - return true if delivered
-    bool executeAll() const;
     //! allow plugins to expand scene bounding sphere
     void expandBoundingSphere(osg::BoundingSphere &bs) const;
 
@@ -202,7 +200,7 @@ private:
     int m_numOutstandingTimestepPlugins = 0;
     int m_requestedTimestep = -1;
     int m_currentTimestep = 0;
-
+    mutable bool m_stopIteration = false;
 };
 }
 #endif

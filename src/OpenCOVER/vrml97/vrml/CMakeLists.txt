@@ -86,20 +86,30 @@ INCLUDE_DIRECTORIES(
 )
 
 SET(VRML_SOURCES
-  gifread.c
-  jpgread.c
-  pngread.c
-  tifread.c
-  coEventQueue.cpp
-  System.cpp
   Audio.cpp
+  coEventQueue.cpp
   Doc.cpp
+  gifread.c
   Image.cpp
+  jpgread.c
   MathUtils.cpp
   mpgread.cpp
+  Player.cpp
+  PlayerAlsa.cpp
+  PlayerArts.cpp
+  PlayerAServer.cpp
+  PlayerEsd.cpp
+  PlayerFactory.cpp
+  PlayerIrixAL.cpp
+  PlayerMix.cpp
+  PlayerOpenAL.cpp
+  PlayerOSS.cpp
+  pngread.c
   ScriptJDK.cpp
   ScriptJS.cpp
   ScriptObject.cpp
+  System.cpp
+  tifread.c
   Viewer.cpp
   VrmlField.cpp
   VrmlNamespace.cpp
@@ -111,16 +121,16 @@ SET(VRML_SOURCES
   VrmlNodeBooleanSequencer.cpp
   VrmlNodeBox.cpp
   VrmlNodeBumpMapping.cpp
+  VrmlNodeChild.cpp
   VrmlNodeCollision.cpp
   VrmlNodeColor.cpp
-  VrmlNodeColorRGBA.cpp
-  VrmlNodeColorInt.cpp
   VrmlNodeColoredSet.cpp
+  VrmlNodeColorInt.cpp
+  VrmlNodeColorRGBA.cpp
   VrmlNodeCone.cpp
   VrmlNodeCoordinate.cpp
   VrmlNodeCoordinateInt.cpp
   VrmlNodeCOVER.cpp
-  VrmlNode.cpp
   VrmlNodeCubeTexture.cpp
   VrmlNodeCylinder.cpp
   VrmlNodeCylinderSensor.cpp
@@ -133,23 +143,19 @@ SET(VRML_SOURCES
   VrmlNodeGroup.cpp
   VrmlNodeIFaceSet.cpp
   VrmlNodeILineSet.cpp
+  VrmlNodeImageTexture.cpp
+  VrmlNodeIndexedSet.cpp
+  VrmlNodeInline.cpp
   VrmlNodeIPolygonsCommon.cpp
   VrmlNodeIQuadSet.cpp
   VrmlNodeITriangleFanSet.cpp
   VrmlNodeITriangleSet.cpp
   VrmlNodeITriangleStripSet.cpp
-  VrmlNodeImageTexture.cpp
-  VrmlNodeIndexedSet.cpp
-  VrmlNodeInline.cpp
   VrmlNodeLight.cpp
   VrmlNodeLOD.cpp
   VrmlNodeMaterial.cpp
   VrmlNodeMetadata.cpp
-  VrmlNodeMetadataBoolean.cpp
-  VrmlNodeMetadataDouble.cpp
-  VrmlNodeMetadataFloat.cpp
-  VrmlNodeMetadataInteger.cpp
-  VrmlNodeMetadataString.cpp
+  VrmlNodeMetadataNumeric.cpp
   VrmlNodeMetadataSet.cpp
   VrmlNodeMovieTexture.cpp
   VrmlNodeMultiTexture.cpp
@@ -177,6 +183,7 @@ SET(VRML_SOURCES
   VrmlNodeSphereSensor.cpp
   VrmlNodeSpotLight.cpp
   VrmlNodeSwitch.cpp
+  VrmlNode.cpp
   VrmlNodeText.cpp
   VrmlNodeTexture.cpp
   VrmlNodeTextureCoordinate.cpp
@@ -193,17 +200,8 @@ SET(VRML_SOURCES
   VrmlNodeVisibilitySensor.cpp
   VrmlNodeWave.cpp
   VrmlNodeWorldInfo.cpp
+  VrmlRoute.cpp
   VrmlScene.cpp
-  PlayerAlsa.cpp
-  PlayerArts.cpp
-  PlayerAServer.cpp
-  PlayerFactory.cpp
-  Player.cpp
-  PlayerEsd.cpp
-  PlayerIrixAL.cpp
-  PlayerMix.cpp
-  PlayerOpenAL.cpp
-  PlayerOSS.cpp
 )
 
 SET(VRML_HEADERS
@@ -254,10 +252,6 @@ SET(VRML_HEADERS
   VrmlMFVec3d.h
   VrmlMFVec3f.h
   VrmlNamespace.h
-  VrmlNodeBindable.h
-  VrmlNodeChild.h
-  VrmlNodeTexture.h
-  VrmlNode.h
   VrmlNodeAnchor.h
   VrmlNodeAppearance.h
   VrmlNodeAudioClip.h
@@ -266,16 +260,16 @@ SET(VRML_HEADERS
   VrmlNodeBooleanSequencer.h
   VrmlNodeBox.h
   VrmlNodeBumpMapping.h
+  VrmlNodeChild.h
   VrmlNodeCollision.h
   VrmlNodeColor.h
-  VrmlNodeColorRGBA.h
-  VrmlNodeColorInt.h
   VrmlNodeColoredSet.h
+  VrmlNodeColorInt.h
+  VrmlNodeColorRGBA.h
   VrmlNodeCone.h
   VrmlNodeCoordinate.h
   VrmlNodeCoordinateInt.h
   VrmlNodeCOVER.h
-  VrmlNode.h
   VrmlNodeCubeTexture.h
   VrmlNodeCylinder.h
   VrmlNodeCylinderSensor.h
@@ -288,22 +282,19 @@ SET(VRML_HEADERS
   VrmlNodeGroup.h
   VrmlNodeIFaceSet.h
   VrmlNodeILineSet.h
+  VrmlNodeImageTexture.h
+  VrmlNodeIndexedSet.h
+  VrmlNodeInline.h
   VrmlNodeIPolygonsCommon.h
   VrmlNodeIQuadSet.h
   VrmlNodeITriangleFanSet.h
   VrmlNodeITriangleSet.h
   VrmlNodeITriangleStripSet.h
-  VrmlNodeImageTexture.h
-  VrmlNodeIndexedSet.h
-  VrmlNodeInline.h
   VrmlNodeLight.h
   VrmlNodeLOD.h
   VrmlNodeMaterial.h
   VrmlNodeMetadata.h
-  VrmlNodeMetadataDouble.h
-  VrmlNodeMetadataFloat.h
-  VrmlNodeMetadataInteger.h
-  VrmlNodeMetadataString.h
+  VrmlNodeMetadataNumeric.h
   VrmlNodeMetadataSet.h
   VrmlNodeMovieTexture.h
   VrmlNodeMultiTexture.h
@@ -331,7 +322,9 @@ SET(VRML_HEADERS
   VrmlNodeSphereSensor.h
   VrmlNodeSpotLight.h
   VrmlNodeSwitch.h
+  VrmlNode.h
   VrmlNodeText.h
+  VrmlNodeTexture.h
   VrmlNodeTextureCoordinate.h
   VrmlNodeTextureCoordinateGenerator.h
   VrmlNodeTextureTransform.h
@@ -346,6 +339,7 @@ SET(VRML_HEADERS
   VrmlNodeVisibilitySensor.h
   VrmlNodeWave.h
   VrmlNodeWorldInfo.h
+  VrmlRoute.h
   VrmlScene.h
   VrmlSFBool.h
   VrmlSFColor.h
@@ -354,6 +348,7 @@ SET(VRML_HEADERS
   VrmlSFFloat.h
   VrmlSFImage.h
   VrmlSFInt.h
+  VrmlSFMatrix.h
   VrmlSFNode.h
   VrmlSFRotation.h
   VrmlSFString.h
@@ -362,7 +357,6 @@ SET(VRML_HEADERS
   VrmlSFVec2f.h
   VrmlSFVec3d.h
   VrmlSFVec3f.h
-  VrmlSFMatrix.h
 )
 
 

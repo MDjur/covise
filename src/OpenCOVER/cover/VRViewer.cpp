@@ -1418,6 +1418,23 @@ void VRViewer::destroyChannels(int i)
     chan.camera = nullptr;
 }
 
+osg::GLExtensions *VRViewer::getExtensions(int chan) const
+{
+    auto &conf = *coVRConfig::instance();
+    if (chan >= conf.numChannels())
+        return nullptr;
+    auto cam = coVRConfig::instance()->channels[chan].camera;
+    if (cam)
+    {
+        if (auto gc = cam->getGraphicsContext())
+        {
+            int contextID = gc->getState()->getContextID();
+            return m_initGlOp->getExtensions(contextID);
+        }
+    }
+    return nullptr;
+}
+
 void VRViewer::forceCompile()
 {
     culling(false, osg::CullSettings::ENABLE_ALL_CULLING, true); // disable culling for one frame to load data to all GPUs
@@ -1610,12 +1627,15 @@ VRViewer::FrustaAndViews VRViewer::computeFrustumAndView(int i)
     }
 
     // for rendering images for auto-stereoscopic displays (e.g. Tridelity)
-    const float off = stereoOn ? currentChannel->stereoOffset : 0.f;
-    if (stereoOn && currentChannel->stereo) {
+    const float off = (stereoOn || animateSeparation) ? currentChannel->stereoOffset : 0.f;
+    if (currentChannel->stereo)
+    {
         leftEye = eyeOffset(EyeLeft) + osg::Vec3(off,0,0);
         rightEye = eyeOffset(EyeRight) + osg::Vec3(off,0,0);
         middleEye = eyeOffset(EyeMiddle) + osg::Vec3(off,0,0);
-    } else {
+    }
+    else
+    {
         leftEye = rightEye = middleEye = eyeOffset(EyeMiddle) + osg::Vec3(off,0,0);
     }
 
@@ -2395,27 +2415,6 @@ void VRViewer::removeCamera(osg::Camera *camera)
 
 void VRViewer::renderingTraversals()
 {
-    bool _outputMasterCameraLocation = false;
-    if (_outputMasterCameraLocation)
-    {
-        Views views;
-        getViews(views);
-
-        for (Views::iterator itr = views.begin();
-             itr != views.end();
-             ++itr)
-        {
-            osgViewer::View *view = *itr;
-            if (view)
-            {
-                const osg::Matrixd &m = view->getCamera()->getInverseViewMatrix();
-                OSG_NOTICE << "View " << view << ", Master Camera position(" << m.getTrans().x() << "," << m.getTrans().y() << "," << m.getTrans().z() << ","
-                           << "), rotation(" << m.getRotate().x() << "," << m.getRotate().y() << "," << m.getRotate().z() << "," << m.getRotate().w() << ","
-                           << ")" << std::endl;
-            }
-        }
-    }
-
     Contexts contexts;
     getContexts(contexts);
 
@@ -2524,6 +2523,7 @@ void VRViewer::renderingTraversals()
     {
         _endDynamicDrawBlock->reset();
     }
+
     // dispatch the the rendering threads
     if (_startRenderingBarrier.valid())
         _startRenderingBarrier->block();
@@ -2559,7 +2559,7 @@ void VRViewer::renderingTraversals()
     }
 
     // osg::notify(osg::NOTICE)<<"Joing _endRenderingDispatchBarrier block "<<_endRenderingDispatchBarrier.get()<<std::endl;
-
+    
     // wait till the rendering dispatch is done.
     if (_endRenderingDispatchBarrier.valid())
         _endRenderingDispatchBarrier->block();

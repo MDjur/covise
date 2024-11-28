@@ -122,6 +122,9 @@ Input::~Input()
     persons.clear();
     personNames.clear();
 
+    gadgets.clear();
+    gadgetNames.clear();
+
     delete m_mouse;
 
     clearMap(buttondevices);
@@ -310,7 +313,6 @@ bool Input::initHardware()
 
 namespace
 {
-
     template <typename Map>
     typename Map::mapped_type findInMap(const Map &map, const typename Map::key_type &key)
     {
@@ -322,65 +324,53 @@ namespace
     }
 }
 
+template <typename value_type>
+value_type* Input::findOrAdd(std::map<std::string, value_type*> &map, const std::string &name, bool *added)
+{
+    if (name.empty())
+        return nullptr;
+    auto it = map.find(name);
+    if (it == map.end())
+    {
+        if(added)
+            *added = true;
+        it = map.insert(std::make_pair(name, new value_type(name))).first;
+    }
+    return it->second;
+}
+
 Person *Input::getPerson(const std::string &name)
 {
-
-    if (name.empty())
-        return NULL;
-
-    Person *person = findInMap(persons, name);
-    if (!person)
-    {
-        person = new Person(name);
-        persons[name] = person;
+    
+    bool added = false;
+    auto retval = findOrAdd(persons, name, &added);
+    if(added)
         personNames.push_back(name);
-    }
-    return person;
+    return retval;            
+}
+
+Gadget *Input::getGadget(const std::string &name)
+{
+    bool added = false;
+    auto retval = findOrAdd(gadgets, name, &added);
+    if(added)
+        gadgetNames.push_back(name);
+    return retval;  
 }
 
 TrackingBody *Input::getBody(const std::string &name)
 {
-
-    if (name.empty())
-        return NULL;
-
-    TrackingBody *body = findInMap(trackingbodies, name);
-    if (!body)
-    {
-        body = new TrackingBody(name);
-        trackingbodies[name] = body;
-    }
-    return body;
+    return findOrAdd(trackingbodies, name);
 }
 
 ButtonDevice *Input::getButtons(const std::string &name)
 {
-
-    if (name.empty())
-        return NULL;
-
-    ButtonDevice *buttons = findInMap(buttondevices, name);
-    if (!buttons)
-    {
-        buttons = new ButtonDevice(name);
-        buttondevices[name] = buttons;
-    }
-    return buttons;
+    return findOrAdd(buttondevices, name);
 }
 
 Valuator *Input::getValuator(const std::string &name)
 {
-
-    if (name.empty())
-        return NULL;
-
-    Valuator *val = findInMap(valuators, name);
-    if (!val)
-    {
-        val = new Valuator(name);
-        valuators[name] = val;
-    }
-    return val;
+    return findOrAdd(valuators, name);
 }
 
 DriverFactoryBase *Input::getDriverPlugin(const std::string &type)
@@ -431,7 +421,20 @@ InputDevice *Input::getDevice(const std::string &name)
     {
         std::string conf = configPath("Device." + name);
         std::string type = coCoviseConfig::getEntry("driver", conf, "const");
-        if (type.empty())
+        DriverFactoryBase *plug = getDriverPlugin(coVRMSController::instance()->isMaster() ? type : "const");
+        if (!plug)
+        {
+            std::cerr << "Input: replaced driver " << name << " with \"const\"" << std::endl;
+            plug = getDriverPlugin("const");
+        }
+        if (plug)
+        {
+            dev = plug->newInstance("COVER.Input.Device." + name);
+            drivers[name] = dev;
+            if (dev->needsThread())
+                dev->start();
+        }
+        else if (type.empty())
         {
             if (coVRPlugin *coverPlugin = coVRPluginList::instance()->addPlugin(name.c_str(), coVRPluginList::Input))
             {
@@ -450,19 +453,6 @@ InputDevice *Input::getDevice(const std::string &name)
             }
         }
         //std::cerr << "Input: creating dev " << name << ", driver " << type << std::endl;
-        DriverFactoryBase *plug = getDriverPlugin(coVRMSController::instance()->isMaster() ? type : "const");
-        if (!plug)
-        {
-            std::cerr << "Input: replaced driver " << name << " with \"const\"" << std::endl;
-            plug = getDriverPlugin("const");
-        }
-        if (plug)
-        {
-            dev = plug->newInstance("COVER.Input.Device." + name);
-            drivers[name] = dev;
-            if (dev->needsThread())
-                dev->start();
-        }
     }
     return dev;
 }
@@ -470,8 +460,12 @@ InputDevice *Input::getDevice(const std::string &name)
 bool Input::initPersons()
 {
     std::vector<std::string> names = coCoviseConfig::getScopeNames(configPath("Persons"), "Person");
-    if (coVRConfig::instance()->useVirtualGL())
+    bool vgl = coVRMSController::instance()->syncBool(coVRConfig::instance()->useVirtualGL());
+    if (vgl)
+    {
+        cout << "Input: running with VirtualGL, using default Persons" << endl;
         names.clear();
+    }
 
     if (names.empty())
     {
@@ -515,6 +509,12 @@ size_t Input::getNumPersons() const
 {
     assert(persons.size() == personNames.size());
     return persons.size();
+}
+
+size_t Input::getNumGadgets() const
+{
+    assert(gadgets.size() == gadgetNames.size());
+    return gadgets.size();
 }
 
 size_t Input::getNumBodies() const
@@ -586,12 +586,20 @@ bool Input::setActivePerson(size_t num)
 
 Person *Input::getPerson(size_t num)
 {
-
     if (num >= personNames.size())
         return NULL;
 
     const std::string &name = personNames[num];
     return getPerson(name);
+}
+
+Gadget *Input::getGadget(size_t num)
+{
+    if (num >= gadgetNames.size())
+        return NULL;
+
+    const std::string &name = gadgetNames[num];
+    return getGadget(name);
 }
 
 const osg::Matrix &Input::getMouseMat() const

@@ -10,6 +10,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <iostream>
+#include <algorithm>
 
 #include <osg/Depth>
 #include <osg/Geometry>
@@ -23,6 +24,7 @@
 #ifdef HAVE_CUDA
 #include <cuda.h>
 #include <cuda_gl_interop.h>
+#include <thrust/fill.h>
 #include "CudaTextureRectangle.h"
 #include "CudaGraphicsResource.h"
 #endif
@@ -720,19 +722,18 @@ void MultiChannelDrawer::initViewData(ViewData &vd) {
 
        vd.colorTex = new osg::TextureRectangle;
        vd.depthTex = new osg::TextureRectangle;
-       for (auto tex: {vd.colorTex, vd.depthTex}) {
-           tex->setResizeNonPowerOfTwoHint(false);
-           tex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
-           tex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
-       }
+
        vd.colorTex->setImage(vd.colorImg);
        vd.depthTex->setImage(vd.depthImg);
    }
 
    for (auto tex: {vd.colorTex, vd.depthTex}) {
        tex->setBorderWidth( 0 );
+       tex->setResizeNonPowerOfTwoHint(false);
        tex->setFilter( osg::Texture::MIN_FILTER, osg::Texture::NEAREST );
        tex->setFilter( osg::Texture::MAG_FILTER, osg::Texture::NEAREST );
+       tex->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+       tex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
    }
 
 
@@ -1062,13 +1063,28 @@ void MultiChannelDrawer::clearDepth(int idx) {
 #ifdef HAVE_CUDA
     if (m_useCuda)
     {
-        static_cast<CudaTextureRectangle*>(vd.depthTex.get())->clear();
+        auto texRect = static_cast<CudaTextureRectangle*>(vd.depthTex.get());
+    
+        float *depth = (float *)texRect->resourceData();
+        if (vd.depthFormat == GL_FLOAT) {
+            thrust::fill(depth, 
+                         depth+texRect->getTotalSizeInBytes()/4,
+                         1.f);
+        } else {
+            throw std::runtime_error("MultiChannelDrawer::clearDepth() unimplemented for format!");
+        }
     }
     else
 #endif
     {
         osg::Image *depth = vd.depthImg;
-        memset(depth->data(), 0, depth->getTotalSizeInBytes());
+        if (vd.depthFormat == GL_FLOAT) {
+            std::fill((float *)depth->data(),
+                      (float *)depth->data()+depth->getTotalSizeInBytes()/4,
+                      1.f);
+        } else {
+            throw std::runtime_error("MultiChannelDrawer::clearDepth() unimplemented for format!");
+        }
         depth->dirty();
     }
 }

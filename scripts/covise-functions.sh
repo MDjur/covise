@@ -30,15 +30,23 @@ guess_archsuffix() {
    fi
 
     if [ "$basedir" != "" ]; then
-       if [ -d "$basedir"/spackopt ]; then
-          export ARCHSUFFIX=spackopt
-          check_readme_archsuffix
-          return
-       elif [ -d "$basedir"/spack ]; then
-          export ARCHSUFFIX=spack
-          check_readme_archsuffix
-          return
-       fi
+       case "$ARCHSUFFIX" in
+           spack*)
+              check_readme_archsuffix
+              return
+              ;;
+          *)
+               if [ -d "$basedir"/spackopt ]; then
+                  export ARCHSUFFIX=spackopt
+                  check_readme_archsuffix
+                  return
+               elif [ -d "$basedir"/spack ]; then
+                  export ARCHSUFFIX=spack
+                  check_readme_archsuffix
+                  return
+               fi
+              ;;
+      esac
     fi
 
    case "$ARCH" in
@@ -66,7 +74,7 @@ guess_archsuffix() {
 	            export ARCHSUFFIX=libc++
                     ;;
 
-                10.11|,10.12|10.13|10.14|10.15|10.16|11.*|12.*|13.*|14.*)
+                10.11|,10.12|10.13|10.14|10.15|10.16|11.*|12.*|13.*|14.*|15.*)
 	            export ARCHSUFFIX=macos
                     ;;
 
@@ -178,6 +186,12 @@ guess_archsuffix() {
                     export ARCHSUFFIX=rhel8
                   elif grep -i -q -s 'CentOS Stream release 8' /etc/system-release; then
                     export ARCHSUFFIX=rhel8
+                  elif grep -i -q -s 'CentOS Stream release 9' /etc/system-release; then
+                    export ARCHSUFFIX=rhel9
+                  elif grep -i -q -s 'Red Hat Enterprise Linux.*release 9..' /etc/system-release; then
+                    export ARCHSUFFIX=rhel9
+                  elif grep -i -q -s 'Rocky Linux release 9' /etc/system-release; then
+                    export ARCHSUFFIX=rhel9
                   fi
                elif grep -i -q -s 'suse.*11.0' /etc/issue; then
                    export ARCHSUFFIX=mabuya
@@ -373,7 +387,12 @@ guess_archsuffix() {
 
 
 check_readme_archsuffix() {
-   local basearch=`echo $ARCHSUFFIX | sed -e 's/opt$//' -e 's/mpi$//' -e 's/xenomai$//'  `
+   local basearch=`echo $ARCHSUFFIX | sed -e 's/opt$//' -e 's/xenomai$//'  `
+   case $basearch in
+       spack*)
+           basearch=spack
+           ;;
+   esac
    local readme="${COVISEDIR}/README-ARCHSUFFIX.txt"
    if [ ! -r "$readme" -o ! -f "$readme" ]; then
        readme="${COVISEDIR}/share/doc/covise/README-ARCHSUFFIX.txt"

@@ -86,12 +86,6 @@
 #include "jsxml.h"
 #endif
 
-#ifdef HAVE_VA_LIST_AS_ARRAY
-#define JS_ADDRESSOF_VA_LIST(ap) ((va_list *)(ap))
-#else
-#define JS_ADDRESSOF_VA_LIST(ap) (&(ap))
-#endif
-
 #if defined(JS_PARANOID_REQUEST) && defined(JS_THREADSAFE)
 #define CHECK_REQUEST(cx) JS_ASSERT(cx->requestDepth)
 #else
@@ -162,8 +156,7 @@ JS_ConvertArguments(JSContext *cx, uintN argc, jsval *argv, const char *format,
 }
 
 JS_PUBLIC_API(JSBool)
-JS_ConvertArgumentsVA(JSContext *cx, uintN argc, jsval *argv,
-                      const char *format, va_list ap)
+JS_ConvertArgumentsVA(JSContext *cx, uintN argc, jsval *argv, const char *format, va_list ap0)
 {
     jsval *sp;
     JSBool required;
@@ -172,6 +165,8 @@ JS_ConvertArgumentsVA(JSContext *cx, uintN argc, jsval *argv,
     jsdouble d;
     JSString *str;
     JSObject *obj;
+    va_list ap;
+    va_copy(ap, ap0);
 
     CHECK_REQUEST(cx);
     sp = argv;
@@ -267,8 +262,7 @@ JS_ConvertArgumentsVA(JSContext *cx, uintN argc, jsval *argv,
             break;
         default:
             format--;
-            if (!TryArgumentFormatter(cx, &format, JS_TRUE, &sp,
-                                      JS_ADDRESSOF_VA_LIST(ap)))
+            if (!TryArgumentFormatter(cx, &format, JS_TRUE, &sp, &ap))
             {
                 return JS_FALSE;
             }
@@ -293,7 +287,7 @@ JS_PushArguments(JSContext *cx, void **markp, const char *format, ...)
 }
 
 JS_PUBLIC_API(jsval *)
-JS_PushArgumentsVA(JSContext *cx, void **markp, const char *format, va_list ap)
+JS_PushArgumentsVA(JSContext *cx, void **markp, const char *format, va_list ap0)
 {
     uintN argc;
     jsval *argv, *sp;
@@ -302,6 +296,8 @@ JS_PushArgumentsVA(JSContext *cx, void **markp, const char *format, va_list ap)
     JSString *str;
     JSFunction *fun;
     JSStackHeader *sh;
+    va_list ap;
+    va_copy(ap, ap0);
 
     CHECK_REQUEST(cx);
     *markp = NULL;
@@ -374,8 +370,7 @@ JS_PushArgumentsVA(JSContext *cx, void **markp, const char *format, va_list ap)
             break;
         default:
             format--;
-            if (!TryArgumentFormatter(cx, &format, JS_FALSE, &sp,
-                                      JS_ADDRESSOF_VA_LIST(ap)))
+            if (!TryArgumentFormatter(cx, &format, JS_FALSE, &sp, &ap))
             {
                 goto bad;
             }

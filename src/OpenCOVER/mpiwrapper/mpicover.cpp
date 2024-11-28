@@ -39,7 +39,10 @@
 #include <cover/OpenCOVER.h>
 #include <util/environment.h>
 
+#ifdef HAS_MPI
 #include <mpi.h>
+#else
+#endif
 
 #include <util/coExport.h>
 
@@ -51,6 +54,7 @@ extern "C" COEXPORT int mpi_main(MPI_Comm comm, int shmGroupRoot, pthread_barrie
     mpi_main_t *typecheck = mpi_main;
     (void)typecheck;
 
+#ifdef HAS_MPI
     int mpiinit = 0;
     MPI_Initialized(&mpiinit);
     if (!mpiinit)
@@ -59,6 +63,7 @@ extern "C" COEXPORT int mpi_main(MPI_Comm comm, int shmGroupRoot, pthread_barrie
         return -1;
     }
     assert(mpiinit);
+#endif
 
 #ifdef _WIN32
     // disable "debug dialog": it prevents the application from exiting,
@@ -76,19 +81,30 @@ extern "C" COEXPORT int mpi_main(MPI_Comm comm, int shmGroupRoot, pthread_barrie
     std::string mastername(my_hostname);
 
     int myID = 0;
+#ifdef HAS_MPI
     MPI_Comm_rank(comm, &myID);
     int len = (int)mastername.size();
     MPI_Bcast(&len, 1, MPI_INT, 0, comm);
     if (myID != 0)
         mastername.resize(len);
     MPI_Bcast(&mastername[0], len, MPI_BYTE, 0, comm);
+#endif
 
     covise::coConfigConstants::setRank(myID, shmGroupRoot);
     covise::coConfigConstants::setMaster(mastername);
-    opencover::config::Access config(my_hostname, mastername, myID);
-    if (auto covisedir = getenv("COVISEDIR"))
+
+    std::unique_ptr<opencover::config::Access> config;
+    if (opencover::config::Access::isInitialized())
     {
-        config.setPrefix(covisedir);
+        config = std::make_unique<opencover::config::Access>();
+    }
+    else
+    {
+        config = std::make_unique<opencover::config::Access>(my_hostname, mastername, myID);
+        if (auto covisedir = getenv("COVISEDIR"))
+        {
+            config->setPrefix(covisedir);
+        }
     }
 
 // timing printouts only if enabled in covise.config
@@ -104,9 +120,13 @@ extern "C" COEXPORT int mpi_main(MPI_Comm comm, int shmGroupRoot, pthread_barrie
     int dl = covise::coCoviseConfig::getInt("COVER.DebugLevel", 0);
     if (dl >= 1)
         fprintf(stderr, "OpenCOVER: Starting up\n\n");
+#ifdef HAS_MPI
     opencover::OpenCOVER *Renderer = new opencover::OpenCOVER(&comm, shmBarrier);
+#else
+    opencover::OpenCOVER *Renderer = new opencover::OpenCOVER();
+#endif
     Renderer->run();
-    config.save();
+    config->save();
     delete Renderer;
 
     return 0;

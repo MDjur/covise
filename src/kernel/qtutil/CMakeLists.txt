@@ -1,11 +1,17 @@
+if(NOT COVISE_USE_QT)
+    return()
+endif()
+
 set(QTUTIL_SOURCES
     FileSysAccess.cpp
+    MEColorChooser.cpp
     NetHelp.cpp
     NonBlockingDialogue.cpp
 )
 
 set(QTUTIL_HEADERS
     FileSysAccess.h
+    MEColorChooser.h
     NetHelp.h
     NonBlockingDialogue.h
     Qt5_15_deprecated.h

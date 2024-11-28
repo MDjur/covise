@@ -29,14 +29,15 @@ public:
     virtual void    apply(osg::State& state) const;
 
     void    resize(osg::State* state, int w, int h, int dataTypeSize);
-    void*   resourceData();
+    void*   resourceData() const;
+    size_t  getTotalSizeInBytes() const;
     void    clear();
 
 protected:
 
-    osg::ref_ptr<osg::PixelDataBufferObject> pbo_;
+    GLuint pbo_{0};
     CudaGraphicsResource resource_;
-    int resourceDataSize_;
+    size_t resourceDataSize_;
 };
 
 }

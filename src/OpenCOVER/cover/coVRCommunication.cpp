@@ -108,26 +108,24 @@ coVRCommunication::coVRCommunication()
     srand((unsigned)time(NULL)); // Initialize the random timer
     ignoreRemoteTransform = coCoviseConfig::isOn("COVER.IgnoreRemoteTransform", false);
 
-    onConnectCallbacks.push_back([this]() {
+    subscribeNotification(Notification::Connected, [this]() {
     	registry->setID(me()->ID(), me()->sessionID());
         registry->registerSender(this);
     });
 
-    onDisconnectCallbacks.push_back([this]() {
+    subscribeNotification(Notification::Disconnected,[this]() {
     	registry->setID(-1, me()->sessionID());
         registry->registerSender(nullptr);
     });
 
     registry.reset(new VrbClientRegistry(-1));
 	sharedStateManager.reset(new SharedStateManager(registry.get()));
+    sharedStateManager->setFrameTime([]() { return cover->frameTime(); });
 }
 
 coVRCommunication::~coVRCommunication()
 {
-    onConnectCallbacks.clear();
-    onDisconnectCallbacks.clear();
-    onSessionChangedCallbacks.clear();
-
+    notificationSubscriptions.clear();
     waitMessagesCallback = nullptr;
     handleMessageCallback = nullptr;
 
@@ -146,25 +144,14 @@ void coVRCommunication::init()
 	remoteNavInteraction = new vrui::coNavInteraction(vrui::coInteraction::NoButton, "remoteNavInteraction");
 }
 
-void handleEvents(const std::vector<std::function<void(void)>> &events)
-{
-    for (auto function : events)
-	{
-		if (function)
-		{
-			function();
-		}
-	}
-}
-
 void coVRCommunication::connected()
 {
-    handleEvents(onConnectCallbacks);
+    callSubscriptions(Notification::Connected);
 }
 
 void coVRCommunication::disconnected()
 {
-    handleEvents(onDisconnectCallbacks);
+    callSubscriptions(Notification::Disconnected);
 }
 
 void coVRCommunication::toggleClientState(bool state){
@@ -193,6 +180,16 @@ const coVRPartner *coVRCommunication::me() const{
     return coVRPartnerList::instance()->me();
 }
 
+void coVRCommunication::callSubscriptions(Notification type)
+{
+    for (auto &function : notificationSubscriptions[type])
+	{
+		if (function)
+		{
+			function();
+		}
+	}
+}
 
 void coVRCommunication::update(clientRegClass *theChangedClass)
 {
@@ -261,7 +258,7 @@ void opencover::coVRCommunication::setSessionID(const vrb::SessionID &id)
     tb << id;
     tb << me()->ID();
     send(tb, COVISE_MESSAGE_VRBC_SET_SESSION);
-    handleEvents(onSessionChangedCallbacks);
+    callSubscriptions(Notification::SessionChanged);
 }
 
 const char *coVRCommunication::getHostaddress()
@@ -283,7 +280,7 @@ bool coVRCommunication::collaborative() // returns true, if in collaborative mod
 {
     if (coVRPartnerList::instance()->numberOfPartners() > 1)
         return true;
-    if (OpenCOVER::instance()->visPlugin())
+    if (OpenCOVER::instance()->visPlugin() && OpenCOVER::instance()->visPlugin()->collaborativeSessionId().empty())
         return true;
     return false;
 }
@@ -447,7 +444,11 @@ void coVRCommunication::handleVRB(const Message &msg)
         }
         for(auto&& cl : uim.otherClients)
         {
+            auto sessionID = cl.sessionID();
             coVRPartnerList::instance()->addPartner(std::move(cl));
+            if(sessionID == me()->sessionID())
+                callSubscriptions(Notification::PartnerJoined);
+
         }
         coVRPartnerList::instance()->print();
         m_vrbMenu->updateRemoteLauncher();
@@ -475,8 +476,11 @@ void coVRCommunication::handleVRB(const Message &msg)
         tb >> id;
         if (id != me()->ID())
         {
-             coVRPartnerList::instance()->removePartner(id);
-			 vrui::coInteractionManager::the()->resetLock(id);
+            auto sessionID = coVRPartnerList::instance()->get(id)->sessionID();
+            coVRPartnerList::instance()->removePartner(id);
+            vrui::coInteractionManager::the()->resetLock(id);
+            if(sessionID == me()->sessionID())
+                callSubscriptions(Notification::PartnerLeft);
         }
         if (coVRPartnerList::instance()->numberOfPartners() <= 1)
             coVRCollaboration::instance()->showCollaborative(false);
@@ -546,7 +550,7 @@ void coVRCommunication::handleVRB(const Message &msg)
     break;
     case COVISE_MESSAGE_VRB_FB_SET:
     {
-
+#ifdef USE_QT
         int subtype;
         int id;
         //Received a filebrowser set command
@@ -601,10 +605,12 @@ void coVRCommunication::handleVRB(const Message &msg)
         {
             cerr << "Unknown type!" << endl;
         }
+#endif
     }
     break;
     case COVISE_MESSAGE_VRB_FB_REMREQ:
     {
+#ifdef USE_QT
 
         if (coVRMSController::instance()->isSlave())
             return;
@@ -639,7 +645,9 @@ void coVRCommunication::handleVRB(const Message &msg)
         {
             cerr << "Unknown type!" << endl;
         }
+#endif
     }
+    break;
     case COVISE_MESSAGE_VRBC_SEND_SESSIONS:
     {
         int size;
@@ -670,8 +678,13 @@ void coVRCommunication::handleVRB(const Message &msg)
         }
         else
         {
+            auto oldSession = coVRPartnerList::instance()->get(id)->sessionID();
             coVRPartnerList::instance()->setSessionID(id, sessionID);
             coVRPartnerList::instance()->print();
+            if(sessionID == me()->sessionID())
+                callSubscriptions(Notification::PartnerJoined);
+            else if(oldSession == me()->sessionID())
+                callSubscriptions(Notification::PartnerLeft);
         }
         coVRCollaboration::instance()->updateSharedStates();
         coVRCollaboration::instance()->updateUi();
@@ -841,22 +854,10 @@ Message *coVRCommunication::waitForMessage(int messageType)
     return m;
 }
 
-
-
-void opencover::coVRCommunication::addOnConnectCallback(std::function<void(void)> function)
+void coVRCommunication::subscribeNotification(Notification type, const std::function<void(void)> &function)
 {
-	onConnectCallbacks.push_back(function);
-}
-
-void opencover::coVRCommunication::addOnDisconnectCallback(std::function<void(void)> function)
-{
-	onDisconnectCallbacks.push_back(function);
-}
-
-void opencover::coVRCommunication::addOnSessionChangedCallback(std::function<void(void)> function)
-{
-    onSessionChangedCallbacks.push_back(function);
-}
+    notificationSubscriptions[type].push_back(function);
+}   
 
 void opencover::coVRCommunication::setWaitMessagesCallback(std::function<std::vector<Message*> (void)> cb)
 {
@@ -892,9 +893,11 @@ void opencover::coVRCommunication::initVrbFileMenu()
 
 void coVRCommunication::setFBData(IData *data)
 {
+#ifdef USE_QT
     VRBData *locData = dynamic_cast<VRBData *>(data);
     if (locData != NULL)
     {
         this->mfbData[locData->getId()] = locData;
     }
+#endif
 }

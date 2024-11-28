@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <vector>
+#include <mutex>
 
 #ifdef _WIN32
 #include <WS2tcpip.h>
@@ -248,6 +249,13 @@ void Host::HostSymbolic(const char *n)
     //II) By  gethostbyname
     //III) If this fails we get "unresolvable IP address"
 
+    static std::mutex globalNameMutex;
+    struct Addresses {
+        std::string addr;
+        char char_address[4];
+    };
+    static std::map<std::string, Addresses> globalNameMap;
+
     //TODO coConfig - richtig parsen
     std::string addr = coCoviseConfig::getEntry(std::string("System.IpTable.") + n);
     if (!addr.empty())
@@ -261,13 +269,6 @@ void Host::HostSymbolic(const char *n)
     if (err == 1)
     {
         memcpy(char_address, &v4, sizeof(char_address));
-        setAddress(n);
-        auto name = lookupHostname(n);
-        if (name.empty())
-            setName(n);
-        else
-            setName(name.c_str());
-        return;
     }
     if (err == 0)
     {
@@ -286,83 +287,85 @@ void Host::HostSymbolic(const char *n)
     }
     memset(char_address, 0, sizeof(char_address));
 
-#if 0
-    struct hostent *hent = gethostbyname(n);
-    if (NULL == hent)
+    std::unique_lock guard(globalNameMutex);
+    auto it = globalNameMap.find(n);
+    if (it != globalNameMap.end())
     {
-        fprintf(stderr, "lookup for %s failed\n", n);
-        if (strchr(n, ' '))
-            abort();
-        setAddress(NULL);
-        return;
-    }
-    if (hent->h_addrtype == AF_INET6)
-    {
-        fprintf(stderr, "cannot handle inet6 address: lookup for %s failed\n", n);
-    }
-    else if (hent->h_addrtype == AF_INET)
-    {
-        char_address[0] = *hent->h_addr_list[0];
-        char_address[1] = *(hent->h_addr_list[0] + 1);
-        char_address[2] = *(hent->h_addr_list[0] + 2);
-        char_address[3] = *(hent->h_addr_list[0] + 3);
-        char buf[1024];
-        sprintf(buf, "%d.%d.%d.%d",
-                char_address[0],
-                char_address[1],
-                char_address[2],
-                char_address[3]);
-        setAddress(buf);
-    }
-#else
-
-    struct addrinfo hints, *result = NULL;
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
-    hints.ai_socktype = 0;       /* any type of socket */
-    //hints.ai_flags = AI_ADDRCONFIG; // this prevents localhost from being resolved if no network is connected on windows
-    hints.ai_protocol = 0; /* Any protocol */
-
-    //std::cerr << "HostSymbolic: calling getaddrinfo for n=" << n << std::endl;
-    int s = getaddrinfo(n, NULL /* service */, &hints, &result);
-    //std::cerr << "HostSymbolic: after calling getaddrinfo for n=" << n << std::endl;
-    if (s != 0)
-    {
-        //std::cerr << "Host::HostSymbolic: getaddrinfo failed for " << n << ": " << s << " " << gai_strerror(s) << std::endl;
-        fprintf(stderr, "Host::HostSymbolic: getaddrinfo failed for %s: %s\n", n, gai_strerror(s));
-        return;
+        //std::cerr << "HostSymbolic: using cache for n=" << n << std::endl;
+        auto &entry = it->second;
+        bool valid = !entry.addr.empty();
+        if (valid)
+        {
+            setAddress(it->second.addr.c_str());
+        }
+        else
+        {
+            setAddress(nullptr);
+        }
+        memcpy(char_address, it->second.char_address, sizeof(char_address));
+        guard.unlock();
     }
     else
     {
-        /* getaddrinfo() returns a list of address structures.
+        guard.unlock();
+        struct addrinfo hints, *result = NULL;
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC; /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = 0; /* any type of socket */
+        //hints.ai_flags = AI_ADDRCONFIG; // this prevents localhost from being resolved if no network is connected on windows
+        hints.ai_flags = AI_PASSIVE; // returned address to be used for listening socket
+        hints.ai_protocol = 0; /* Any protocol */
+
+        //std::cerr << "HostSymbolic: calling getaddrinfo for n=" << n << std::endl;
+        int s = getaddrinfo(n, NULL /* service */, &hints, &result);
+        //std::cerr << "HostSymbolic: after calling getaddrinfo for n=" << n << std::endl;
+        if (s != 0)
+        {
+            //std::cerr << "Host::HostSymbolic: getaddrinfo failed for " << n << ": " << s << " " << gai_strerror(s) << std::endl;
+            fprintf(stderr, "Host::HostSymbolic: getaddrinfo failed for %s: %s\n", n, gai_strerror(s));
+            setAddress(nullptr);
+            guard.lock();
+            globalNameMap[n].addr.clear();
+            memcpy(globalNameMap[n].char_address, char_address, sizeof(char_address));
+            guard.unlock();
+            return;
+        }
+        else
+        {
+            /* getaddrinfo() returns a list of address structures.
            Try each address until we successfully connect(2).
            If socket(2) (or connect(2)) fails, we (close the socket
            and) try the next address. */
 
-        for (struct addrinfo *rp = result; rp != NULL; rp = rp->ai_next)
-        {
-            if (rp->ai_family != AF_INET)
-                continue;
+            for (struct addrinfo *rp = result; rp != NULL; rp = rp->ai_next)
+            {
+                if (rp->ai_family != AF_INET)
+                    continue;
 
-            char address[1000];
-            struct sockaddr_in *saddr = reinterpret_cast<struct sockaddr_in *>(rp->ai_addr);
-            memcpy(char_address, &saddr->sin_addr, sizeof(char_address));
-            if (!inet_ntop(rp->ai_family, &saddr->sin_addr, address, sizeof(address)))
-            {
-                std::cerr << "could not convert address of " << n << " to printable format: " << strerror(errno) << std::endl;
-                continue;
-            }
-            else
-            {
+                char address[1000];
+                struct sockaddr_in *saddr = reinterpret_cast<struct sockaddr_in *>(rp->ai_addr);
                 memcpy(char_address, &saddr->sin_addr, sizeof(char_address));
-                setAddress(address);
-                break;
+                if (!inet_ntop(rp->ai_family, &saddr->sin_addr, address, sizeof(address)))
+                {
+                    std::cerr << "could not convert address of " << n << " to printable format: " << strerror(errno)
+                              << std::endl;
+                    continue;
+                }
+                else
+                {
+                    memcpy(char_address, &saddr->sin_addr, sizeof(char_address));
+                    setAddress(address);
+                    guard.lock();
+                    globalNameMap[n].addr = address;
+                    memcpy(globalNameMap[n].char_address, char_address, sizeof(char_address));
+                    guard.unlock();
+                    break;
+                }
             }
-        }
 
-        freeaddrinfo(result); /* No longer needed */
+            freeaddrinfo(result); /* No longer needed */
+        }
     }
-#endif
     setName(n);
 }
 
@@ -468,6 +471,15 @@ const char *Host::getAddress() const
     if (!m_addressValid)
         return NULL;
     return m_address.c_str();
+}
+
+const char *Host::getPrintable() const
+{
+    if (m_nameValid)
+        return m_name.c_str();
+    if (m_addressValid)
+        return m_address.c_str();
+    return "(invalid)";
 }
 
 static bool isLoopbackAddress(const unsigned char address[4])

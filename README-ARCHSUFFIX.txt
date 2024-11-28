@@ -22,6 +22,7 @@
 # covise/scripts/covise-functions.sh
 # covise/README-ARCHSUFFIX.txt (this file)
 # covise/archive/extlibs-$BASEARCHSUFFIX-files.txt
+# covise/.gitignore
 # 
 # 
 # ARCHSUFFIXes currently used
@@ -38,13 +39,14 @@ linux64         Generic x86_64 Linux
 linuxarm        Generic aarch64 Linux
 cray64          Cray x86_64 Linux software rendering
 rhel8           Red Hat Enterprise Linux/CentOS 8 with updates on x86_64 (64 bit mode)
+rhel9           Red Hat Enterprise Linux/CentOS/Rocky 9 with updates on x86_64 (64 bit mode)
 jammy           Ubuntu 22.04 Jammy Jellyfish on x86_64 (64 bit mode)
 
 darwin          Generic macOS
 macos           macOS, x86_64 or arm64 with libc++
 
 freebsd         Generic FreeBSD
-spack           Installation via spack (https://spack.io)
+spack*          Installation of dependencies via spack (https://spack.io), possibly based on a spack environment
 
 
 #

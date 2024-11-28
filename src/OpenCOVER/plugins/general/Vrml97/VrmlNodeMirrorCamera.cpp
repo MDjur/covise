@@ -50,45 +50,29 @@
 
 static list<VrmlNodeMirrorCamera *> cameraNodes;
 
-// ARSensor factory.
-
-static VrmlNode *creator(VrmlScene *scene)
+void VrmlNodeMirrorCamera::initFields(VrmlNodeMirrorCamera *node, vrml::VrmlNodeType *t)
 {
-    return new VrmlNodeMirrorCamera(scene);
+    VrmlNodeChild::initFields(node, t);
+    initFieldsHelper(node, t,
+                     exposedField("hFov", node->d_hFov),
+                     exposedField("vFov", node->d_vFov),
+                     exposedField("far", node->d_far),
+                     exposedField("near", node->d_near),
+                     exposedField("enabled", node->d_enabled),
+                     exposedField("cameraID", node->d_cameraID));
 }
 
-// Define the built in VrmlNodeType:: "ARSensor" fields
-
-VrmlNodeType *VrmlNodeMirrorCamera::defineType(VrmlNodeType *t)
+const char *VrmlNodeMirrorCamera::name()
 {
-    static VrmlNodeType *st = 0;
-
-    if (!t)
-    {
-        if (st)
-            return st; // Only define the type once.
-        t = st = new VrmlNodeType("MirrorCamera", creator);
-    }
-
-    VrmlNodeChild::defineType(t); // Parent class
-
-    t->addExposedField("hFov", VrmlField::SFFLOAT);
-    t->addExposedField("vFov", VrmlField::SFFLOAT);
-    t->addExposedField("enabled", VrmlField::SFBOOL);
-    t->addExposedField("cameraID", VrmlField::SFINT32);
-
-    return t;
-}
-
-VrmlNodeType *VrmlNodeMirrorCamera::nodeType() const
-{
-    return defineType(0);
+    return "MirrorCamera";
 }
 
 VrmlNodeMirrorCamera::VrmlNodeMirrorCamera(VrmlScene *scene)
-    : VrmlNodeChild(scene)
+    : VrmlNodeChild(scene, name())
     , d_hFov(90.0)
     , d_vFov(90.0)
+    , d_near(0.1)
+    , d_far(10000.0)
     , d_enabled(true)
     , d_cameraID(1)
 {
@@ -109,11 +93,11 @@ void VrmlNodeMirrorCamera::addToScene(VrmlScene *s, const char *relUrl)
 }
 
 VrmlNodeMirrorCamera::VrmlNodeMirrorCamera(const VrmlNodeMirrorCamera &n)
-    : VrmlNodeChild(n.d_scene)
-    ,
-
-    d_hFov(n.d_hFov)
+    : VrmlNodeChild(n)
+    , d_hFov(n.d_hFov)
     , d_vFov(n.d_vFov)
+    , d_near(n.d_near)
+    , d_far(n.d_far)
     , d_enabled(n.d_enabled)
     , d_cameraID(n.d_cameraID)
 {
@@ -123,11 +107,6 @@ VrmlNodeMirrorCamera::VrmlNodeMirrorCamera(const VrmlNodeMirrorCamera &n)
 VrmlNodeMirrorCamera::~VrmlNodeMirrorCamera()
 {
     removeMC(this);
-}
-
-VrmlNode *VrmlNodeMirrorCamera::cloneMe() const
-{
-    return new VrmlNodeMirrorCamera(*this);
 }
 
 void VrmlNodeMirrorCamera::render(Viewer *v)
@@ -140,8 +119,8 @@ void VrmlNodeMirrorCamera::render(Viewer *v)
         if (viewer->mirrors[i].CameraID == d_cameraID.get())
         {
 
-            float nearC = 0.1;
-            float farC = 10000;
+            float nearC = d_near.get();
+            float farC = d_far.get();
 
             float tangent = tanf(DEG_TO_RAD(d_vFov.get()) / 2.0f); // tangent of half vertical fov
             float height = nearC * tangent; // half height of near plane
@@ -154,59 +133,11 @@ void VrmlNodeMirrorCamera::render(Viewer *v)
             osg::Matrix tr;
             //VrmlMat4 currentTransform;
             tr = viewer->currentTransform;
-            tr.postMult(viewer->vrmlBaseMat);
-            tr = tr.inverse(tr);
-            viewer->mirrors[i].vm = tr;
+            viewer->mirrors[i].vm =tr; // update vm one frame later
         }
     }
 
     setModified();
-}
-
-ostream &VrmlNodeMirrorCamera::printFields(ostream &os, int indent)
-{
-    if (!d_cameraID.get())
-        PRINT_FIELD(cameraID);
-    if (!d_enabled.get())
-        PRINT_FIELD(enabled);
-    if (!d_hFov.get())
-        PRINT_FIELD(hFov);
-    if (!d_vFov.get())
-        PRINT_FIELD(vFov);
-
-    return os;
-}
-
-// Set the value of one of the node fields.
-
-void VrmlNodeMirrorCamera::setField(const char *fieldName,
-                                    const VrmlField &fieldValue)
-{
-    if
-        TRY_FIELD(cameraID, SFInt)
-    else if
-        TRY_FIELD(enabled, SFBool)
-    else if
-        TRY_FIELD(hFov, SFFloat)
-    else if
-        TRY_FIELD(vFov, SFFloat)
-    else
-        VrmlNodeChild::setField(fieldName, fieldValue);
-}
-
-const VrmlField *VrmlNodeMirrorCamera::getField(const char *fieldName) const
-{
-    if (strcmp(fieldName, "cameraID") == 0)
-        return &d_cameraID;
-    else if (strcmp(fieldName, "enabled") == 0)
-        return &d_enabled;
-    else if (strcmp(fieldName, "hFov") == 0)
-        return &d_hFov;
-    else if (strcmp(fieldName, "vFov") == 0)
-        return &d_vFov;
-    else
-        cerr << "Node does not have this eventOut or exposed field " << nodeType()->getName() << "::" << name() << "." << fieldName << endl;
-    return 0;
 }
 
 void VrmlNodeMirrorCamera::addMC(VrmlNodeMirrorCamera *node)

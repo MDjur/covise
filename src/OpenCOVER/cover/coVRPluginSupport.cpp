@@ -301,29 +301,14 @@ float coVRPluginSupport::getSceneSize() const
     return coVRConfig::instance()->getSceneSize();
 }
 
+// return no. of seconds since epoch 
 double coVRPluginSupport::currentTime()
 {
     START("coVRPluginSupport::currentTime");
-    timeval currentTime;
-    gettimeofday(&currentTime, NULL);
-    
-    time_t t1, t2;
-    struct tm tms;
-    time(&t1);
-#ifdef WIN32
-    _localtime64_s(&tms,&t1);
-#else
-    localtime_r(&t1,&tms);
-#endif
-    tms.tm_hour = 0;
-    tms.tm_min = 0;
-    tms.tm_sec = 0;
-#ifdef WIN32
-    t2 = _mktime64(&tms);
-#else
-    t2 = mktime(&tms);
-#endif
-    return (currentTime.tv_sec - t2 + (double)currentTime.tv_usec / 1000000.0);
+    struct timeval currentTime;
+    gettimeofday(&currentTime, nullptr);
+
+    return currentTime.tv_sec + currentTime.tv_usec / 1000000.0;
 }
 
 double coVRPluginSupport::frameTime() const
@@ -1063,6 +1048,8 @@ void coVRPluginSupport::sendMessage(coVRPlugin *sender, int toWhom, int type, in
         sender->message(toWhom, type, len, buf);
     if (toWhom == coVRPluginSupport::TO_ALL)
         coVRPluginList::instance()->message(toWhom, type, len, buf);
+    if (toWhom == coVRPluginSupport::TO_ALL_OTHERS)
+        coVRPluginList::instance()->message(toWhom, type, len, buf, sender);
 
     if ((toWhom == coVRPluginSupport::TO_SAME) || (toWhom == coVRPluginSupport::TO_SAME_OTHERS))
     {

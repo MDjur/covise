@@ -11,6 +11,9 @@ DesignOptionChanger.cs
 ConnectionDialog.cs
 ConnectionDialog.Designer.cs
 ConnectionDialog.resx
+SettingsDialog.cs
+SettingsDialog.Designer.cs
+SettingsDialog.resx
 COVER.cs
 COVERToolbar.cs
 ExportContext.cs
@@ -44,9 +47,9 @@ IF(CMAKE_CONFIGURATION_TYPES)
     ELSE(CMAKE_CONFIGURATION_TYPES)
       # no configuration types - probably makefile generator
       STRING(TOUPPER "${CMAKE_BUILD_TYPE}" upper_build_type_str)
-      SET_TARGET_PROPERTIES(OpenCOVERPlugin PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_${upper_build_type_str} "${COVISE_DESTDIR}/${ARCHSUFFIX}/${BINLIB_SUFFIX}${MYPATH_POSTFIX}")
-      SET_TARGET_PROPERTIES(OpenCOVERPlugin PROPERTIES LIBRARY_OUTPUT_DIRECTORY_${upper_build_type_str} "${COVISE_DESTDIR}/${ARCHSUFFIX}/${BINLIB_SUFFIX}${MYPATH_POSTFIX}")
-      SET_TARGET_PROPERTIES(OpenCOVERPlugin PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${upper_build_type_str} "${COVISE_DESTDIR}/${ARCHSUFFIX}/${BINLIB_SUFFIX}${MYPATH_POSTFIX}")
+      SET_TARGET_PROPERTIES(OpenCOVERPlugin PROPERTIES ARCHIVE_OUTPUT_DIRECTORY_${upper_build_type_str} "${COVISE_DESTDIR}/${COVISE_ARCHSUFFIX}/${BINLIB_SUFFIX}${MYPATH_POSTFIX}")
+      SET_TARGET_PROPERTIES(OpenCOVERPlugin PROPERTIES LIBRARY_OUTPUT_DIRECTORY_${upper_build_type_str} "${COVISE_DESTDIR}/${COVISE_ARCHSUFFIX}/${BINLIB_SUFFIX}${MYPATH_POSTFIX}")
+      SET_TARGET_PROPERTIES(OpenCOVERPlugin PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${upper_build_type_str} "${COVISE_DESTDIR}/${COVISE_ARCHSUFFIX}/${BINLIB_SUFFIX}${MYPATH_POSTFIX}")
     ENDIF(CMAKE_CONFIGURATION_TYPES)
 
 csharp_set_designer_cs_properties(
@@ -54,12 +57,17 @@ Properties/AssemblyInfo.cs
 ConnectionDialog.cs
 ConnectionDialog.Designer.cs
 ConnectionDialog.resx
+SettingsDialog.cs
+SettingsDialog.Designer.cs
+SettingsDialog.resx
+
 )
 set_property(TARGET OpenCOVERPlugin PROPERTY VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.8")
 #set_property(TARGET OpenCOVERPlugin PROPERTY WIN32_EXECUTABLE TRUE)
 
 set_property(TARGET OpenCOVERPlugin PROPERTY VS_DOTNET_REFERENCES
     ${EXTRA_REFS}
+    "AdWindows"
     "PresentationCore"
     "System"
     "System.Core"
