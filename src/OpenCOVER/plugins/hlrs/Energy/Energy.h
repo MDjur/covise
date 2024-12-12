@@ -94,7 +94,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void switchTo(const osg::ref_ptr<osg::Node> child);
   void updateColorMap(const covise::ColorMap& map);
 
-  // CAMPUS_DB
+  // HISTORICAL
   void helper_initTimestepGrp(size_t maxTimesteps,
                               osg::ref_ptr<osg::Group> &timestepGroup);
   void helper_initTimestepsAndMinYear(size_t &maxTimesteps, int &minYear,
@@ -165,7 +165,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Slider* m_numSteps = nullptr;
   std::unique_ptr<covise::ColorMapSelector> m_colorMapSelector = nullptr;
 
-  // db
+  // historical
   opencover::ui::Button *ShowGraph = nullptr;
   opencover::ui::ButtonGroup *componentGroup = nullptr;
   opencover::ui::Group *componentList = nullptr;

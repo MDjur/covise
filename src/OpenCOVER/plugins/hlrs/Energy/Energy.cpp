@@ -756,7 +756,7 @@ EnergyPlugin::updateEnnovatisBuildings(const DeviceList &deviceList) {
 
 /* #endregion */
 
-/* #region CAMPUS_DB */
+/* #region HISTORIC */
 
 void EnergyPlugin::reinitDevices(int comp) {
   for (auto s : m_SDlist) {
