@@ -12,6 +12,19 @@
 #include "interfaces/IEnergyGrid.h"
 
 namespace core {
+
+/**
+ * @class EnergyGrid
+ * @brief A class representing an energy grid, inheriting from interface::EnergyGrid.
+ *
+ * This class is responsible for managing and visualizing an energy grid using OpenSceneGraph.
+ *
+ * @param name The name of the energy grid.
+ * @param points The points that define the grid.
+ * @param cl The indices that define the connections between points.
+ * @param parent The parent OSG group node (default is nullptr).
+ * @param connectionRadius The radius for connections (default is 1.0f).
+ */
 class EnergyGrid : public interface::EnergyGrid {
  public:
   EnergyGrid(const std::string &name, const grid::Points &points,
