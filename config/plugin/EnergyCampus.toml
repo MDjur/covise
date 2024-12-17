@@ -29,5 +29,5 @@ defaultHeightCylinder = 100.0
 radiusCylinder = 3.0
 
 [Simulation]
-staticInfluxCSV = "/home/hpcmdjur/data/DiTEnS/campus/johannes.csv"
-powerGridDir = "/home/hpcmdjur/data/DiTEnS/campus/input/IEH/uni_grid"
+staticInfluxCSV = "/data/DiTEnS/campus/johannes.csv"
+powerGridDir = "/data/DiTEnS/campus/input/IEH/uni_grid"
