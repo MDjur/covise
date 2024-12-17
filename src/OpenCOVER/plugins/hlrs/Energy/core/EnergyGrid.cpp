@@ -28,15 +28,23 @@ EnergyGrid::EnergyGrid(const std::string &name, const grid::Points &points,
 }
 
 void EnergyGrid::initDrawables() {
+  osg::ref_ptr<osg::Group> points = new osg::Group;
+  points->setName("Points");
+  osg::ref_ptr<osg::Group> connections = new osg::Group;
+  connections->setName("Connections");
+
   for (auto &point : m_points) {
     m_drawables.push_back(point);
-    m_parent->addChild(point);
+    points->addChild(point);
   }
 
   for (auto &connection : m_connections) {
     m_drawables.push_back(connection);
-    m_parent->addChild(connection);
+    connections->addChild(connection);
   }
+
+  m_parent->addChild(points);
+  m_parent->addChild(connections);
 }
 
 void EnergyGrid::updateColor(const osg::Vec4 &color) {
