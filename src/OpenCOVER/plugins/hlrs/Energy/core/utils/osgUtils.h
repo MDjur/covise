@@ -23,9 +23,10 @@ void deleteChildrenRecursive(osg::Group *grp);
  * @param radius The radius of the cylinder.
  * @param cylinderColor The color of the cylinder.
  * @param group The group to which the cylinder will be added.
+ * @param hints The tessellation hints for the cylinder.
  */
-osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(osg::Vec3 start, osg::Vec3 end,
-                                                     float radius,
-                                                     osg::Vec4 cylinderColor);
+osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+    osg::Vec3 start, osg::Vec3 end, float radius, osg::Vec4 cylinderColor,
+    osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints());
 }  // namespace core::utils::osgUtils
 #endif

@@ -57,19 +57,9 @@ void deleteChildrenRecursive(osg::Group *grp) {
   }
 }
 
-/**
- * @brief Adds a cylinder between two points.
- * Source: http://www.thjsmith.com/40/cylinder-between-two-points-opengl-c
- *
- * @param start The starting point of the cylinder.
- * @param end The ending point of the cylinder.
- * @param radius The radius of the cylinder.
- * @param cylinderColor The color of the cylinder.
- * @param group The group to which the cylinder will be added.
- */
-osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(osg::Vec3 start, osg::Vec3 end,
-                                                     float radius,
-                                                     osg::Vec4 cylinderColor) {
+osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+    osg::Vec3 start, osg::Vec3 end, float radius, osg::Vec4 cylinderColor,
+    osg::ref_ptr<osg::TessellationHints> hints) {
   osg::ref_ptr geode = new osg::Geode;
   osg::Vec3 center;
   float height;
@@ -97,7 +87,7 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(osg::Vec3 start, osg::Vec3 
   cylinder = new osg::Cylinder(center, radius, height);
   cylinder->setRotation(osg::Quat(angle, osg::Vec3(t.x(), t.y(), t.z())));
 
-  cylinderDrawable = new osg::ShapeDrawable(cylinder);
+  cylinderDrawable = new osg::ShapeDrawable(cylinder, hints);
   geode->addDrawable(cylinderDrawable);
 
   // Set the color of the cylinder that extends between the two points.
