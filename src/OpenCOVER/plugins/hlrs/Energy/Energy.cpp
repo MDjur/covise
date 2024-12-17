@@ -26,8 +26,10 @@
 #include <build_options.h>
 #include <config/CoviseConfig.h>
 #include <core/CityGMLBuilding.h>
+#include <core/EnergyGrid.h>
 #include <core/PrototypeBuilding.h>
 #include <core/TxtInfoboard.h>
+#include <core/utils/color.h>
 #include <core/utils/osgUtils.h>
 
 // COVER
@@ -40,6 +42,7 @@
 #include <cover/ui/SelectionList.h>
 #include <cover/ui/Slider.h>
 #include <cover/ui/View.h>
+#include <utils/read/csv/csv.h>
 #include <utils/string/LevenshteinDistane.h>
 
 // Ennovatis
@@ -63,10 +66,14 @@
 #include <vector>
 
 // OSG
+#include <osg/Geometry>
 #include <osg/Group>
 #include <osg/LineWidth>
 #include <osg/MatrixTransform>
 #include <osg/Node>
+#include <osg/Sequence>
+#include <osg/Shape>
+#include <osg/ShapeDrawable>
 #include <osg/Switch>
 #include <osg/Vec3>
 #include <osg/Version>
@@ -75,15 +82,18 @@
 
 // boost
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/tokenizer.hpp>
 
-#include "core/utils/color.h"
-#include "utils/read/csv/csv.h"
+#include "core/grid.h"
 
 using namespace opencover;
 using namespace opencover::utils::read;
 using namespace opencover::utils::string;
 using namespace energy;
+
+namespace fs = boost::filesystem;
 
 namespace {
 
@@ -141,24 +151,28 @@ float computeDistributionCenter(const std::vector<float> &values) {
 EnergyPlugin *EnergyPlugin::m_plugin = nullptr;
 
 EnergyPlugin::EnergyPlugin()
-    : coVRPlugin(COVER_PLUGIN_NAME), ui::Owner("EnergyPlugin", cover->ui) {
+    : coVRPlugin(COVER_PLUGIN_NAME),
+      ui::Owner("EnergyPlugin", cover->ui),
+      m_offset(3),
+      m_req(nullptr),
+      m_ennovatis(new osg::Group()),
+      m_switch(new osg::Switch()),
+      m_sequenceList(new osg::Sequence()),
+      m_Energy(new osg::MatrixTransform()),
+      m_cityGML(new osg::Group()),
+      m_colorMap(nullptr) {
   fprintf(stderr, "Starting Energy Plugin\n");
   m_plugin = this;
 
   m_buildings = std::make_unique<ennovatis::Buildings>();
 
-  m_sequenceList = new osg::Sequence();
   m_sequenceList->setName("DB");
-  m_ennovatis = new osg::Group();
   m_ennovatis->setName("Ennovatis");
-  m_cityGML = new osg::Group();
   m_cityGML->setName("CityGML");
 
-  m_Energy = new osg::MatrixTransform();
   m_Energy->setName("Energy");
   cover->getObjectsRoot()->addChild(m_Energy);
 
-  m_switch = new osg::Switch();
   m_switch->setName("Switch");
   m_switch->addChild(m_sequenceList);
   m_switch->addChild(m_ennovatis);
@@ -170,7 +184,7 @@ EnergyPlugin::EnergyPlugin()
 
   m_SDlist.clear();
 
-  EnergyTab = new ui::Menu("Energy Campus", EnergyPlugin::m_plugin);
+  EnergyTab = new ui::Menu("Energy_Campus", EnergyPlugin::m_plugin);
   EnergyTab->setText("Energy Campus");
 
   // db
@@ -186,45 +200,11 @@ EnergyPlugin::EnergyPlugin()
 
   initEnnovatisUI();
   initCityGMLUI();
-
-  m_colorMapGroup = new ui::Group(EnergyTab, "ColorMap");
-  m_colorMapSelector = std::make_unique<covise::ColorMapSelector>(*m_colorMapGroup);
-  m_colorMapSelector->setCallback([this](const covise::ColorMap &cm) {
-    updateColorMap(m_colorMapSelector->selectedMap());
-  });
-  //   m_colorMap =
-  //   std::make_shared<covise::ColorMap>(m_colorMapSelector->selectedMap());
-  m_colorMap = std::make_shared<core::utils::color::ColorMapExtended>(
-      m_colorMapSelector->selectedMap());
-  m_minAttribute = new ui::Slider(m_colorMapGroup, "min");
-  m_minAttribute->setBounds(0, 1);
-  m_minAttribute->setPresentation(ui::Slider::AsDial);
-  m_minAttribute->setValue(0);
-  m_minAttribute->setCallback([this](float value, bool moving) {
-    if (!moving) return;
-    m_colorMap->min = value;
-  });
-  m_maxAttribute = new ui::Slider(m_colorMapGroup, "max");
-  m_maxAttribute->setBounds(0, 1);
-  m_maxAttribute->setValue(1);
-  m_maxAttribute->setCallback([this](float value, bool moving) {
-    if (!moving) return;
-    m_colorMap->max = value;
-  });
-  m_numSteps = new ui::Slider(m_colorMapGroup, "steps");
-  m_numSteps->setBounds(32, 1024);
-  m_numSteps->setPresentation(ui::Slider::AsDial);
-  m_numSteps->setScale(ui::Slider::Linear);
-  m_numSteps->setIntegral(true);
-  m_numSteps->setLinValue(32);
-  m_numSteps->setValue(32);
-  m_numSteps->setCallback([this](float value, bool moving) {
-    if (!moving) return;
-    m_colorMap->map = covise::interpolateColorMap(m_colorMap->map, value);
-  });
-
+  initColorMap();
   m_offset =
       configFloatArray("General", "offset", std::vector<double>{0, 0, 0})->value();
+
+  initGrid();
 }
 
 EnergyPlugin::~EnergyPlugin() {
@@ -244,6 +224,66 @@ EnergyPlugin::~EnergyPlugin() {
   }
 
   m_plugin = nullptr;
+}
+
+std::pair<PJ *, PJ_COORD> EnergyPlugin::initProj() {
+  ProjTrans pjTrans;
+  pjTrans.projFrom = configString("General", "projFrom", "default")->value();
+  pjTrans.projTo = configString("General", "projTo", "default")->value();
+  auto P = proj_create_crs_to_crs(PJ_DEFAULT_CTX, pjTrans.projFrom.c_str(),
+                                  pjTrans.projTo.c_str(), NULL);
+  PJ_COORD coord;
+  coord.lpzt.z = 0.0;
+  coord.lpzt.t = HUGE_VAL;
+  bool mapdrape = true;
+
+  if (!P) {
+    fprintf(stderr,
+            "Energy Plugin: Ignore mapping. No valid projection was "
+            "found between given proj string in "
+            "config EnergyCampus.toml\n");
+    mapdrape = false;
+  }
+  return std::make_pair(P, coord);
+}
+
+void EnergyPlugin::initColorMap() {
+  m_colorMapGroup = new ui::Group(EnergyTab, "ColorMap");
+  m_colorMapSelector = std::make_unique<covise::ColorMapSelector>(*m_colorMapGroup);
+  m_colorMapSelector->setCallback([this](const covise::ColorMap &cm) {
+    updateColorMap(m_colorMapSelector->selectedMap());
+  });
+
+  m_colorMap = std::make_shared<core::utils::color::ColorMapExtended>(
+      m_colorMapSelector->selectedMap());
+  m_minAttribute = new ui::Slider(m_colorMapGroup, "min");
+  m_minAttribute->setBounds(0, 1);
+  m_minAttribute->setPresentation(ui::Slider::AsDial);
+  m_minAttribute->setValue(0);
+  m_minAttribute->setCallback([this](float value, bool moving) {
+    if (!moving) return;
+    m_colorMap->min = value;
+  });
+
+  m_maxAttribute = new ui::Slider(m_colorMapGroup, "max");
+  m_maxAttribute->setBounds(0, 1);
+  m_maxAttribute->setValue(1);
+  m_maxAttribute->setCallback([this](float value, bool moving) {
+    if (!moving) return;
+    m_colorMap->max = value;
+  });
+
+  m_numSteps = new ui::Slider(m_colorMapGroup, "steps");
+  m_numSteps->setBounds(32, 1024);
+  m_numSteps->setPresentation(ui::Slider::AsDial);
+  m_numSteps->setScale(ui::Slider::Linear);
+  m_numSteps->setIntegral(true);
+  m_numSteps->setLinValue(32);
+  m_numSteps->setValue(32);
+  m_numSteps->setCallback([this](float value, bool moving) {
+    if (!moving) return;
+    m_colorMap->map = covise::interpolateColorMap(m_colorMap->map, value);
+  });
 }
 
 bool EnergyPlugin::update() {
@@ -329,6 +369,21 @@ void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
   m_colorMap->map = map;
   //   for (auto &[_, sensor] : m_cityGMLObjs) sensor->updateShader();
 }
+
+EnergyPlugin::CSVStMapPtr EnergyPlugin::getCSVStreams(
+    const boost::filesystem::path &dirPath) {
+  auto csv_files = std::make_unique<CSVStreamMap>();
+  for (auto &entry : fs::directory_iterator(dirPath)) {
+    if (fs::is_regular_file(entry)) {
+      if (entry.path().extension() == ".csv") {
+        auto path = entry.path();
+        csv_files->insert(
+            {path.stem().string(), std::make_unique<CSVStream>(path.string())});
+      }
+    }
+  }
+  return csv_files;
+}
 /* #endregion */
 
 /* #region CITYGML */
@@ -357,60 +412,9 @@ void EnergyPlugin::enableCityGML(bool on) {
     }
     switchTo(m_cityGML);
 
-    if (m_cityGMLObjs.empty()) return;
-
-    //TODO: export into function and add input field for csv path => currently rly bad
-    using namespace opencover::utils::read;
     auto influxStatic =
         configString("Simulation", "staticInfluxCSV", "default")->value();
-    if (!boost::filesystem::exists(influxStatic)) return;
-
-    auto csvStream = CSVStream(influxStatic);
-    const auto &headers = csvStream.getHeader();
-    std::map<std::string, std::vector<float>> values;
-    float max = 0, min = -1;
-    float sum = 0;
-    int timesteps = 0;
-    if (csvStream && headers.size() > 1) {
-      CSVStream::CSVRow row;
-      while (csvStream >> row) {
-        for (auto cityGMLBuildingName : headers) {
-          auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
-          if (sensor != m_cityGMLObjs.end()) {
-            float value = 0;
-            access_CSVRow(row, cityGMLBuildingName, value);
-            if (value > max)
-              max = value;
-            else if (value < min || min == -1)
-              min = value;
-            sum += value;
-            if (values.find(cityGMLBuildingName) == values.end())
-              values.insert({cityGMLBuildingName, {value}});
-            else
-              values[cityGMLBuildingName].push_back(value);
-          }
-        }
-        ++timesteps;
-      }
-    }
-
-    m_colorMap->max = max;
-    m_colorMap->min = min;
-    m_colorMap->map =
-        covise::interpolateColorMap(m_colorMap->map, m_numSteps->value());
-    auto distributionCenter = sum  / (timesteps * values.size());
-    m_minAttribute->setBounds(0, distributionCenter);
-    m_maxAttribute->setBounds(distributionCenter, max);
-
-    for (auto &[name, values] : values) {
-      auto sensorIt = m_cityGMLObjs.find(name);
-      if (sensorIt != m_cityGMLObjs.end()) {
-        sensorIt->second->updateTimestepColors(values);
-      }
-    }
-
-    if (timesteps > opencover::coVRAnimationManager::instance()->getNumTimesteps())
-      opencover::coVRAnimationManager::instance()->setNumTimesteps(timesteps);
+    applyStaticInfluxToCityGML(influxStatic);
 
   } else {
     switchTo(m_sequenceList);
@@ -505,7 +509,8 @@ void EnergyPlugin::initEnnovatisUI() {
   m_ennovatisGroup->setText("Ennovatis");
 
   m_ennovatisSelectionsList =
-      new ui::SelectionList(m_ennovatisGroup, "Ennovatis ChannelType: ");
+      new ui::SelectionList(m_ennovatisGroup, "Ennovatis_ChannelType");
+  m_ennovatisSelectionsList->setText("Channel Type: ");
   std::vector<std::string> ennovatisSelections;
   for (int i = 0; i < static_cast<int>(ennovatis::ChannelGroup::None); ++i)
     ennovatisSelections.push_back(
@@ -513,10 +518,12 @@ void EnergyPlugin::initEnnovatisUI() {
 
   m_ennovatisSelectionsList->setList(ennovatisSelections);
   m_enabledEnnovatisDevices =
-      new opencover::ui::SelectionList(EnergyTab, "Enabled Devices: ");
+      new opencover::ui::SelectionList(EnergyTab, "Enabled_Devices");
+  m_enabledEnnovatisDevices->setText("Enabled Devices: ");
   m_enabledEnnovatisDevices->setCallback(
       [this](int value) { selectEnabledDevice(); });
-  m_ennovatisChannelList = new opencover::ui::SelectionList(EnergyTab, "Channels: ");
+  m_ennovatisChannelList = new opencover::ui::SelectionList(EnergyTab, "Channels");
+  m_ennovatisChannelList->setText("Channels: ");
 
   // TODO: add calender widget instead of txtfields
   m_ennovatisFrom = new ui::EditField(EnergyTab, "from");
@@ -933,4 +940,199 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
 /* #endregion */
 
+/* #region SIMULATION_DATA */
+
+std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
+    utils::read::CSVStream &stream, float &max, float &min, float &sum,
+    int &timesteps) {
+  const auto &headers = stream.getHeader();
+  FloatMap values;
+  if (stream && headers.size() > 1) {
+    CSVStream::CSVRow row;
+    while (stream >> row) {
+      for (auto cityGMLBuildingName : headers) {
+        auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
+        if (sensor != m_cityGMLObjs.end()) {
+          float value = 0;
+          access_CSVRow(row, cityGMLBuildingName, value);
+          if (value > max)
+            max = value;
+          else if (value < min || min == -1)
+            min = value;
+          sum += value;
+          if (values.find(cityGMLBuildingName) == values.end())
+            values.insert({cityGMLBuildingName, {value}});
+          else
+            values[cityGMLBuildingName].push_back(value);
+        }
+      }
+      ++timesteps;
+    }
+  }
+  return std::make_unique<FloatMap>(values);
+}
+
+void EnergyPlugin::applyStaticInfluxToCityGML(
+    const std::string &filePathToInfluxCSV) {
+  if (m_cityGMLObjs.empty()) return;
+  if (!boost::filesystem::exists(filePathToInfluxCSV)) return;
+  auto csvStream = CSVStream(filePathToInfluxCSV);
+  float max = 0, min = -1;
+  float sum = 0;
+  int timesteps = 0;
+  auto values = getInlfuxDataFromCSV(csvStream, max, min, sum, timesteps);
+
+  m_colorMap->max = max;
+  m_colorMap->min = min;
+  m_colorMap->map =
+      covise::interpolateColorMap(m_colorMap->map, m_numSteps->value());
+
+  auto distributionCenter = sum / (timesteps * values->size());
+  m_minAttribute->setBounds(0, distributionCenter);
+  m_maxAttribute->setBounds(distributionCenter, max);
+
+  for (auto &[name, values] : *values) {
+    auto sensorIt = m_cityGMLObjs.find(name);
+    if (sensorIt != m_cityGMLObjs.end()) {
+      sensorIt->second->updateTimestepColors(values);
+    }
+  }
+
+  if (timesteps > opencover::coVRAnimationManager::instance()->getNumTimesteps())
+    opencover::coVRAnimationManager::instance()->setNumTimesteps(timesteps);
+}
+
+void EnergyPlugin::initGrid() {
+  buildPowerGrid();
+  buildCoolingGrid();
+  buildHeatingGrid();
+}
+
+std::unique_ptr<std::vector<std::string>> EnergyPlugin::getBusNames(
+    utils::read::CSVStream &stream) {
+  auto busNames = std::vector<std::string>();
+  CSVStream::CSVRow bus;
+  std::string busName("");
+  while (stream >> bus) {
+    access_CSVRow(bus, "name", busName);
+    busNames.push_back(busName);
+  }
+  return std::make_unique<std::vector<std::string>>(busNames);
+}
+
+std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
+    utils::read::CSVStream &stream, const float &sphereRadius,
+    const std::vector<std::string> &busNames) {
+  using Points = core::grid::Points;
+
+  auto [P, coord] = initProj();
+
+  CSVStream::CSVRow point;
+  float lat = 0, lon = 0;
+  Points points;
+  int busID = 0;
+  while (stream >> point) {
+    access_CSVRow(point, "x", lon);
+    access_CSVRow(point, "y", lat);
+
+    // x = lon, y = lat
+    coord.lpzt.lam = lon;
+    coord.lpzt.phi = lat;
+    float alt = 0.;
+
+    coord = proj_trans(P, PJ_FWD, coord);
+
+    lon = coord.xy.x + m_offset[0];
+    lat = coord.xy.y + m_offset[1];
+
+    auto busName = busNames[busID];
+
+    osg::ref_ptr<core::grid::Point> p =
+        new core::grid::Point(busName, lon, lat, 0.0f, sphereRadius);
+    points.push_back(p);
+    ++busID;
+  }
+  return std::make_unique<Points>(points);
+}
+
+std::unique_ptr<core::grid::Indices> EnergyPlugin::createPowerGridIndices(
+    utils::read::CSVStream &stream, const size_t &numBus) {
+  using Indices = core::grid::Indices;
+  Indices indices(numBus);
+  CSVStream::CSVRow line;
+  std::string lineName("");
+  std::string type("");
+  int from = 0, to = 0;
+  float length = 0;
+  while (stream >> line) {
+    access_CSVRow(line, "name", lineName);
+    access_CSVRow(line, "std_type", type);
+    access_CSVRow(line, "from_bus", from);
+    access_CSVRow(line, "to_bus", to);
+    access_CSVRow(line, "length_km", length);
+
+    indices[from].push_back(to);
+  }
+  return std::make_unique<Indices>(indices);
+}
+
+void EnergyPlugin::buildPowerGrid() {
+  auto powerGridDir = configString("Simulation", "powerGridDir", "default")->value();
+  fs::path dir_path(powerGridDir);
+  if (!fs::exists(dir_path)) return;
+  auto csv_files = getCSVStreams(dir_path);
+  if (!csv_files) return;
+
+  // fetch bus names
+  auto busData = csv_files->find("bus");
+  std::unique_ptr<std::vector<std::string>> busNames(nullptr);
+  if (busData != csv_files->end()) {
+    auto &[name, busStream] = *busData;
+    busNames = getBusNames(*busStream);
+  }
+
+  if (!busNames) return;
+
+  // create points
+  auto pointsData = csv_files->find("bus_geodata");
+  std::unique_ptr<core::grid::Points> points(nullptr);
+  int busId(0);
+  float sphereRadius(1.0f);
+  if (pointsData != csv_files->end()) {
+    auto &[name, pointStream] = *pointsData;
+    points = createPowerGridPoints(*pointStream, sphereRadius, *busNames);
+  }
+
+  // create line
+  auto lineData = csv_files->find("line");
+  std::unique_ptr<core::grid::Indices> indices = nullptr;
+  if (lineData != csv_files->end()) {
+    auto &[name, lineStream] = *lineData;
+    indices = createPowerGridIndices(*lineStream, busNames->size());
+  }
+
+  // create grid
+  if (indices == nullptr || points == nullptr) return;
+  m_powerGrid =
+      std::make_unique<core::EnergyGrid>("POWER", *points, *indices, nullptr, 0.5f);
+  m_powerGrid->initDrawables();
+  m_Energy->addChild(m_powerGrid->getParent());
+
+  // TODO:
+  //  [ ] set trafo as 3d model or block
+  //  [ ] make points and lines clickable and add bill board to it with data from csv
+
+  // how to implement this generically?
+  // - fixed grid structure for discussion in AK Software
+  // - look into Energy ADE
+}
+
+void EnergyPlugin::buildHeatingGrid() {
+  // NOTE: implement when data available (Abdul)
+}
+void EnergyPlugin::buildCoolingGrid() {
+  // NOTE: implemnt when data is available (Abdul)
+}
+
+/* #endregion */
 COVERPLUGIN(EnergyPlugin)

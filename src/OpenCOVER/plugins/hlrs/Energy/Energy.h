@@ -21,8 +21,8 @@
 #include <EnnovatisDeviceSensor.h>
 #include <PluginUtil/coSensor.h>
 #include <core/PrototypeBuilding.h>
-#include <core/utils/osgUtils.h>
 #include <core/utils/color.h>
+#include <core/utils/osgUtils.h>
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>
@@ -30,12 +30,12 @@
 #include <cover/ui/Action.h>
 #include <cover/ui/Button.h>
 #include <cover/ui/ButtonGroup.h>
+#include <cover/ui/CovconfigLink.h>
 #include <cover/ui/EditField.h>
+#include <cover/ui/Group.h>
 #include <cover/ui/Menu.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/SelectionList.h>
-#include <cover/ui/CovconfigLink.h>
-#include <cover/ui/Group.h>
 #include <ennovatis/building.h>
 #include <ennovatis/rest.h>
 #include <gdal_priv.h>
@@ -44,6 +44,7 @@
 #include <util/common.h>
 #include <utils/read/csv/csv.h>
 
+#include <boost/filesystem.hpp>
 #include <map>
 #include <memory>
 #include <osg/Geode>
@@ -56,6 +57,10 @@
 #include <osg/Vec3>
 #include <osg/ref_ptr>
 #include <string>
+#include <vector>
+
+#include "core/EnergyGrid.h"
+#include "core/grid.h"
 
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
@@ -83,18 +88,35 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
  private:
   using Geodes = core::utils::osgUtils::Geodes;
-//   using ColorMap = core::utils::color::ColorMap;
+
+  template <typename T>
+  using NameMap = std::map<std::string, T>;
+  template <typename T>
+  using NameMapPtr = NameMap<std::unique_ptr<T>>;
+  template <typename T>
+  using NameMapVector = NameMap<std::vector<T>>;
+  template <typename T>
+  using NameMapVectorPtr = NameMapPtr<std::vector<T>>;
+
   typedef const ennovatis::Building *building_const_ptr;
   typedef const ennovatis::Buildings *buildings_const_Ptr;
   typedef std::vector<building_const_ptr> const_buildings;
   typedef std::map<energy::Device::ptr, building_const_ptr> DeviceBuildingMap;
-  typedef std::map<std::string, std::vector<energy::DeviceSensor::ptr>> DeviceList;
 
-  // GENERAL
+  typedef NameMapVector<float> FloatMap;
+  typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
+  typedef NameMapPtr<utils::read::CSVStream> CSVStreamMap;
+  typedef std::unique_ptr<CSVStreamMap> CSVStMapPtr;
+
+  /* #region GENERAL */
   void switchTo(const osg::ref_ptr<osg::Node> child);
-  void updateColorMap(const covise::ColorMap& map);
+  void updateColorMap(const covise::ColorMap &map);
+  void initColorMap();
+  std::pair<PJ *, PJ_COORD> initProj();
+  CSVStMapPtr getCSVStreams(const boost::filesystem::path &dirPath);
+  /* #endregion */
 
-  // HISTORICAL
+  /* #region HISTORIC */
   void helper_initTimestepGrp(size_t maxTimesteps,
                               osg::ref_ptr<osg::Group> &timestepGroup);
   void helper_initTimestepsAndMinYear(size_t &maxTimesteps, int &minYear,
@@ -108,8 +130,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   bool loadDBFile(const std::string &fileName, const ProjTrans &projTrans);
   bool loadDB(const std::string &path, const ProjTrans &projTrans);
   void reinitDevices(int comp);
+  /* #endregion */
 
-  // ENNOVATIS
+  /* #region ENNOVATIS */
   void initRESTRequest();
   void initEnnovatisUI();
   void selectEnabledDevice();
@@ -141,8 +164,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
    * @return True if the data was successfully loaded, false otherwise.
    */
   bool loadChannelIDs(const std::string &pathToJSON, const std::string &pathToCSV);
+  /* #endregion */
 
-  // CITYGML
+  /* #region CITYGML */
   void initCityGMLUI();
   void enableCityGML(bool on);
   void addCityGMLObjects(osg::ref_ptr<osg::Group> citygmlGroup);
@@ -153,16 +177,37 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void restoreCityGMLDefaultStatesets();
   void restoreGeodesStatesets(CityGMLDeviceSensor &sensor, const std::string &name,
                               const Geodes &citygmlGeodes);
+  /* #endregion */
 
+  /* #region SIMULATION */
+
+  std::unique_ptr<FloatMap> getInlfuxDataFromCSV(utils::read::CSVStream &stream,
+                                                 float &max, float &min, float &sum,
+                                                 int &timesteps);
+  std::unique_ptr<core::grid::Points> createPowerGridPoints(
+      utils::read::CSVStream &stream, const float &sphereRadius,
+      const std::vector<std::string> &busNames);
+  std::unique_ptr<core::grid::Indices> createPowerGridIndices(
+      utils::read::CSVStream &stream, const size_t &numBus);
+  std::unique_ptr<std::vector<std::string>> getBusNames(
+      utils::read::CSVStream &stream);
+
+  void initGrid();
+  void applyStaticInfluxToCityGML(const std::string &filePath);
+  void buildPowerGrid();
+  void buildHeatingGrid();
+  void buildCoolingGrid();
+
+  /* #endregion*/
+
+  // general
   static EnergyPlugin *m_plugin;
-
-  //general
   opencover::coTUITab *coEnergyTab = nullptr;
   opencover::ui::Menu *EnergyTab = nullptr;
   opencover::ui::Group *m_colorMapGroup = nullptr;
-  opencover::ui::Slider* m_minAttribute = nullptr;
-  opencover::ui::Slider* m_maxAttribute = nullptr;
-  opencover::ui::Slider* m_numSteps = nullptr;
+  opencover::ui::Slider *m_minAttribute = nullptr;
+  opencover::ui::Slider *m_maxAttribute = nullptr;
+  opencover::ui::Slider *m_numSteps = nullptr;
   std::unique_ptr<covise::ColorMapSelector> m_colorMapSelector = nullptr;
 
   // historical
@@ -210,7 +255,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::map<std::string, Geodes> m_cityGMLDefaultStatesets;
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
-  std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap = nullptr;
+  std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap;
+  std::unique_ptr<core::EnergyGrid> m_powerGrid;
 };
 
 #endif
