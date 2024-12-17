@@ -25,7 +25,7 @@ namespace core {
  * @param parent The parent OSG group node (default is nullptr).
  * @param connectionRadius The radius for connections (default is 1.0f).
  */
-class EnergyGrid : public interface::EnergyGrid {
+class EnergyGrid : public interface::IEnergyGrid {
  public:
   EnergyGrid(const std::string &name, const grid::Points &points,
              const grid::Indices &cl, osg::ref_ptr<osg::Group> parent = nullptr,

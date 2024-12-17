@@ -20,7 +20,8 @@ EnergyGrid::EnergyGrid(const std::string &name, const grid::Points &points,
   for (auto i = 0; i < cl.size(); ++i) {
     for (auto j = 0; j < cl[i].size(); ++j) {
       grid::ConnectionData<grid::Point> data("connection", *m_points[i],
-                                             *m_points[cl[i][j]], connectionRadius, nullptr);
+                                             *m_points[cl[i][j]], connectionRadius,
+                                             nullptr);
       m_connections.push_back(new grid::Connection(data));
     }
   }
