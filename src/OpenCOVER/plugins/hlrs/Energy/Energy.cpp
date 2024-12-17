@@ -1113,10 +1113,13 @@ void EnergyPlugin::buildPowerGrid() {
 
   // create grid
   if (indices == nullptr || points == nullptr) return;
+
+  osg::ref_ptr<osg::Group> power = new osg::Group();
+  power->setName("PowerGrid");
   m_powerGrid =
-      std::make_unique<core::EnergyGrid>("POWER", *points, *indices, nullptr, 0.5f);
+      std::make_unique<core::EnergyGrid>("POWER", *points, *indices, power, 0.5f);
   m_powerGrid->initDrawables();
-  m_Energy->addChild(m_powerGrid->getParent());
+  m_Energy->addChild(power);
 
   // TODO:
   //  [ ] set trafo as 3d model or block

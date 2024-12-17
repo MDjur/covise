@@ -59,8 +59,8 @@
 #include <string>
 #include <vector>
 
-#include "core/EnergyGrid.h"
-#include "core/grid.h"
+#include <core/interfaces/IEnergyGrid.h>
+#include <core/grid.h>
 
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
@@ -260,7 +260,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
   std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap;
-  std::unique_ptr<core::EnergyGrid> m_powerGrid;
+  std::unique_ptr<core::interface::IEnergyGrid> m_powerGrid;
 };
 
 #endif
