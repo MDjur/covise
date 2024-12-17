@@ -87,6 +87,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   };
 
  private:
+
+  /* #region using and typedef */
   using Geodes = core::utils::osgUtils::Geodes;
 
   template <typename T>
@@ -107,6 +109,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
   typedef NameMapPtr<utils::read::CSVStream> CSVStreamMap;
   typedef std::unique_ptr<CSVStreamMap> CSVStMapPtr;
+
+  /* #endregion */
 
   /* #region GENERAL */
   void switchTo(const osg::ref_ptr<osg::Node> child);

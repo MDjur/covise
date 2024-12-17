@@ -1128,10 +1128,10 @@ void EnergyPlugin::buildPowerGrid() {
 }
 
 void EnergyPlugin::buildHeatingGrid() {
-  // NOTE: implement when data available (Abdul)
+  // NOTE: implement when data available
 }
 void EnergyPlugin::buildCoolingGrid() {
-  // NOTE: implemnt when data is available (Abdul)
+  // NOTE: implemnt when data is available
 }
 
 /* #endregion */
