@@ -4,7 +4,6 @@
 #include <cover/coBillboard.h>
 
 #include <osg/ref_ptr>
-#include <osgText/Text>
 
 #include "interfaces/IInfoboard.h"
 
@@ -72,11 +71,6 @@ class TxtInfoboard : public interface::IInfoboard<std::string> {
   }
 
  private:
-  osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
-                                            const osg::Vec3 &position, int charSize,
-                                            const char *fontFile,
-                                            const float &maxWidth,
-                                            const float &margin) const;
   osg::ref_ptr<osg::Group> m_TextGeode = nullptr;
   osg::ref_ptr<opencover::coBillboard> m_BBoard = nullptr;
 

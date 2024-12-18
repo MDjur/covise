@@ -6,7 +6,6 @@
 #include <osg/MatrixTransform>
 #include <osg/Vec3>
 #include <osg/ref_ptr>
-#include <osgText/Text>
 
 #include "cover/coBillboard.h"
 #include "utils/osgUtils.h"
@@ -42,10 +41,10 @@ void TxtInfoboard::updateInfo(const std::string &info) {
   auto contentPos = pos;
   contentPos.z() -= m_attributes.height * m_attributes.titleHeightPercentage;
 
-  auto textBoxTitle = createTextBox(m_attributes.title, pos, m_attributes.charSize,
+  auto textBoxTitle = utils::osgUtils::createTextBox(m_attributes.title, pos, m_attributes.charSize,
                                     m_attributes.fontFile.c_str(),
                                     m_attributes.maxWidth, m_attributes.margin);
-  auto textBoxContent = createTextBox("", contentPos, m_attributes.charSize,
+  auto textBoxContent = utils::osgUtils::createTextBox("", contentPos, m_attributes.charSize,
                                       m_attributes.fontFile.c_str(),
                                       m_attributes.maxWidth, m_attributes.margin);
   textBoxContent->setText(info, osgText::String::ENCODING_UTF8);
@@ -74,23 +73,5 @@ void TxtInfoboard::move(const osg::Vec3 &pos) {
 void TxtInfoboard::hideInfo() {
   m_BBoard->removeChild(m_TextGeode);
   m_enabled = false;
-}
-
-osg::ref_ptr<osgText::Text> TxtInfoboard::createTextBox(
-    const std::string &text, const osg::Vec3 &position, int charSize,
-    const char *fontFile, const float &maxWidth, const float &margin) const {
-  osg::ref_ptr<osgText::Text> textBox = new osgText::Text();
-  textBox->setAlignment(osgText::Text::LEFT_TOP);
-  textBox->setAxisAlignment(osgText::Text::XZ_PLANE);
-  textBox->setColor(osg::Vec4(1, 1, 1, 1));
-  textBox->setText(text, osgText::String::ENCODING_UTF8);
-  textBox->setCharacterSize(charSize);
-  textBox->setFont(opencover::coVRFileManager::instance()->getFontFile(fontFile));
-  textBox->setMaximumWidth(maxWidth);
-  textBox->setPosition(position);
-  textBox->setDrawMode(osgText::Text::FILLEDBOUNDINGBOX | osgText::Text::TEXT);
-  textBox->setBoundingBoxColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.5f));
-  textBox->setBoundingBoxMargin(margin);
-  return textBox;
 }
 }  // namespace core

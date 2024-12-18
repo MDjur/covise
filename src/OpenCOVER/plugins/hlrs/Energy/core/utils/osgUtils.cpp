@@ -9,8 +9,30 @@
 #include <osg/ShapeDrawable>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
+#include <osgText/Text>
 
 namespace core::utils::osgUtils {
+
+osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
+                                          const osg::Vec3 &position, int charSize,
+                                          const char *fontFile,
+                                          const float &maxWidth,
+                                          const float &margin) {
+  osg::ref_ptr<osgText::Text> textBox = new osgText::Text();
+  textBox->setAlignment(osgText::Text::LEFT_TOP);
+  textBox->setAxisAlignment(osgText::Text::XZ_PLANE);
+  textBox->setColor(osg::Vec4(1, 1, 1, 1));
+  textBox->setText(text, osgText::String::ENCODING_UTF8);
+  textBox->setCharacterSize(charSize);
+  textBox->setFont(fontFile);
+  textBox->setMaximumWidth(maxWidth);
+  textBox->setPosition(position);
+  textBox->setDrawMode(osgText::Text::FILLEDBOUNDINGBOX | osgText::Text::TEXT);
+  textBox->setBoundingBoxColor(osg::Vec4(0.0f, 0.0f, 0.0f, 0.5f));
+  textBox->setBoundingBoxMargin(margin);
+  return textBox;
+}
+
 std::unique_ptr<Geodes> getGeodes(osg::Group *grp) {
   Geodes geodes{};
   for (unsigned int i = 0; i < grp->getNumChildren(); ++i) {
