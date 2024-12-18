@@ -88,7 +88,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
  private:
 
-  /* #region using and typedef */
+  /* #region using */
   using Geodes = core::utils::osgUtils::Geodes;
 
   template <typename T>
@@ -100,6 +100,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   template <typename T>
   using NameMapVectorPtr = NameMapPtr<std::vector<T>>;
 
+  /* #endregion */
+
+  /* #region typedef */
   typedef const ennovatis::Building *building_const_ptr;
   typedef const ennovatis::Buildings *buildings_const_Ptr;
   typedef std::vector<building_const_ptr> const_buildings;
@@ -109,7 +112,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
   typedef NameMapPtr<utils::read::CSVStream> CSVStreamMap;
   typedef std::unique_ptr<CSVStreamMap> CSVStMapPtr;
-
   /* #endregion */
 
   /* #region GENERAL */
@@ -191,7 +193,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::unique_ptr<core::grid::Points> createPowerGridPoints(
       utils::read::CSVStream &stream, const float &sphereRadius,
       const std::vector<std::string> &busNames);
-  std::unique_ptr<core::grid::Indices> createPowerGridIndices(
+//   std::unique_ptr<core::grid::Indices> createPowerGridIndices(
+//       utils::read::CSVStream &stream, const size_t &numBus);
+  std::pair<std::unique_ptr<core::grid::Indices>, std::unique_ptr<core::grid::DataList>> getPowerGridIndicesAndOptionalData(
       utils::read::CSVStream &stream, const size_t &numBus);
   std::unique_ptr<std::vector<std::string>> getBusNames(
       utils::read::CSVStream &stream);

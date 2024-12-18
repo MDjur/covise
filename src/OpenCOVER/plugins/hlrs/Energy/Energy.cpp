@@ -63,6 +63,7 @@
 #include <memory>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // OSG
@@ -1055,25 +1056,39 @@ std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
   return std::make_unique<Points>(points);
 }
 
-std::unique_ptr<core::grid::Indices> EnergyPlugin::createPowerGridIndices(
-    utils::read::CSVStream &stream, const size_t &numBus) {
+std::pair<std::unique_ptr<core::grid::Indices>,
+          std::unique_ptr<core::grid::DataList>>
+EnergyPlugin::getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
+                                                 const size_t &numBus) {
   using Indices = core::grid::Indices;
+  using DataList = core::grid::DataList;
   Indices indices(numBus);
   CSVStream::CSVRow line;
   std::string lineName("");
   std::string type("");
   int from = 0, to = 0;
   float length = 0;
+  core::grid::DataList additionalData;
   while (stream >> line) {
+    core::grid::Data data;
+
     access_CSVRow(line, "name", lineName);
     access_CSVRow(line, "std_type", type);
     access_CSVRow(line, "from_bus", from);
     access_CSVRow(line, "to_bus", to);
     access_CSVRow(line, "length_km", length);
 
+    data["name"] = lineName;
+    data["std_type"] = type;
+    data["from_bus"] = from;
+    data["to_bus"] = to;
+    data["length_km"] = length;
+
     indices[from].push_back(to);
+    additionalData.push_back(data);
   }
-  return std::make_unique<Indices>(indices);
+  return std::make_pair(std::make_unique<Indices>(indices),
+                        std::make_unique<DataList>(additionalData));
 }
 
 void EnergyPlugin::buildPowerGrid() {
@@ -1106,20 +1121,22 @@ void EnergyPlugin::buildPowerGrid() {
   // create line
   auto lineData = csv_files->find("line");
   std::unique_ptr<core::grid::Indices> indices = nullptr;
+  std::unique_ptr<core::grid::DataList> optData = nullptr;
   if (lineData != csv_files->end()) {
     auto &[name, lineStream] = *lineData;
-    indices = createPowerGridIndices(*lineStream, busNames->size());
+    std::tie(indices, optData) =
+        getPowerGridIndicesAndOptionalData(*lineStream, busNames->size());
   }
 
   // create grid
   if (indices == nullptr || points == nullptr) return;
 
-  osg::ref_ptr<osg::Group> power = new osg::Group();
-  power->setName("PowerGrid");
-  m_powerGrid =
-      std::make_unique<core::EnergyGrid>("POWER", *points, *indices, power, 0.5f);
+  osg::ref_ptr<osg::Group> powerGroup = new osg::Group();
+  powerGroup->setName("PowerGrid");
+  m_powerGrid = std::make_unique<core::EnergyGrid>("POWER", *points, *indices,
+                                                   powerGroup, 0.5f, *optData);
   m_powerGrid->initDrawables();
-  m_Energy->addChild(power);
+  m_Energy->addChild(powerGroup);
 
   // TODO:
   //  [ ] set trafo as 3d model or block
