@@ -63,7 +63,6 @@
 #include <memory>
 #include <regex>
 #include <string>
-#include <string_view>
 #include <vector>
 
 // OSG
@@ -943,6 +942,9 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
 /* #region SIMULATION_DATA */
 
+// TODO:
+// [ ] - add a button to enable/disable the simulation data
+// [ ] - plan uniform grid structure file => csv file in specific format
 std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
     utils::read::CSVStream &stream, float &max, float &min, float &sum,
     int &timesteps) {
