@@ -1,6 +1,7 @@
 #ifndef _CORE_ENERGYGRIND_H
 #define _CORE_ENERGYGRIND_H
 
+#include <memory>
 #include <osg/Geode>
 #include <osg/Group>
 #include <osg/Shape>
@@ -8,8 +9,10 @@
 #include <osg/Vec3>
 #include <osg/ref_ptr>
 
+#include "PluginUtil/coSensor.h"
 #include "grid.h"
 #include "interfaces/IEnergyGrid.h"
+#include "interfaces/IInfoboard.h"
 
 namespace core {
 
@@ -38,14 +41,35 @@ class EnergyGrid : public interface::IEnergyGrid {
   void updateDrawables() override;
   const auto &getName() const { return m_name; }
   osg::ref_ptr<osg::Group> getParent() { return m_parent; }
+  void initDrawableConnections();
+  void initDrawablePoints();
 
  private:
+  class InfoboardSensor : public coPickSensor {
+   public:
+    InfoboardSensor(osg::ref_ptr<osg::Group> parent,
+                    std::unique_ptr<interface::IInfoboard<std::string>> &&infoboard,
+                    const std::string &content = "");
+
+    void updateDrawable() { m_infoBoard->updateDrawable(); }
+    int hit(vrui::vruiHit *hit) override;
+
+    void update() override {
+      m_infoBoard->updateDrawable();
+      coPickSensor::update();
+    }
+
+   private:
+    std::unique_ptr<interface::IInfoboard<std::string>> m_infoBoard;
+  };
+
   void initConnections(const grid::Indices &indices, const float &radius,
                        const grid::DataList &additionalConnectionData);
   std::string m_name;
   grid::Points m_points;
   grid::Connections m_connections;
   osg::ref_ptr<osg::Group> m_parent;
+  std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
 };
 }  // namespace core
 #endif

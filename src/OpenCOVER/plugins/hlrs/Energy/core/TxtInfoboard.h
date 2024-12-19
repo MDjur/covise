@@ -2,9 +2,7 @@
 #define _CORE_TXTINFOBOARD_H
 
 #include <cover/coBillboard.h>
-
 #include <osg/ref_ptr>
-
 #include "interfaces/IInfoboard.h"
 
 namespace core {
@@ -30,6 +28,7 @@ struct TxtBoxAttributes {
   float titleHeightPercentage;  // title height in percentage of total height
   int charSize;
 };
+
 class TxtInfoboard : public interface::IInfoboard<std::string> {
  public:
   TxtInfoboard(const TxtBoxAttributes &attributes) : m_attributes(attributes){};
