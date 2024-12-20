@@ -28,7 +28,7 @@ void TxtInfoboard::initInfoboard() {
   m_BBoard = new opencover::coBillboard();
   m_BBoard->setNormal(osg::Vec3(0, -1, 0));
   m_BBoard->setAxis(osg::Vec3(0, 0, 1));
-  m_BBoard->setMode(opencover::coBillboard::AXIAL_ROT);
+  m_BBoard->setMode(opencover::coBillboard::POINT_ROT_EYE);
 }
 
 void TxtInfoboard::updateDrawable() {}
