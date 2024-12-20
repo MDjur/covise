@@ -17,11 +17,10 @@
 namespace core {
 
 /**
- * @class EnergyGrid
- * @brief A class representing an energy grid, inheriting from interface::EnergyGrid.
+ * @struct EnergyGridConfig
+ * @brief A struct representing the data needed to create an energy grid.
  *
- * This class is responsible for managing and visualizing an energy grid using
- * OpenSceneGraph.
+ * This struct is used to store the data needed to create an energy grid.
  *
  * @param name The name of the energy grid.
  * @param points The points that define the grid.
@@ -30,17 +29,33 @@ namespace core {
  * @param connectionRadius The radius for connections (default is 1.0f).
  * @param additionalConData Additional connection data (default is an empty list).
  */
+struct EnergyGridConfig {
+  // mandatory
+  std::string name;
+  grid::Points points;
+  grid::Indices indices;
+  // optional
+  osg::ref_ptr<osg::Group> parent = nullptr;
+  float connectionRadius = 1.0f;
+  grid::DataList additionalConnectionData = grid::DataList();
+};
+
+/**
+ * @class EnergyGrid
+ * @brief A class representing an energy grid, inheriting from interface::EnergyGrid.
+ *
+ * This class is responsible for managing and visualizing an energy grid using
+ * OpenSceneGraph.
+ *
+ */
 class EnergyGrid : public interface::IEnergyGrid {
  public:
-  EnergyGrid(const std::string &name, const grid::Points &points,
-             const grid::Indices &indices, osg::ref_ptr<osg::Group> parent = nullptr,
-             const float &connectionRadius = 1.0f,
-             const grid::DataList &additionalConnectionData = grid::DataList());
+  EnergyGrid(EnergyGridConfig &&data);
   void initDrawables() override;
   void updateColor(const osg::Vec4 &color) override;
   void updateDrawables() override;
-  const auto &getName() const { return m_name; }
-  osg::ref_ptr<osg::Group> getParent() { return m_parent; }
+  const auto &getName() const { return m_config.name; }
+  osg::ref_ptr<osg::Group> getParent() { return m_config.parent; }
   void initDrawableConnections();
   void initDrawablePoints();
 
@@ -55,9 +70,11 @@ class EnergyGrid : public interface::IEnergyGrid {
     int hit(vrui::vruiHit *hit) override;
 
     void update() override {
-      m_infoBoard->updateDrawable();
+      updateDrawable();
       coPickSensor::update();
     }
+
+    interface::IInfoboard<std::string> *getInfoboard() { return m_infoBoard.get(); }
 
    private:
     std::unique_ptr<interface::IInfoboard<std::string>> m_infoBoard;
@@ -65,10 +82,8 @@ class EnergyGrid : public interface::IEnergyGrid {
 
   void initConnections(const grid::Indices &indices, const float &radius,
                        const grid::DataList &additionalConnectionData);
-  std::string m_name;
-  grid::Points m_points;
+  EnergyGridConfig m_config;
   grid::Connections m_connections;
-  osg::ref_ptr<osg::Group> m_parent;
   std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
 };
 }  // namespace core

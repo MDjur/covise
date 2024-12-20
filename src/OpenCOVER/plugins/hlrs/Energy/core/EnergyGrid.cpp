@@ -4,13 +4,49 @@
 #include <utils/osgUtils.h>
 
 #include <cassert>
+// #include <osg/MatrixTransform>
+// #include <osg/PositionAttitudeTransform>
 #include <osg/Shape>
+// #include <osg/Transform>
 #include <osg/ref_ptr>
 #include <osgText/Text>
+// #include <osgViewer/Viewer>
 #include <sstream>
 #include <variant>
 
 #include "TxtInfoboard.h"
+#include "cover/VRViewer.h"
+// #include "cover/coBillboard.h"
+
+// namespace {
+// class BillboardTextCallback : public osg::NodeCallback {
+//  public:
+//   BillboardTextCallback(osg::Camera *camera) : _camera(camera) {}
+
+//   void operator()(osg::Node *node, osg::NodeVisitor *nv) {
+//     // Get the PositionAttitudeTransform
+//     osg::PositionAttitudeTransform *pat =
+//         dynamic_cast<osg::PositionAttitudeTransform *>(node);
+//     if (pat) {
+//       // Update the position of the text in front of the camera
+//       osg::Vec3 cameraPosition = _camera->getViewMatrix().getTrans();
+//       osg::Vec3 eye, center, up;
+//       _camera->getViewMatrixAsLookAt(eye, center, up);
+//       osg::Vec3 cameraDirection = center - eye;
+//       pat->setPosition(cameraPosition +
+//                        cameraDirection * 5.0f);  // Adjust the distance as needed
+
+//       // Update the orientation of the text to face the camera
+//       pat->setAttitude(osg::Quat());  // Reset attitude to face the camera
+//     }
+
+//     traverse(node, nv);
+//   }
+
+//  private:
+//   osg::ref_ptr<osg::Camera> _camera;
+// };
+// }  // namespace
 
 namespace core {
 
@@ -42,24 +78,22 @@ int EnergyGrid::InfoboardSensor::hit(vrui::vruiHit *hit) {
   return coPickSensor::hit(hit);
 }
 
-EnergyGrid::EnergyGrid(const std::string &name, const grid::Points &points,
-                       const grid::Indices &indices, osg::ref_ptr<osg::Group> parent,
-                       const float &connectionRadius,
-                       const grid::DataList &additionalConnectionData)
-    : m_name(name), m_points(points), m_parent(parent) {
-  if (m_parent == nullptr) {
-    m_parent = new osg::Group;
-    m_parent->setName(name);
+EnergyGrid::EnergyGrid(EnergyGridConfig &&data) : m_config(std::move(data)) {
+  if (m_config.parent == nullptr) {
+    m_config.parent = new osg::Group;
+    m_config.parent->setName(m_config.name);
   }
-  initConnections(indices, connectionRadius, additionalConnectionData);
-}
+  initConnections(m_config.indices, m_config.connectionRadius,
+                  m_config.additionalConnectionData);
+};
 
 void EnergyGrid::initConnections(const grid::Indices &indices, const float &radius,
                                  const grid::DataList &additionalConnectionData) {
-  assert(indices.size() == m_points.size());
+  assert(indices.size() == m_config.points.size());
 
   bool hasAdditionalData = !additionalConnectionData.empty();
 
+  const auto &points = m_config.points;
   for (auto i = 0; i < indices.size(); ++i) {
     for (auto j = 0; j < indices[i].size(); ++j) {
       std::unique_ptr<grid::ConnectionData<grid::Point>> data;
@@ -70,11 +104,11 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
           name = std::get<std::string>(additionalData.at("name"));
         }
         data = std::make_unique<grid::ConnectionData<grid::Point>>(
-            name, *m_points[i], *m_points[indices[i][j]], radius, nullptr,
+            name, *points[i], *points[indices[i][j]], radius, nullptr,
             additionalConnectionData[i]);
       } else {
         data = std::make_unique<grid::ConnectionData<grid::Point>>(
-            "connection", *m_points[i], *m_points[indices[i][j]], radius);
+            "connection", *points[i], *points[indices[i][j]], radius);
       }
       m_connections.push_back(new grid::DirectedConnection(*data));
     }
@@ -84,18 +118,17 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
 void EnergyGrid::initDrawablePoints() {
   osg::ref_ptr<osg::Group> points = new osg::Group;
   points->setName("Points");
-  for (auto &point : m_points) {
+  for (auto &point : m_config.points) {
     m_drawables.push_back(point);
     points->addChild(point);
   }
-  m_parent->addChild(points);
+  m_config.parent->addChild(points);
 }
 
 void EnergyGrid::initDrawableConnections() {
   osg::ref_ptr<osg::Group> connections = new osg::Group;
   connections->setName("Connections");
 
-  // TODO: calculate height and width of text box
   TxtBoxAttributes attributes(osg::Vec3(0, 0, 0), "Energy Grid",
                               "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
 
@@ -105,6 +138,8 @@ void EnergyGrid::initDrawableConnections() {
     return ss.str();
   };
 
+  auto viewer = opencover::VRViewer::instance();
+  auto camera = viewer->getCamera();
   for (auto &connection : m_connections) {
     m_drawables.push_back(connection);
     connections->addChild(connection);
@@ -114,16 +149,49 @@ void EnergyGrid::initDrawableConnections() {
       toPrint += " > " + name + ": " + std::visit(get_string, data);
     }
     auto center = connection->getCenter();
+    auto connectionBB = connection->getGeode()->getBoundingBox();
     center.z() += 30;
     auto name = connection->getName();
+
     attributes.position = center;
     attributes.title = name;
     TxtInfoboard infoboard(attributes);
     m_infoboards.push_back(std::make_unique<InfoboardSensor>(
         connection, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+
+    // TODO: use the position of the viewer to determine the position of the
+    // infoboard
+    // auto iboard = m_infoboards.back()->getInfoboard();
+    // iboard->showInfo(); //otherwise the infoboard would have geode attached
+    // auto mt = dynamic_cast<osg::MatrixTransform *>(iboard->getDrawable().get());
+    // if (!mt)
+    //     std::cout << "Error: Could not get MatrixTransform from infoboard
+    //     drawable\n";
+    // auto bboard = dynamic_cast<osg::Transform *>(mt->getChild(0));
+    // if (!bboard)
+    //     std::cout << "Error: Could not get Billboard from infoboard drawable\n";
+    // auto geo = bboard->getChild(0)->asGeode();
+    // if (!geo)
+    //     std::cout << "Error: Could not get Geode from infoboard drawable\n";
+
+    // auto geo = iboard->getDrawable()->asMatrixTransform()->getChild(0)->asGeode();
+    // if (!geo) {
+    //     std::cout << "Error: Could not get Geode from infoboard drawable\n";
+    //     return;
+    // }
+
+    // auto parent = dynamic_cast<osg::MatrixTransform *>(geo->getParent(0));
+    // osg::ref_ptr<osg::PositionAttitudeTransform> pat = new
+    // osg::PositionAttitudeTransform; mt->addChild(pat);
+
+    // pat->addChild(geo);
+    // mt->removeChild(geo);
+
+    // mt->setUpdateCallback(new BillboardTextCallback(camera));
+    // iboard->getDrawable()->setUpdateCallback(new BillboardTextCallback(camera));
   }
 
-  m_parent->addChild(connections);
+  m_config.parent->addChild(connections);
 }
 
 void EnergyGrid::initDrawables() {
@@ -135,7 +203,7 @@ void EnergyGrid::updateColor(const osg::Vec4 &color) {
   for (auto &connection : m_connections) {
     utils::color::overrideGeodeColor(connection->getGeode(), color);
   }
-  for (auto &point : m_points) {
+  for (auto &point : m_config.points) {
     utils::color::overrideGeodeColor(point->getGeode(), color);
   }
 }

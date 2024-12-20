@@ -1135,8 +1135,8 @@ void EnergyPlugin::buildPowerGrid() {
 
   osg::ref_ptr<osg::Group> powerGroup = new osg::Group();
   powerGroup->setName("PowerGrid");
-  m_powerGrid = std::make_unique<core::EnergyGrid>("POWER", *points, *indices,
-                                                   powerGroup, 0.5f, *optData);
+  m_powerGrid = std::make_unique<core::EnergyGrid>(
+      core::EnergyGridConfig{"POWER", *points, *indices, powerGroup, 0.5f, *optData});
   m_powerGrid->initDrawables();
   m_Energy->addChild(powerGroup);
 
