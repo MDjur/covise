@@ -25,12 +25,6 @@
 #include <EnnovatisDeviceSensor.h>
 #include <build_options.h>
 #include <config/CoviseConfig.h>
-#include <core/CityGMLBuilding.h>
-#include <core/EnergyGrid.h>
-#include <core/PrototypeBuilding.h>
-#include <core/TxtInfoboard.h>
-#include <core/utils/color.h>
-#include <core/utils/osgUtils.h>
 
 // COVER
 #include <PluginUtil/coColorMap.h>
@@ -86,7 +80,14 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/tokenizer.hpp>
 
-#include "core/grid.h"
+// core
+#include <core/CityGMLBuilding.h>
+#include <core/EnergyGrid.h>
+#include <core/PrototypeBuilding.h>
+#include <core/TxtInfoboard.h>
+#include <core/grid.h>
+#include <core/utils/color.h>
+#include <core/utils/osgUtils.h>
 
 using namespace opencover;
 using namespace opencover::utils::read;
@@ -190,7 +191,7 @@ EnergyPlugin::EnergyPlugin()
   // db
   componentGroup = new ui::ButtonGroup(EnergyTab, "ComponentGroup");
   componentGroup->setDefaultValue(Strom);
-  componentList = new ui::Group(EnergyTab, "Component");
+  componentList = new ui::Menu(EnergyTab, "Component");
   componentList->setText("Messwerte (jährlich)");
   StromBt = new ui::Button(componentList, "Strom", componentGroup, Strom);
   WaermeBt = new ui::Button(componentList, "Waerme", componentGroup, Waerme);
@@ -248,7 +249,12 @@ std::pair<PJ *, PJ_COORD> EnergyPlugin::initProj() {
 }
 
 void EnergyPlugin::initColorMap() {
-  m_colorMapGroup = new ui::Group(EnergyTab, "ColorMap");
+  if (m_simulationMenu == nullptr) {
+    m_simulationMenu = new ui::Menu(EnergyTab, "Simulation");
+    m_simulationMenu->setText("Simulation");
+  }
+
+  m_colorMapGroup = new ui::Group(m_simulationMenu, "ColorMap");
   m_colorMapSelector = std::make_unique<covise::ColorMapSelector>(*m_colorMapGroup);
   m_colorMapSelector->setCallback([this](const covise::ColorMap &cm) {
     updateColorMap(m_colorMapSelector->selectedMap());
@@ -388,8 +394,8 @@ EnergyPlugin::CSVStMapPtr EnergyPlugin::getCSVStreams(
 
 /* #region CITYGML */
 void EnergyPlugin::initCityGMLUI() {
-  m_cityGMLGroup = new ui::Group(EnergyTab, "CityGML");
-  m_cityGMLEnable = new ui::Button(m_cityGMLGroup, "Enable");
+  m_cityGMLMenu = new ui::Menu(EnergyTab, "CityGML");
+  m_cityGMLEnable = new ui::Button(m_cityGMLMenu, "Enable");
   m_cityGMLEnable->setCallback([this](bool on) { enableCityGML(on); });
 }
 
@@ -505,11 +511,11 @@ void EnergyPlugin::restoreCityGMLDefaultStatesets() {
 
 /* #region ENNOVATIS */
 void EnergyPlugin::initEnnovatisUI() {
-  m_ennovatisGroup = new ui::Group(EnergyTab, "Ennovatis");
-  m_ennovatisGroup->setText("Ennovatis");
+  m_ennovatisMenu = new ui::Menu(EnergyTab, "Ennovatis");
+  m_ennovatisMenu->setText("Ennovatis");
 
   m_ennovatisSelectionsList =
-      new ui::SelectionList(m_ennovatisGroup, "Ennovatis_ChannelType");
+      new ui::SelectionList(m_ennovatisMenu, "Ennovatis_ChannelType");
   m_ennovatisSelectionsList->setText("Channel Type: ");
   std::vector<std::string> ennovatisSelections;
   for (int i = 0; i < static_cast<int>(ennovatis::ChannelGroup::None); ++i)
@@ -518,18 +524,18 @@ void EnergyPlugin::initEnnovatisUI() {
 
   m_ennovatisSelectionsList->setList(ennovatisSelections);
   m_enabledEnnovatisDevices =
-      new opencover::ui::SelectionList(EnergyTab, "Enabled_Devices");
+      new opencover::ui::SelectionList(m_ennovatisMenu, "Enabled_Devices");
   m_enabledEnnovatisDevices->setText("Enabled Devices: ");
   m_enabledEnnovatisDevices->setCallback(
       [this](int value) { selectEnabledDevice(); });
-  m_ennovatisChannelList = new opencover::ui::SelectionList(EnergyTab, "Channels");
+  m_ennovatisChannelList = new opencover::ui::SelectionList(m_ennovatisMenu, "Channels");
   m_ennovatisChannelList->setText("Channels: ");
 
   // TODO: add calender widget instead of txtfields
-  m_ennovatisFrom = new ui::EditField(EnergyTab, "from");
-  m_ennovatisTo = new ui::EditField(EnergyTab, "to");
+  m_ennovatisFrom = new ui::EditField(m_ennovatisMenu, "from");
+  m_ennovatisTo = new ui::EditField(m_ennovatisMenu, "to");
 
-  m_ennovatisUpdate = new ui::Button(m_ennovatisGroup, "Update");
+  m_ennovatisUpdate = new ui::Button(m_ennovatisMenu, "Update");
   m_ennovatisUpdate->setCallback([this](bool on) { updateEnnovatis(); });
 
   m_ennovatisSelectionsList->setCallback(

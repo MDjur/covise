@@ -20,9 +20,14 @@
 #include <DeviceSensor.h>
 #include <EnnovatisDeviceSensor.h>
 #include <PluginUtil/coSensor.h>
-#include <core/PrototypeBuilding.h>
-#include <core/utils/color.h>
-#include <core/utils/osgUtils.h>
+#include <ennovatis/building.h>
+#include <ennovatis/rest.h>
+#include <gdal_priv.h>
+#include <proj.h>
+#include <util/coTypes.h>
+#include <util/common.h>
+#include <utils/read/csv/csv.h>
+
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>
@@ -36,17 +41,13 @@
 #include <cover/ui/Menu.h>
 #include <cover/ui/Owner.h>
 #include <cover/ui/SelectionList.h>
-#include <ennovatis/building.h>
-#include <ennovatis/rest.h>
-#include <gdal_priv.h>
-#include <proj.h>
-#include <util/coTypes.h>
-#include <util/common.h>
-#include <utils/read/csv/csv.h>
 
 #include <boost/filesystem.hpp>
 #include <map>
 #include <memory>
+#include <string>
+#include <vector>
+
 #include <osg/Geode>
 #include <osg/Group>
 #include <osg/Material>
@@ -56,11 +57,12 @@
 #include <osg/ShapeDrawable>
 #include <osg/Vec3>
 #include <osg/ref_ptr>
-#include <string>
-#include <vector>
 
 #include <core/interfaces/IEnergyGrid.h>
 #include <core/grid.h>
+#include <core/PrototypeBuilding.h>
+#include <core/utils/color.h>
+#include <core/utils/osgUtils.h>
 
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
@@ -193,8 +195,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::unique_ptr<core::grid::Points> createPowerGridPoints(
       utils::read::CSVStream &stream, const float &sphereRadius,
       const std::vector<std::string> &busNames);
-//   std::unique_ptr<core::grid::Indices> createPowerGridIndices(
-//       utils::read::CSVStream &stream, const size_t &numBus);
   std::pair<std::unique_ptr<core::grid::Indices>, std::unique_ptr<core::grid::DataList>> getPowerGridIndicesAndOptionalData(
       utils::read::CSVStream &stream, const size_t &numBus);
   std::unique_ptr<std::vector<std::string>> getBusNames(
@@ -221,14 +221,14 @@ class EnergyPlugin : public opencover::coVRPlugin,
   // historical
   opencover::ui::Button *ShowGraph = nullptr;
   opencover::ui::ButtonGroup *componentGroup = nullptr;
-  opencover::ui::Group *componentList = nullptr;
+  opencover::ui::Menu *componentList = nullptr;
   opencover::ui::Button *StromBt = nullptr;
   opencover::ui::Button *WaermeBt = nullptr;
   opencover::ui::Button *KaelteBt = nullptr;
 
   // ennovatis UI
   opencover::ui::SelectionList *m_ennovatisSelectionsList = nullptr;
-  opencover::ui::Group *m_ennovatisGroup = nullptr;
+  opencover::ui::Menu *m_ennovatisMenu = nullptr;
   opencover::ui::EditField *m_ennovatisFrom = nullptr;
   opencover::ui::EditField *m_ennovatisTo = nullptr;
   opencover::ui::Button *m_ennovatisUpdate = nullptr;
@@ -236,8 +236,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::SelectionList *m_enabledEnnovatisDevices = nullptr;
 
   // citygml UI
-  opencover::ui::Group *m_cityGMLGroup = nullptr;
+  opencover::ui::Menu *m_cityGMLMenu = nullptr;
   opencover::ui::Button *m_cityGMLEnable = nullptr;
+
+  // Simulation UI
+  opencover::ui::Menu *m_simulationMenu = nullptr;
 
   float rad, scaleH;
   int m_selectedComp = 0;
