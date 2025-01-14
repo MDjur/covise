@@ -1134,9 +1134,12 @@ void EnergyPlugin::buildPowerGrid() {
   if (indices == nullptr || points == nullptr) return;
 
   osg::ref_ptr<osg::Group> powerGroup = new osg::Group();
+  core::TxtBoxAttributes infoboardAttributes =
+      core::TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText",
+                             "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
   powerGroup->setName("PowerGrid");
-  m_powerGrid = std::make_unique<core::EnergyGrid>(
-      core::EnergyGridConfig{"POWER", *points, *indices, powerGroup, 0.5f, *optData});
+  m_powerGrid = std::make_unique<core::EnergyGrid>(core::EnergyGridConfig{
+      "POWER", *points, *indices, powerGroup, 0.5f, *optData, infoboardAttributes});
   m_powerGrid->initDrawables();
   m_Energy->addChild(powerGroup);
 

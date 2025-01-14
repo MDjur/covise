@@ -10,6 +10,7 @@
 #include <osg/ref_ptr>
 
 #include "PluginUtil/coSensor.h"
+#include "TxtInfoboard.h"
 #include "grid.h"
 #include "interfaces/IEnergyGrid.h"
 #include "interfaces/IInfoboard.h"
@@ -38,6 +39,9 @@ struct EnergyGridConfig {
   osg::ref_ptr<osg::Group> parent = nullptr;
   float connectionRadius = 1.0f;
   grid::DataList additionalConnectionData = grid::DataList();
+  TxtBoxAttributes infoboardAttributes =
+      TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText", "DroidSans-Bold.ttf",
+                       50, 50, 2.0f, 0.1, 2);
 };
 
 /**

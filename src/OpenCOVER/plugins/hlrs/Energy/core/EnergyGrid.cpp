@@ -129,9 +129,6 @@ void EnergyGrid::initDrawableConnections() {
   osg::ref_ptr<osg::Group> connections = new osg::Group;
   connections->setName("Connections");
 
-  TxtBoxAttributes attributes(osg::Vec3(0, 0, 0), "Energy Grid",
-                              "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
-
   auto get_string = [&](const auto &data) {
     std::stringstream ss;
     ss << data << "\n\n";
@@ -153,9 +150,9 @@ void EnergyGrid::initDrawableConnections() {
     center.z() += 30;
     auto name = connection->getName();
 
-    attributes.position = center;
-    attributes.title = name;
-    TxtInfoboard infoboard(attributes);
+    m_config.infoboardAttributes.position = center;
+    m_config.infoboardAttributes.title = name;
+    TxtInfoboard infoboard(m_config.infoboardAttributes);
     m_infoboards.push_back(std::make_unique<InfoboardSensor>(
         connection, std::make_unique<TxtInfoboard>(infoboard), toPrint));
 
