@@ -58,10 +58,6 @@ class EnergyGrid : public interface::IEnergyGrid {
   void initDrawables() override;
   void updateColor(const osg::Vec4 &color) override;
   void updateDrawables() override;
-  const auto &getName() const { return m_config.name; }
-  osg::ref_ptr<osg::Group> getParent() { return m_config.parent; }
-  void initDrawableConnections();
-  void initDrawablePoints();
 
  private:
   class InfoboardSensor : public coPickSensor {
@@ -86,6 +82,8 @@ class EnergyGrid : public interface::IEnergyGrid {
 
   void initConnections(const grid::Indices &indices, const float &radius,
                        const grid::DataList &additionalConnectionData);
+  void initDrawableConnections();
+  void initDrawablePoints();
   EnergyGridConfig m_config;
   grid::Connections m_connections;
   std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
