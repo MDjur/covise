@@ -33,6 +33,7 @@
 #include <cover/coVRFileManager.h>
 #include <cover/coVRTui.h>
 #include <cover/ui/EditField.h>
+#include <cover/ui/Group.h>
 #include <cover/ui/SelectionList.h>
 #include <cover/ui/Slider.h>
 #include <cover/ui/View.h>
@@ -421,7 +422,7 @@ void EnergyPlugin::enableCityGML(bool on) {
     auto influxStatic =
         configString("Simulation", "staticInfluxCSV", "default")->value();
     applyStaticInfluxToCityGML(influxStatic);
-
+    initSimUI();
   } else {
     switchTo(m_sequenceList);
   }
@@ -528,7 +529,8 @@ void EnergyPlugin::initEnnovatisUI() {
   m_enabledEnnovatisDevices->setText("Enabled Devices: ");
   m_enabledEnnovatisDevices->setCallback(
       [this](int value) { selectEnabledDevice(); });
-  m_ennovatisChannelList = new opencover::ui::SelectionList(m_ennovatisMenu, "Channels");
+  m_ennovatisChannelList =
+      new opencover::ui::SelectionList(m_ennovatisMenu, "Channels");
   m_ennovatisChannelList->setText("Channels: ");
 
   // TODO: add calender widget instead of txtfields
@@ -948,6 +950,21 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
 /* #region SIMULATION_DATA */
 
+void EnergyPlugin::initPowerGridStreams() {
+  auto powerGridDir = configString("Simulation", "powerGridDir", "default")->value();
+  fs::path dir_path(powerGridDir);
+  if (!fs::exists(dir_path)) return;
+  m_powerGridStreams = getCSVStreams(dir_path);
+  if (!m_powerGridStreams) {
+    std::cout << "No csv files found in " << powerGridDir << std::endl;
+    return;
+  }
+}
+
+void EnergyPlugin::initSimUI() {
+  if (!m_cityGMLEnable->enabled()) return;
+}
+
 // TODO:
 // [ ] - add a button to enable/disable the simulation data
 // [ ] - plan uniform grid structure file => csv file in specific format
@@ -1011,8 +1028,37 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
     opencover::coVRAnimationManager::instance()->setNumTimesteps(timesteps);
 }
 
-void EnergyPlugin::initGrid() {
+void EnergyPlugin::initPowerGridUI() {
+  m_powerGridMenu = new opencover::ui::Menu("Power Grid Data Selection", EnergyTab);
+  if (!m_powerGridStreams) return;
+  for (auto &[name, stream] : *m_powerGridStreams) {
+    auto menu = new opencover::ui::Menu(m_powerGridMenu, name);
+    auto header = stream->getHeader();
+    std::map<std::string, opencover::ui::Button *> checkBoxMap;
+    for (auto &col : header) {
+      if (col.find("Unnamed") == 0) continue;
+      auto checkBox = new opencover::ui::Button(menu, col);
+      checkBox->setState(true);
+      checkBoxMap.insert({col, checkBox});
+    }
+    if (auto it = m_powerGridCheckboxes.find(menu);
+        it != m_powerGridCheckboxes.end()) {
+      auto &[_, chBxMap] = *it;
+      chBxMap.insert(checkBoxMap.begin(), checkBoxMap.end());
+    } else {
+      m_powerGridCheckboxes.insert({menu, checkBoxMap});
+    }
+  }
+}
+
+void EnergyPlugin::initPowerGrid() {
+  initPowerGridStreams();
+  initPowerGridUI();
   buildPowerGrid();
+}
+
+void EnergyPlugin::initGrid() {
+  initPowerGrid();
   buildCoolingGrid();
   buildHeatingGrid();
 }
@@ -1029,6 +1075,67 @@ std::unique_ptr<std::vector<std::string>> EnergyPlugin::getBusNames(
   return std::make_unique<std::vector<std::string>>(busNames);
 }
 
+void EnergyPlugin::helper_getAdditionalPowerGridPointData_addData(
+    int busId, core::grid::DataList &additionalData, const core::grid::Data &data) {
+  if (busId > -1 && busId < additionalData.size()) {
+    auto &existingData = additionalData[busId];
+    if (existingData.empty())
+      additionalData[busId] = data;
+    else
+      existingData.insert(data.begin(), data.end());
+  }
+}
+
+void EnergyPlugin::helper_getAdditionalPowerGridPointData_handleDuplicate(
+    std::string &name, std::map<std::string, uint> &duplicateMap) {
+  if (auto it = duplicateMap.find(name); it != duplicateMap.end())
+    // if there is a similar entity, add the id to the name
+    name = name + "_" + std::to_string(++it->second);
+  else
+    duplicateMap.insert({name, 0});
+}
+
+std::unique_ptr<core::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointData(
+    const std::size_t &numOfBus) {
+  using DataList = core::grid::DataList;
+
+  // additional bus data
+  DataList additionalData(numOfBus);
+
+  for (auto &[tableName, tableStream] : *m_powerGridStreams) {
+    auto header = tableStream->getHeader();
+    if (auto it = std::find(header.begin(), header.end(), "bus"); it == header.end())
+      continue;
+    auto it = std::find(header.begin(), header.end(), "bus");
+    if (it == header.end()) CSVStream::CSVRow busdata;
+    int busId = -1;
+    std::map<std::string, uint> duplicate{};
+    CSVStream::CSVRow row;
+    // row
+    while (*tableStream >> row) {
+      core::grid::Data data;
+      // column
+      for (auto &colName : header) {
+        // get bus id without adding it
+        if (colName == "bus") {
+          access_CSVRow(row, colName, busId);
+          continue;
+        }
+        std::string value;
+        access_CSVRow(row, colName, value);
+
+        // add the name of the table to the name
+        std::string columnNameWithTable = tableName + " > " + colName;
+        helper_getAdditionalPowerGridPointData_handleDuplicate(columnNameWithTable,
+                                                               duplicate);
+        data[columnNameWithTable] = value;
+      }
+      helper_getAdditionalPowerGridPointData_addData(busId, additionalData, data);
+    }
+  }
+  return std::make_unique<DataList>(additionalData);
+}
+
 std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
     utils::read::CSVStream &stream, const float &sphereRadius,
     const std::vector<std::string> &busNames) {
@@ -1040,6 +1147,9 @@ std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
   float lat = 0, lon = 0;
   Points points;
   int busID = 0;
+
+  auto additionalData = getAdditionalPowerGridPointData(busNames.size());
+
   while (stream >> point) {
     access_CSVRow(point, "x", lon);
     access_CSVRow(point, "y", lat);
@@ -1055,9 +1165,10 @@ std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
     lat = coord.xy.y + m_offset[1];
 
     auto busName = busNames[busID];
+    auto busData = (*additionalData)[busID];
 
     osg::ref_ptr<core::grid::Point> p =
-        new core::grid::Point(busName, lon, lat, 0.0f, sphereRadius);
+        new core::grid::Point(busName, lon, lat, 0.0f, sphereRadius, busData);
     points.push_back(p);
     ++busID;
   }
@@ -1100,16 +1211,12 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
 }
 
 void EnergyPlugin::buildPowerGrid() {
-  auto powerGridDir = configString("Simulation", "powerGridDir", "default")->value();
-  fs::path dir_path(powerGridDir);
-  if (!fs::exists(dir_path)) return;
-  auto csv_files = getCSVStreams(dir_path);
-  if (!csv_files) return;
+  if (!m_powerGridStreams) return;
 
   // fetch bus names
-  auto busData = csv_files->find("bus");
+  auto busData = m_powerGridStreams->find("bus");
   std::unique_ptr<std::vector<std::string>> busNames(nullptr);
-  if (busData != csv_files->end()) {
+  if (busData != m_powerGridStreams->end()) {
     auto &[name, busStream] = *busData;
     busNames = getBusNames(*busStream);
   }
@@ -1117,20 +1224,20 @@ void EnergyPlugin::buildPowerGrid() {
   if (!busNames) return;
 
   // create points
-  auto pointsData = csv_files->find("bus_geodata");
+  auto pointsData = m_powerGridStreams->find("bus_geodata");
   std::unique_ptr<core::grid::Points> points(nullptr);
   int busId(0);
   float sphereRadius(1.0f);
-  if (pointsData != csv_files->end()) {
+  if (pointsData != m_powerGridStreams->end()) {
     auto &[name, pointStream] = *pointsData;
     points = createPowerGridPoints(*pointStream, sphereRadius, *busNames);
   }
 
   // create line
-  auto lineData = csv_files->find("line");
+  auto lineData = m_powerGridStreams->find("line");
   std::unique_ptr<core::grid::Indices> indices = nullptr;
   std::unique_ptr<core::grid::DataList> optData = nullptr;
-  if (lineData != csv_files->end()) {
+  if (lineData != m_powerGridStreams->end()) {
     auto &[name, lineStream] = *lineData;
     std::tie(indices, optData) =
         getPowerGridIndicesAndOptionalData(*lineStream, busNames->size());

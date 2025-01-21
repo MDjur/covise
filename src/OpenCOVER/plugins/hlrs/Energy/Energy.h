@@ -19,15 +19,16 @@
 #include <Device.h>
 #include <DeviceSensor.h>
 #include <EnnovatisDeviceSensor.h>
-#include <PluginUtil/coSensor.h>
-#include <ennovatis/building.h>
-#include <ennovatis/rest.h>
-#include <gdal_priv.h>
-#include <proj.h>
-#include <util/coTypes.h>
-#include <util/common.h>
-#include <utils/read/csv/csv.h>
 
+// core
+#include <core/PrototypeBuilding.h>
+#include <core/grid.h>
+#include <core/interfaces/IEnergyGrid.h>
+#include <core/utils/color.h>
+#include <core/utils/osgUtils.h>
+
+// cover
+#include <PluginUtil/coSensor.h>
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>
@@ -42,12 +43,19 @@
 #include <cover/ui/Owner.h>
 #include <cover/ui/SelectionList.h>
 
-#include <boost/filesystem.hpp>
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
+// ennovatis
+#include <ennovatis/building.h>
+#include <ennovatis/rest.h>
+#include <gdal_priv.h>
+#include <proj.h>
+#include <util/coTypes.h>
+#include <util/common.h>
+#include <utils/read/csv/csv.h>
 
+// boost
+#include <boost/filesystem.hpp>
+
+// osg
 #include <osg/Geode>
 #include <osg/Group>
 #include <osg/Material>
@@ -58,11 +66,11 @@
 #include <osg/Vec3>
 #include <osg/ref_ptr>
 
-#include <core/interfaces/IEnergyGrid.h>
-#include <core/grid.h>
-#include <core/PrototypeBuilding.h>
-#include <core/utils/color.h>
-#include <core/utils/osgUtils.h>
+// std
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
@@ -89,7 +97,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   };
 
  private:
-
   /* #region using */
   using Geodes = core::utils::osgUtils::Geodes;
 
@@ -188,6 +195,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region SIMULATION */
+  void initPowerGridStreams();
 
   std::unique_ptr<FloatMap> getInlfuxDataFromCSV(utils::read::CSVStream &stream,
                                                  float &max, float &min, float &sum,
@@ -195,13 +203,23 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::unique_ptr<core::grid::Points> createPowerGridPoints(
       utils::read::CSVStream &stream, const float &sphereRadius,
       const std::vector<std::string> &busNames);
-  std::pair<std::unique_ptr<core::grid::Indices>, std::unique_ptr<core::grid::DataList>> getPowerGridIndicesAndOptionalData(
-      utils::read::CSVStream &stream, const size_t &numBus);
+  std::pair<std::unique_ptr<core::grid::Indices>,
+            std::unique_ptr<core::grid::DataList>>
+  getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
+                                     const size_t &numBus);
   std::unique_ptr<std::vector<std::string>> getBusNames(
       utils::read::CSVStream &stream);
 
+  void helper_getAdditionalPowerGridPointData_addData(int busId, core::grid::DataList &additionalData, const core::grid::Data &data);
+  void helper_getAdditionalPowerGridPointData_handleDuplicate(std::string &name, std::map<std::string, uint> &duplicateMap);
+  std::unique_ptr<core::grid::DataList> getAdditionalPowerGridPointData(
+      const std::size_t &numOfBus);
+
+  void initSimUI();
   void initGrid();
   void applyStaticInfluxToCityGML(const std::string &filePath);
+  void initPowerGrid();
+  void initPowerGridUI();
   void buildPowerGrid();
   void buildHeatingGrid();
   void buildCoolingGrid();
@@ -242,6 +260,17 @@ class EnergyPlugin : public opencover::coVRPlugin,
   // Simulation UI
   opencover::ui::Menu *m_simulationMenu = nullptr;
 
+  // Powergrid UI
+  opencover::ui::Menu *m_powerGridMenu = nullptr;
+  std::map<opencover::ui::Menu *, std::map<std::string, opencover::ui::Button *>>
+      m_powerGridCheckboxes;
+
+  // Heatgrid UI
+  opencover::ui::Menu *m_heatGridMenu = nullptr;
+
+  // Coolinggrid UI
+  opencover::ui::Menu *m_coolingGridMenu = nullptr;
+
   float rad, scaleH;
   int m_selectedComp = 0;
   std::vector<double> m_offset;
@@ -268,6 +297,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap;
   std::unique_ptr<core::interface::IEnergyGrid> m_powerGrid;
+  CSVStMapPtr m_powerGridStreams;
 };
 
 #endif

@@ -16,6 +16,14 @@
 
 #include "TxtInfoboard.h"
 #include "cover/VRViewer.h"
+
+namespace {
+  auto get_string = [](const auto &data) {
+    std::stringstream ss;
+    ss << data << "\n\n";
+    return ss.str();
+  };
+}
 // #include "cover/coBillboard.h"
 
 // namespace {
@@ -121,6 +129,21 @@ void EnergyGrid::initDrawablePoints() {
   for (auto &point : m_config.points) {
     m_drawables.push_back(point);
     points->addChild(point);
+    std::string toPrint = "";
+    for (const auto &[name, data] : point->getAdditionalData()) {
+      toPrint += " > " + name + ": " + std::visit(get_string, data);
+    }
+    auto center = point->getPosition();
+    auto pointBB = point->getGeode()->getBoundingBox();
+    center.z() += 30;
+    auto name = point->getName();
+
+    m_config.infoboardAttributes.position = center;
+    m_config.infoboardAttributes.title = name;
+    TxtInfoboard infoboard(m_config.infoboardAttributes);
+    m_infoboards.push_back(std::make_unique<InfoboardSensor>(
+        point, std::make_unique<TxtInfoboard>(infoboard), toPrint));
+
   }
   m_config.parent->addChild(points);
 }
@@ -129,14 +152,8 @@ void EnergyGrid::initDrawableConnections() {
   osg::ref_ptr<osg::Group> connections = new osg::Group;
   connections->setName("Connections");
 
-  auto get_string = [&](const auto &data) {
-    std::stringstream ss;
-    ss << data << "\n\n";
-    return ss.str();
-  };
-
-  auto viewer = opencover::VRViewer::instance();
-  auto camera = viewer->getCamera();
+  //   auto viewer = opencover::VRViewer::instance();
+  //   auto camera = viewer->getCamera();
   for (auto &connection : m_connections) {
     m_drawables.push_back(connection);
     connections->addChild(connection);
