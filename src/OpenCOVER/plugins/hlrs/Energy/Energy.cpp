@@ -377,7 +377,7 @@ void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
   //   for (auto &[_, sensor] : m_cityGMLObjs) sensor->updateShader();
 }
 
-EnergyPlugin::CSVStMapPtr EnergyPlugin::getCSVStreams(
+EnergyPlugin::CSVStreamMapPtr EnergyPlugin::getCSVStreams(
     const boost::filesystem::path &dirPath) {
   auto csv_files = std::make_unique<CSVStreamMap>();
   for (auto &entry : fs::directory_iterator(dirPath)) {
@@ -1028,8 +1028,51 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
     opencover::coVRAnimationManager::instance()->setNumTimesteps(timesteps);
 }
 
+bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
+                                               const std::string &paramName) {
+  auto eq_tableName =
+      [&](const std::pair<opencover::ui::Menu *,
+                          std::map<std::string, opencover::ui::Button *>> &cb) {
+        auto menu = cb.first;
+        return menu->name() == tableName;
+      };
+  if (auto it = std::find_if(m_powerGridCheckboxes.begin(),
+                             m_powerGridCheckboxes.end(), eq_tableName);
+      it != m_powerGridCheckboxes.end()) {
+    auto &checkBoxes = it->second;
+    if (auto it = checkBoxes.find(paramName); it != checkBoxes.end()) {
+      return it->second->state();
+    }
+  }
+  return false;
+}
+
+void EnergyPlugin::rebuildPowerGrid() {
+  initPowerGridStreams();
+  buildPowerGrid();
+}
+
+void EnergyPlugin::updatePowerGridSelection(bool on) {
+  if (!on) return;
+
+  for (auto i = 0; i < m_Energy->getNumChildren(); ++i) {
+    auto child = m_Energy->getChild(i);
+    if (child->getName() == "PowerGrid") {
+      m_Energy->removeChild(i);
+      break;
+    }
+  }
+  rebuildPowerGrid();
+}
+
 void EnergyPlugin::initPowerGridUI() {
   m_powerGridMenu = new opencover::ui::Menu("Power Grid Data Selection", EnergyTab);
+
+  m_updatePowerGridSelection = new opencover::ui::Button(m_powerGridMenu, "Update");
+  m_updatePowerGridSelection->setState(false);
+  m_updatePowerGridSelection->setCallback(
+      [this](bool enable) { updatePowerGridSelection(enable); });
+
   if (!m_powerGridStreams) return;
   for (auto &[name, stream] : *m_powerGridStreams) {
     auto menu = new opencover::ui::Menu(m_powerGridMenu, name);
@@ -1038,7 +1081,6 @@ void EnergyPlugin::initPowerGridUI() {
     for (auto &col : header) {
       if (col.find("Unnamed") == 0) continue;
       auto checkBox = new opencover::ui::Button(menu, col);
-      checkBox->setState(true);
       checkBoxMap.insert({col, checkBox});
     }
     if (auto it = m_powerGridCheckboxes.find(menu);
@@ -1055,6 +1097,7 @@ void EnergyPlugin::initPowerGrid() {
   initPowerGridStreams();
   initPowerGridUI();
   buildPowerGrid();
+  m_powerGridStreams->clear();
 }
 
 void EnergyPlugin::initGrid() {
@@ -1116,6 +1159,7 @@ std::unique_ptr<core::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointD
       core::grid::Data data;
       // column
       for (auto &colName : header) {
+        if (!checkBoxSelection_powergrid(tableName, colName)) continue;
         // get bus id without adding it
         if (colName == "bus") {
           access_CSVRow(row, colName, busId);
@@ -1183,25 +1227,24 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
   using DataList = core::grid::DataList;
   Indices indices(numBus);
   CSVStream::CSVRow line;
-  std::string lineName("");
-  std::string type("");
   int from = 0, to = 0;
-  float length = 0;
   core::grid::DataList additionalData;
+  // TODO: add window for user to select the columns
+  auto header = stream.getHeader();
   while (stream >> line) {
     core::grid::Data data;
 
-    access_CSVRow(line, "name", lineName);
-    access_CSVRow(line, "std_type", type);
+    for (auto colName : header) {
+      fs::path filename(stream.getFilename());
+      auto filename_without_ext = filename.stem().string();
+      if (!checkBoxSelection_powergrid(filename_without_ext, colName)) continue;
+      std::string value;
+      access_CSVRow(line, colName, value);
+      data[colName] = value;
+    }
+
     access_CSVRow(line, "from_bus", from);
     access_CSVRow(line, "to_bus", to);
-    access_CSVRow(line, "length_km", length);
-
-    data["name"] = lineName;
-    data["std_type"] = type;
-    data["from_bus"] = from;
-    data["to_bus"] = to;
-    data["length_km"] = length;
 
     indices[from].push_back(to);
     additionalData.push_back(data);
