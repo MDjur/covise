@@ -81,6 +81,8 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/tokenizer.hpp>
 
+#include "OpenConfig/covconfig/array.h"
+
 // core
 #include <core/CityGMLBuilding.h>
 #include <core/EnergyGrid.h>
@@ -163,6 +165,9 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_colorMap(nullptr) {
+  // need to save the config on exit => will only be saved when COVER is closed
+  // correctly via q or closing the window
+  config()->setSaveOnExit(true);
   fprintf(stderr, "Starting Energy Plugin\n");
   m_plugin = this;
 
@@ -225,6 +230,7 @@ EnergyPlugin::~EnergyPlugin() {
     root->removeChild(m_Energy.get());
   }
 
+  config()->save();
   m_plugin = nullptr;
 }
 
@@ -1030,18 +1036,23 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
 
 bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
                                                const std::string &paramName) {
-  auto eq_tableName =
-      [&](const std::pair<opencover::ui::Menu *,
-                          std::map<std::string, opencover::ui::Button *>> &cb) {
-        auto menu = cb.first;
-        return menu->name() == tableName;
-      };
+  using namespace std::placeholders;
+  auto eq_name = [](const std::string &compare,
+                    const auto &pointerWithNameFunction) {
+    return compare == pointerWithNameFunction->name();
+  };
+  auto eq_tableName = [&tableName, &eq_name](const auto &pair) {
+    auto menu = pair.first;
+    return eq_name(tableName, menu);
+  };
   if (auto it = std::find_if(m_powerGridCheckboxes.begin(),
                              m_powerGridCheckboxes.end(), eq_tableName);
       it != m_powerGridCheckboxes.end()) {
-    auto &checkBoxes = it->second;
-    if (auto it = checkBoxes.find(paramName); it != checkBoxes.end()) {
-      return it->second->state();
+    const auto &checkBoxes = it->second;
+    if (auto it = std::find_if(checkBoxes.begin(), checkBoxes.end(),
+                               std::bind(eq_name, paramName, _1));
+        it != checkBoxes.end()) {
+      return (*it)->state();
     }
   }
   return false;
@@ -1052,9 +1063,27 @@ void EnergyPlugin::rebuildPowerGrid() {
   buildPowerGrid();
 }
 
+void EnergyPlugin::updatePowerGridConfig(const std::string &tableName,
+                                         const std::string &name, bool on) {
+  int idx = 0;
+  for (auto &[menuName, checkBoxes] : m_powerGridCheckboxes) {
+    if (menuName->name() != tableName) {
+      idx += checkBoxes.size();
+      continue;
+    }
+    for (auto &checkBox : checkBoxes) {
+      if (checkBox->name() == name) {
+        (*m_powerGridSelectionPtr)[idx] = on;
+        return;
+      }
+      ++idx;
+    }
+  }
+}
+
 void EnergyPlugin::updatePowerGridSelection(bool on) {
   if (!on) return;
-
+  m_updatePowerGridSelection->setState(false);
   for (auto i = 0; i < m_Energy->getNumChildren(); ++i) {
     auto child = m_Energy->getChild(i);
     if (child->getName() == "PowerGrid") {
@@ -1065,7 +1094,8 @@ void EnergyPlugin::updatePowerGridSelection(bool on) {
   rebuildPowerGrid();
 }
 
-void EnergyPlugin::initPowerGridUI() {
+void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip) {
+  if (!m_powerGridStreams) initPowerGridStreams();
   m_powerGridMenu = new opencover::ui::Menu("Power Grid Data Selection", EnergyTab);
 
   m_updatePowerGridSelection = new opencover::ui::Button(m_powerGridMenu, "Update");
@@ -1073,29 +1103,59 @@ void EnergyPlugin::initPowerGridUI() {
   m_updatePowerGridSelection->setCallback(
       [this](bool enable) { updatePowerGridSelection(enable); });
 
-  if (!m_powerGridStreams) return;
+  m_powerGridSelectionPtr =
+      configBoolArray("Simulation", "powerGridDataSelection", std::vector<bool>{});
+  auto powerGridSelection = m_powerGridSelectionPtr->value();
+  bool initConfig = false;
+  if (powerGridSelection.size() < 1) initConfig = true;
+
+  int i = 0;
   for (auto &[name, stream] : *m_powerGridStreams) {
+    if (std::any_of(tablesToSkip.begin(), tablesToSkip.end(),
+                    [n = name](const std::string &table) { return table == n; }))
+      continue;
+
     auto menu = new opencover::ui::Menu(m_powerGridMenu, name);
+    menu->allowRelayout(true);
+
     auto header = stream->getHeader();
-    std::map<std::string, opencover::ui::Button *> checkBoxMap;
+    std::vector<opencover::ui::Button *> checkBoxMap;
     for (auto &col : header) {
       if (col.find("Unnamed") == 0) continue;
       auto checkBox = new opencover::ui::Button(menu, col);
-      checkBoxMap.insert({col, checkBox});
+      checkBox->setCallback([this, tableName = name, col](bool on) {
+        updatePowerGridConfig(tableName, col, on);
+      });
+      if (initConfig) {
+        checkBox->setState(true);
+        powerGridSelection.push_back(true);
+      } else {
+        checkBox->setState(powerGridSelection[i]);
+      }
+      //   checkBoxMap.insert({col, checkBox});
+      checkBoxMap.push_back(checkBox);
+      ++i;
     }
     if (auto it = m_powerGridCheckboxes.find(menu);
         it != m_powerGridCheckboxes.end()) {
       auto &[_, chBxMap] = *it;
-      chBxMap.insert(checkBoxMap.begin(), checkBoxMap.end());
+      //   chBxMap.insert(checkBoxMap.begin(), checkBoxMap.end());
+      std::move(checkBoxMap.begin(), checkBoxMap.end(), std::back_inserter(chBxMap));
     } else {
-      m_powerGridCheckboxes.insert({menu, checkBoxMap});
+      m_powerGridCheckboxes.emplace(menu, checkBoxMap);
     }
+  }
+  if (initConfig) {
+    m_powerGridSelectionPtr->resize(powerGridSelection.size());
+    for (auto i = 0; i < powerGridSelection.size(); ++i)
+      (*m_powerGridSelectionPtr)[i] = powerGridSelection[i];
   }
 }
 
 void EnergyPlugin::initPowerGrid() {
   initPowerGridStreams();
-  initPowerGridUI();
+  initPowerGridUI({"trafo3w_std_types", "trafo_std_types", "trafo", "parameters",
+                   "dtypes", "bus_geodata", "fuse_std_types", "line_std_types"});
   buildPowerGrid();
   m_powerGridStreams->clear();
 }
@@ -1312,7 +1372,7 @@ void EnergyPlugin::buildHeatingGrid() {
   // NOTE: implement when data available
 }
 void EnergyPlugin::buildCoolingGrid() {
-  // NOTE: implemnt when data is available
+  // NOTE: implement when data is available
 }
 
 /* #endregion */

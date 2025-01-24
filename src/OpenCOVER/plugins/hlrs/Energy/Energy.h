@@ -28,6 +28,7 @@
 #include <core/utils/osgUtils.h>
 
 // cover
+#include <OpenConfig/array.h>
 #include <PluginUtil/coSensor.h>
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
@@ -210,9 +211,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::unique_ptr<std::vector<std::string>> getBusNames(
       utils::read::CSVStream &stream);
 
-  bool checkBoxSelection_powergrid(const std::string &tableName, const std::string &paramName);
-  void helper_getAdditionalPowerGridPointData_addData(int busId, core::grid::DataList &additionalData, const core::grid::Data &data);
-  void helper_getAdditionalPowerGridPointData_handleDuplicate(std::string &name, std::map<std::string, uint> &duplicateMap);
+  bool checkBoxSelection_powergrid(const std::string &tableName,
+                                   const std::string &paramName);
+  void helper_getAdditionalPowerGridPointData_addData(
+      int busId, core::grid::DataList &additionalData, const core::grid::Data &data);
+  void helper_getAdditionalPowerGridPointData_handleDuplicate(
+      std::string &name, std::map<std::string, uint> &duplicateMap);
   std::unique_ptr<core::grid::DataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
 
@@ -220,9 +224,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initGrid();
   void applyStaticInfluxToCityGML(const std::string &filePath);
   void updatePowerGridSelection(bool on);
+  void updatePowerGridConfig(const std::string &tableName, const std::string &name,
+                             bool on);
   void rebuildPowerGrid();
   void initPowerGrid();
-  void initPowerGridUI();
+  void initPowerGridUI(const std::vector<std::string> &tablesToSkip = {});
   void buildPowerGrid();
   void buildHeatingGrid();
   void buildCoolingGrid();
@@ -266,8 +272,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   // Powergrid UI
   opencover::ui::Menu *m_powerGridMenu = nullptr;
   opencover::ui::Button *m_updatePowerGridSelection = nullptr;
-  std::map<opencover::ui::Menu *, std::map<std::string, opencover::ui::Button *>>
+  std::map<opencover::ui::Menu *, std::vector<opencover::ui::Button *>>
       m_powerGridCheckboxes;
+  std::unique_ptr<config::Array<bool>> m_powerGridSelectionPtr = nullptr;
 
   // Heatgrid UI
   opencover::ui::Menu *m_heatGridMenu = nullptr;
