@@ -5,7 +5,10 @@
 #include "IDrawables.h"
 
 namespace core::interface {
-class IEnergyGrid : public IDrawables, public IColorable {};
+class IEnergyGrid : public IDrawables, public IColorable {
+ public:
+  virtual ~IEnergyGrid() = default;
+};
 }  // namespace core::interface
 
 #endif
