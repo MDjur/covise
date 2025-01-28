@@ -197,6 +197,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   /* #region SIMULATION */
   void initPowerGridStreams();
+  void initHeatingGridStreams();
 
   std::unique_ptr<FloatMap> getInlfuxDataFromCSV(utils::read::CSVStream &stream,
                                                  float &max, float &min, float &sum,
@@ -230,6 +231,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initPowerGrid();
   void initPowerGridUI(const std::vector<std::string> &tablesToSkip = {});
   void buildPowerGrid();
+
+  void initHeatingGrid();
   void buildHeatingGrid();
   void buildCoolingGrid();
 
@@ -308,7 +311,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap;
   std::unique_ptr<core::interface::IEnergyGrid> m_powerGrid;
+  std::unique_ptr<core::interface::IEnergyGrid> m_heatingGrid;
   CSVStreamMapPtr m_powerGridStreams;
+  CSVStreamMapPtr m_heatingGridStreams;
 };
 
 #endif

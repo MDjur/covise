@@ -57,6 +57,7 @@
 #include <iostream>
 #include <memory>
 #include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -882,9 +883,9 @@ void EnergyPlugin::helper_handleEnergyInfo(size_t maxTimesteps, int minYear,
     auto kaelte = "Kälte " + str_yr;
     auto deviceInfoTimestep = std::make_shared<energy::DeviceInfo>(*deviceInfoPtr);
     float strom_val = 0.f;
-    access_CSVRow(row, strom, strom_val);
-    access_CSVRow(row, waerme, deviceInfoTimestep->waerme);
-    access_CSVRow(row, kaelte, deviceInfoTimestep->kaelte);
+    ACCESS_CSV_ROW(row, strom, strom_val);
+    ACCESS_CSV_ROW(row, waerme, deviceInfoTimestep->waerme);
+    ACCESS_CSV_ROW(row, kaelte, deviceInfoTimestep->kaelte);
     deviceInfoTimestep->strom = strom_val / 1000.;  // kW -> MW
     auto timestep = year - 2000;
     deviceInfoTimestep->timestep = timestep;
@@ -938,8 +939,8 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
       deviceInfoPtr->ID = row["GebäudeID"];
       deviceInfoPtr->strasse = row["Straße"] + " " + row["Nr"];
       deviceInfoPtr->name = row["Details"];
-      access_CSVRow(row, "Baujahr", deviceInfoPtr->baujahr);
-      access_CSVRow(row, "Grundfläche (GIS)", deviceInfoPtr->flaeche);
+      ACCESS_CSV_ROW(row, "Baujahr", deviceInfoPtr->baujahr);
+      ACCESS_CSV_ROW(row, "Grundfläche (GIS)", deviceInfoPtr->flaeche);
 
       // electricity, heat, cold
       helper_handleEnergyInfo(maxTimesteps, minYear, row, deviceInfoPtr);
@@ -986,7 +987,7 @@ std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
         auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
         if (sensor != m_cityGMLObjs.end()) {
           float value = 0;
-          access_CSVRow(row, cityGMLBuildingName, value);
+          ACCESS_CSV_ROW(row, cityGMLBuildingName, value);
           if (value > max)
             max = value;
           else if (value < min || min == -1)
@@ -1162,8 +1163,8 @@ void EnergyPlugin::initPowerGrid() {
 
 void EnergyPlugin::initGrid() {
   initPowerGrid();
+  initHeatingGrid();
   buildCoolingGrid();
-  buildHeatingGrid();
 }
 
 std::unique_ptr<std::vector<std::string>> EnergyPlugin::getBusNames(
@@ -1172,7 +1173,7 @@ std::unique_ptr<std::vector<std::string>> EnergyPlugin::getBusNames(
   CSVStream::CSVRow bus;
   std::string busName("");
   while (stream >> bus) {
-    access_CSVRow(bus, "name", busName);
+    ACCESS_CSV_ROW(bus, "name", busName);
     busNames.push_back(busName);
   }
   return std::make_unique<std::vector<std::string>>(busNames);
@@ -1222,11 +1223,11 @@ std::unique_ptr<core::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointD
         if (!checkBoxSelection_powergrid(tableName, colName)) continue;
         // get bus id without adding it
         if (colName == "bus") {
-          access_CSVRow(row, colName, busId);
+          ACCESS_CSV_ROW(row, colName, busId);
           continue;
         }
         std::string value;
-        access_CSVRow(row, colName, value);
+        ACCESS_CSV_ROW(row, colName, value);
 
         // add the name of the table to the name
         std::string columnNameWithTable = tableName + " > " + colName;
@@ -1255,8 +1256,8 @@ std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
   auto additionalData = getAdditionalPowerGridPointData(busNames.size());
 
   while (stream >> point) {
-    access_CSVRow(point, "x", lon);
-    access_CSVRow(point, "y", lat);
+    ACCESS_CSV_ROW(point, "x", lon);
+    ACCESS_CSV_ROW(point, "y", lat);
 
     // x = lon, y = lat
     coord.lpzt.lam = lon;
@@ -1299,12 +1300,12 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
       auto filename_without_ext = filename.stem().string();
       if (!checkBoxSelection_powergrid(filename_without_ext, colName)) continue;
       std::string value;
-      access_CSVRow(line, colName, value);
+      ACCESS_CSV_ROW(line, colName, value);
       data[colName] = value;
     }
 
-    access_CSVRow(line, "from_bus", from);
-    access_CSVRow(line, "to_bus", to);
+    ACCESS_CSV_ROW(line, "from_bus", from);
+    ACCESS_CSV_ROW(line, "to_bus", to);
 
     indices[from].push_back(to);
     additionalData.push_back(data);
@@ -1361,16 +1362,146 @@ void EnergyPlugin::buildPowerGrid() {
 
   // TODO:
   //  [ ] set trafo as 3d model or block
-  //  [ ] make points and lines clickable and add bill board to it with data from csv
 
   // how to implement this generically?
   // - fixed grid structure for discussion in AK Software
   // - look into Energy ADE
 }
 
-void EnergyPlugin::buildHeatingGrid() {
-  // NOTE: implement when data available
+void EnergyPlugin::initHeatingGridStreams() {
+  auto heatingGridDir =
+      configString("Simulation", "heatingGridDir", "default")->value();
+  fs::path dir_path(heatingGridDir);
+  if (!fs::exists(dir_path)) return;
+  m_heatingGridStreams = getCSVStreams(dir_path);
+  if (!m_heatingGridStreams) {
+    std::cout << "No csv files found in " << heatingGridDir << std::endl;
+    return;
+  }
 }
+
+void EnergyPlugin::initHeatingGrid() {
+  initHeatingGridStreams();
+  buildHeatingGrid();
+  m_heatingGridStreams->clear();
+}
+
+void EnergyPlugin::buildHeatingGrid() {
+  if (!m_heatingGridStreams) return;
+
+  // find correct csv
+  auto heatingIt = m_heatingGridStreams->find("heating_network");
+  if (heatingIt == m_heatingGridStreams->end()) return;
+
+  auto &[_, heatingStream] = *heatingIt;
+  CSVStream::CSVRow row;
+  //   int id = 0;
+  int maxId = 0;
+  core::grid::Points points_unsorted;
+  core::grid::Indices indices;
+  core::grid::DataList heatingData;
+  core::grid::Data pointData;
+  osg::ref_ptr<osg::Group> heatingGroup = new osg::Group();
+  core::TxtBoxAttributes infoboardAttributes =
+      core::TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText",
+                             "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
+
+  auto [P, coord] = initProj();
+
+  int idx = 0;
+  while (*heatingStream >> row) {
+    std::string name, connections;
+    float lat, lon;
+    ACCESS_CSV_ROW(row, "id", name);
+    ACCESS_CSV_ROW(row, "connections", connections);
+    ACCESS_CSV_ROW(row, "Latitude", lat);
+    ACCESS_CSV_ROW(row, "Longitude", lon);
+
+    pointData["name"] = name;
+
+    coord.lpzt.lam = lon;
+    coord.lpzt.phi = lat;
+    float alt = 0.;
+
+    coord = proj_trans(P, PJ_FWD, coord);
+
+    lon = coord.xy.x + m_offset[0];
+    lat = coord.xy.y + m_offset[1];
+
+    int corruptId = std::stoi(name);
+    if (maxId < corruptId) maxId = corruptId;
+
+    // create a point
+    osg::ref_ptr<core::grid::Point> point =
+        new core::grid::Point(name, lon, lat, 0.0f, 1.0f, pointData);
+    points_unsorted.push_back(point);
+
+    // create indices
+    // if (connections.empty()) continue;
+    std::vector<int> connectionsList;
+    std::stringstream ss(connections);
+    std::string connection;
+
+    while (std::getline(ss, connection, ' ')) {
+      if (connection.empty() || connection == "0") continue;
+      connectionsList.push_back(std::stoi(connection));
+      //   connectionsList.push_back(++idx);
+    }
+
+    indices.push_back(connectionsList);
+    // ++id;
+  }
+
+  // core::grid::Points points(indices.size() + 1);
+  // core::grid::Points points(maxId+1);
+  idx = 0;
+//   core::grid::Points points(maxId + 1);
+  core::grid::Points points;
+  for (int i = 0; i < indices.size(); ++i) {
+    for (int j = 0; j < indices[i].size(); ++j) {
+      auto indice = indices[i][j];
+      for (auto p : points_unsorted) {
+        auto data = p->getAdditionalData();
+        auto name_variant = data["name"];
+        std::string name = std::get<std::string>(name_variant);
+        auto id = std::stoi(name);
+        // if (id == 0) {
+        //     indices[i][j]
+        // }
+        if (id == indice) {
+          // TODO: add the right indice => not the id
+          indices[i][j] = ++idx;
+          points.push_back(p);
+        //   points[++idx] = p;
+          break;
+        }
+      }
+    }
+  }
+  //   for (auto &p : points_unsorted) {
+  //     auto data = p->getAdditionalData();
+  //     auto name_variant = data["name"];
+  //     std::string name = std::get<std::string>(name_variant);
+  //     int idx = std::stoi(name);
+  //     // int idx = 0;
+  //     // for (auto &point : points_unsorted) {
+  //     //     auto data = point->getAdditionalData();
+  //     //     auto name_variant = data["name"];
+  //     //     std::string name_to_check = std::get<std::string>(name_variant);
+  //     //     if (name_to_check == name) break;
+  //     //     ++idx;
+  //     // }
+  //     // points[idx - 1] = p;
+  //   }
+
+  heatingGroup->setName("HeatingGrid");
+  m_heatingGrid = std::make_unique<core::EnergyGrid>(
+      core::EnergyGridConfig{"HEATING", points, indices, heatingGroup, 0.5f,
+                             heatingData, infoboardAttributes});
+  m_heatingGrid->initDrawables();
+  m_Energy->addChild(heatingGroup);
+}
+
 void EnergyPlugin::buildCoolingGrid() {
   // NOTE: implement when data is available
 }
