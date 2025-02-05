@@ -119,23 +119,13 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
       }
       const auto &to = *points[indice];
 
-      if (hasAdditionalData) {
-        if (additionalConnectionData.size() <= i + j) {
-          std::cerr << "Invalid Index for additionalConnectionData: i = " << i
-                    << ", j = " << j << std::endl;
-          continue;
-        }
-        auto &additionalData = additionalConnectionData[i + j];
-        std::string name = "connection";
-        if (additionalData.find("name") != additionalData.end()) {
-          name = std::get<std::string>(additionalData.at("name"));
-        }
-        data = std::make_unique<grid::ConnectionData<grid::Point>>(
-            name, from, to, radius, nullptr, additionalConnectionData[i]);
-      } else {
-        data = std::make_unique<grid::ConnectionData<grid::Point>>(
-            "connection", from, to, radius);
-      }
+      std::string name(from.getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX + " " + to.getName());
+      core::grid::Data additionalData{};
+      if (hasAdditionalData)
+        if (additionalConnectionData.size() > i + j)
+          additionalData = additionalConnectionData[i + j];
+      data = std::make_unique<grid::ConnectionData<grid::Point>>(
+          name, from, to, radius, nullptr, additionalData);
       m_connections.push_back(new grid::DirectedConnection(*data));
     }
   }
@@ -205,8 +195,9 @@ void EnergyGrid::initDrawableConnections() {
     // if (!geo)
     //     std::cout << "Error: Could not get Geode from infoboard drawable\n";
 
-    // auto geo = iboard->getDrawable()->asMatrixTransform()->getChild(0)->asGeode();
-    // if (!geo) {
+    // auto geo =
+    // iboard->getDrawable()->asMatrixTransform()->getChild(0)->asGeode(); if
+    // (!geo) {
     //     std::cout << "Error: Could not get Geode from infoboard drawable\n";
     //     return;
     // }
