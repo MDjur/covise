@@ -242,7 +242,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initHeatingGrid();
   void buildHeatingGrid();
   void readHeatingGridStream(utils::read::CSVStream &heatingStream);
-  std::unique_ptr<std::vector<int>> createHeatingGridIndices(
+  std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
       core::grid::DataList &additionalData);

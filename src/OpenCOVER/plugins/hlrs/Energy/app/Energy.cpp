@@ -1363,7 +1363,8 @@ void EnergyPlugin::buildPowerGrid() {
   m_powerGrid = std::make_unique<core::EnergyGrid>(core::EnergyGridConfig{
       "POWER", *points, *indices, powerGroup, 0.5f, *optData, infoboardAttributes});
   m_powerGrid->initDrawables();
-  m_powerGrid->updateColor(osg::Vec4(255.0f/255.0f, 222.0f/255.0f, 33.0f/255.0f, 1.0f));
+  m_powerGrid->updateColor(
+      osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   m_Energy->addChild(powerGroup);
 
   // TODO:
@@ -1392,22 +1393,22 @@ void EnergyPlugin::initHeatingGrid() {
   m_heatingGridStreams->clear();
 }
 
-std::unique_ptr<std::vector<int>> EnergyPlugin::createHeatingGridIndices(
+std::vector<int> EnergyPlugin::createHeatingGridIndices(
     const std::string &pointName,
     const std::string &connectionsStrWithCommaDelimiter,
     core::grid::DataList &additionalConnectionData) {
-  std::vector<int> connectionsList;
+  std::vector<int> connectivityList;
   std::stringstream ss(connectionsStrWithCommaDelimiter);
   std::string connection;
   core::grid::Data connectionData;
 
   while (std::getline(ss, connection, ' ')) {
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
-    connectionData["name"] = pointName + "_" + connection;
-    additionalConnectionData.push_back(connectionData);
-    connectionsList.push_back(std::stoi(connection));
+    // connectionData["name"] = pointName + "_" + connection;
+    // additionalConnectionData.push_back(connectionData);
+    connectivityList.push_back(std::stoi(connection));
   }
-  return std::make_unique<std::vector<int>>(connectionsList);
+  return connectivityList;
 }
 
 void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
@@ -1462,8 +1463,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
     idMap[strangeId] = idx;
 
     // create and add indice
-    indices.push_back(
-        *createHeatingGridIndices(name, connections, additionalConnectionData));
+    indices.emplace_back(
+        createHeatingGridIndices(name, connections, additionalConnectionData));
 
     ++idx;
 
@@ -1484,7 +1485,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
       core::EnergyGridConfig{"HEATING", points, indices, heatingGroup, 0.5f,
                              additionalConnectionData, infoboardAttributes});
   m_heatingGrid->initDrawables();
-  m_heatingGrid->updateColor(osg::Vec4(168.0f/255.0f, 50.0f/255.0f, 50.0f/255.0f, 1.0f));
+  m_heatingGrid->updateColor(
+      osg::Vec4(168.0f / 255.0f, 50.0f / 255.0f, 50.0f / 255.0f, 1.0f));
   m_Energy->addChild(heatingGroup);
 }
 
