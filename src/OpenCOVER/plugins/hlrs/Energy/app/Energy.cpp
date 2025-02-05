@@ -1473,7 +1473,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
     row.clear();
   }
 
-  // indices are strangely mapped with random ids => make them contiguos
+  // indices are strangely mapped with random ids => make them contiguous
   for (int i = 0; i < indices.size(); ++i)
     for (int j = 0; j < indices[i].size(); ++j)
       if (auto it = idMap.find(indices[i][j]); it != idMap.end())
