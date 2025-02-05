@@ -890,6 +890,7 @@ void EnergyPlugin::helper_projTransformation(bool mapdrape, PJ *P, PJ_COORD &coo
 void EnergyPlugin::helper_handleEnergyInfo(size_t maxTimesteps, int minYear,
                                            const CSVStream::CSVRow &row,
                                            DeviceInfo::ptr deviceInfoPtr) {
+  auto font = configString("Billboard", "font", "default")->value();
   for (size_t year = minYear; year < minYear + maxTimesteps; ++year) {
     auto str_yr = std::to_string(year);
     auto strom = "Strom " + str_yr;
@@ -904,7 +905,7 @@ void EnergyPlugin::helper_handleEnergyInfo(size_t maxTimesteps, int minYear,
     auto timestep = year - 2000;
     deviceInfoTimestep->timestep = timestep;
     auto device = std::make_shared<energy::Device>(
-        deviceInfoTimestep, m_sequenceList->getChild(timestep)->asGroup());
+        deviceInfoTimestep, m_sequenceList->getChild(timestep)->asGroup(), font);
     auto deviceSensor =
         std::make_shared<energy::DeviceSensor>(device, device->getGroup());
     m_SDlist[deviceInfoPtr->ID].push_back(deviceSensor);
@@ -1356,9 +1357,9 @@ void EnergyPlugin::buildPowerGrid() {
   if (indices == nullptr || points == nullptr) return;
 
   osg::ref_ptr<osg::Group> powerGroup = new osg::Group();
-  core::TxtBoxAttributes infoboardAttributes =
-      core::TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText",
-                             "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
+  auto font = configString("Billboard", "font", "default")->value();
+  core::TxtBoxAttributes infoboardAttributes = core::TxtBoxAttributes(
+      osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   powerGroup->setName("PowerGrid");
   m_powerGrid = std::make_unique<core::EnergyGrid>(core::EnergyGridConfig{
       "POWER", *points, *indices, powerGroup, 0.5f, *optData, infoboardAttributes});
@@ -1397,15 +1398,14 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
     const std::string &pointName,
     const std::string &connectionsStrWithCommaDelimiter,
     core::grid::DataList &additionalConnectionData) {
-  std::vector<int> connectivityList;
+  std::vector<int> connectivityList{};
   std::stringstream ss(connectionsStrWithCommaDelimiter);
-  std::string connection;
-  core::grid::Data connectionData;
+  std::string connection("");
 
   while (std::getline(ss, connection, ' ')) {
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
-    // connectionData["name"] = pointName + "_" + connection;
-    // additionalConnectionData.push_back(connectionData);
+    core::grid::Data connectionData{{"name", pointName + "_" + connection}};
+    additionalConnectionData.emplace_back(connectionData);
     connectivityList.push_back(std::stoi(connection));
   }
   return connectivityList;
@@ -1415,16 +1415,15 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   CSVStream::CSVRow row;
   //   int id = 0;
   int maxId = 0;
-  core::grid::Points points;
-  core::grid::Indices indices;
-  core::grid::DataList additionalConnectionData;
-  core::grid::Data pointData;
+  core::grid::Points points{};
+  core::grid::Indices indices{};
+  core::grid::DataList additionalConnectionData{};
+  core::grid::Data pointData{};
+  std::map<int, int> idMap{};
   osg::ref_ptr<osg::Group> heatingGroup = new osg::Group();
-  core::TxtBoxAttributes infoboardAttributes =
-      core::TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText",
-                             "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
-
-  std::map<int, int> idMap;
+  auto font = configString("Billboard", "font", "default")->value();
+  core::TxtBoxAttributes infoboardAttributes = core::TxtBoxAttributes(
+      osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
 
   auto checkForInvalidValue = [](const std::string &value) {
     return value == INVALID_CELL_VALUE;
@@ -1435,8 +1434,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
                                                 const std::string &value) {
     if (!checkForInvalidValue(value)) pointData[key] = value;
   };
-  std::string name, connections, label, type;
-  float lat, lon;
+  std::string name = "", connections = "", label = "", type = "";
+  float lat = 0.0f, lon = 0.0f;
 
   int idx = 0;
   while (heatingStream >> row) {

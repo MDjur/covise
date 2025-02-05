@@ -19,6 +19,7 @@ set(HEADERS
     utils/color.h
     utils/osgUtils.h
     grid.h
+    constants.h
 )
 
 set(Name "EnergyCore")

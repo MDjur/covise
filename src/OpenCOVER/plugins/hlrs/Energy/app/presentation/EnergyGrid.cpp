@@ -3,6 +3,7 @@
 #include <lib/core/grid.h>
 #include <lib/core/utils/color.h>
 #include <lib/core/utils/osgUtils.h>
+#include <lib/core/constants.h>
 
 #include <cassert>
 // #include <osg/MatrixTransform>
@@ -148,7 +149,7 @@ void EnergyGrid::initDrawablePoints() {
     points->addChild(point);
     std::string toPrint = "";
     for (const auto &[name, data] : point->getAdditionalData()) {
-      toPrint += " > " + name + ": " + std::visit(get_string, data);
+      toPrint += UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
     }
     auto center = point->getPosition();
     auto pointBB = point->getGeode()->getBoundingBox();
@@ -176,7 +177,7 @@ void EnergyGrid::initDrawableConnections() {
 
     std::string toPrint = "";
     for (const auto &[name, data] : connection->getAdditionalData()) {
-      toPrint += " > " + name + ": " + std::visit(get_string, data);
+      toPrint += UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
     }
     auto center = connection->getCenter();
     auto connectionBB = connection->getGeode()->getBoundingBox();
