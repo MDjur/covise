@@ -32,7 +32,7 @@ template <typename CoordType>
 struct ConnectionData {
   ConnectionData(const std::string &name, const CoordType &start,
                  const CoordType &end, const float &radius,
-                 osg::ref_ptr<osg::TessellationHints> hints,
+                 osg::ref_ptr<osg::TessellationHints> hints = nullptr,
                  const Data &additionalData = Data())
       : name(name),
         start(start),

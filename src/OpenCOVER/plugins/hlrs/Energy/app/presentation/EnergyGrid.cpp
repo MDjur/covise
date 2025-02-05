@@ -133,7 +133,7 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
             name, from, to, radius, nullptr, additionalConnectionData[i]);
       } else {
         data = std::make_unique<grid::ConnectionData<grid::Point>>(
-            "connection", from, to, radius, nullptr, core::grid::Data());
+            "connection", from, to, radius);
       }
       m_connections.push_back(new grid::DirectedConnection(*data));
     }
