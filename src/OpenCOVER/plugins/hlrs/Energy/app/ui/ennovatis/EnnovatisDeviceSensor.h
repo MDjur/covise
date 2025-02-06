@@ -18,6 +18,9 @@ class EnnovatisDeviceSensor : public coPickSensor {
     if (active) disactivate();
   }
 
+  EnnovatisDeviceSensor(const EnnovatisDeviceSensor &) = delete;
+  EnnovatisDeviceSensor &operator=(const EnnovatisDeviceSensor &) = delete;
+
   [[nodiscard]] auto getDevice() const { return m_dev.get(); }
 
   void update() override {

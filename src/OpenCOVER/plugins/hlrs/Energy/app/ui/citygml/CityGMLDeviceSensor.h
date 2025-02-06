@@ -19,6 +19,8 @@ class CityGMLDeviceSensor : public coPickSensor {
       std::shared_ptr<ColorMapExtended> colorMap);
 
   ~CityGMLDeviceSensor();
+  CityGMLDeviceSensor(const CityGMLDeviceSensor &) = delete;
+  CityGMLDeviceSensor &operator=(const CityGMLDeviceSensor &) = delete;
 
   void update() override;
   void setTimestep(int t) { m_cityGMLBuilding->updateTime(t); }
