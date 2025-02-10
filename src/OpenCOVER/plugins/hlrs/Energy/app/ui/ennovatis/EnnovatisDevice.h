@@ -10,6 +10,7 @@
 #include <lib/ennovatis/building.h>
 #include <lib/ennovatis/json.h>
 #include <lib/ennovatis/rest.h>
+#include <lib/core/utils/osgUtils.h>
 
 // cover
 #include <cover/coBillboard.h>
@@ -23,6 +24,7 @@
 #include <osg/Shape>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
+#include <osg/StateSet>
 #include <osgText/Text>
 
 // std
@@ -82,6 +84,7 @@ class EnnovatisDevice {
   ennovatis::rest_request_handler m_restWorker;
   opencover::coVRMSController *m_opncvrCtrl;  // cannot be const because syncing
                                               // methods are not const correct
+  core::utils::osgUtils::Geodes m_defaultStateSets;
   TimestepColorList m_timestepColors;
   SensorData m_sensorData;
   float m_consumptionPerArea = 0.0f;
