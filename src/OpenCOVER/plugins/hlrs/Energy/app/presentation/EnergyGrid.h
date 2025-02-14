@@ -42,7 +42,7 @@ struct EnergyGridConfig {
   float connectionRadius = 1.0f;
   grid::DataList additionalConnectionData = grid::DataList();
   TxtBoxAttributes infoboardAttributes =
-      TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText", "DroidSans-Bold.ttf",
+      TxtBoxAttributes(osg::Vec3(0, 0, 0), "EnergyGridText", "DejaVuSans-Bold.ttf",
                        50, 50, 2.0f, 0.1, 2);
 };
 
@@ -60,6 +60,19 @@ class EnergyGrid : public interface::IEnergyGrid {
   void initDrawables() override;
   void updateColor(const osg::Vec4 &color) override;
   void updateDrawables() override;
+  void updateTime(int timestep) override {}
+
+  osg::ref_ptr<grid::DirectedConnection> getConnectionByName(
+      const std::string &name);
+  osg::ref_ptr<grid::DirectedConnection> getConnectionByIdx(int idx) {
+    if (idx < 0 || idx >= m_connections.size()) return nullptr;
+    return m_connections[idx];
+  }
+  osg::ref_ptr<grid::Point> getPointByName(const std::string &name);
+  osg::ref_ptr<grid::Point> getPointByIdx(int idx) {
+    if (idx < 0 || idx >= m_config.points.size()) return nullptr;
+    return m_config.points[idx];
+  }
 
  private:
   class InfoboardSensor : public coPickSensor {

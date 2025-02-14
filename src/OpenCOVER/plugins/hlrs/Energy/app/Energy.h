@@ -20,6 +20,7 @@
 #include "ui/historic/Device.h"
 #include "ui/historic/DeviceSensor.h"
 #include "ui/ennovatis/EnnovatisDeviceSensor.h"
+#include "ui/simulation/HeatingSimulationUI.h"
 
 // presentation
 #include "presentation/PrototypeBuilding.h"
@@ -120,6 +121,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region typedef */
+  typedef HeatingSimulationUI<core::interface::IEnergyGrid> HeatingSimulationUI;
   typedef const ennovatis::Building *building_const_ptr;
   typedef const ennovatis::Buildings *buildings_const_Ptr;
   typedef std::vector<building_const_ptr> const_buildings;
@@ -211,7 +213,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initPowerGridStreams();
   std::unique_ptr<FloatMap> getInlfuxDataFromCSV(
       opencover::utils::read::CSVStream &stream, float &max, float &min, float &sum,
-                                                 int &timesteps);
+      int &timesteps);
   std::unique_ptr<core::simulation::grid::Points> createPowerGridPoints(
       opencover::utils::read::CSVStream &stream, const float &sphereRadius,
       const std::vector<std::string> &busNames);
@@ -244,7 +246,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initHeatingGridStreams();
   void initHeatingGrid();
   void buildHeatingGrid();
-  void readHeatingGridStream(utils::read::CSVStream &heatingStream);
+  void readSimulationDataStream(opencover::utils::read::CSVStream &heatingSimStream);
+  void applySimulationDataToHeatingGrid();
+  void readHeatingGridStream(opencover::utils::read::CSVStream &heatingStream);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
@@ -335,6 +339,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::shared_ptr<core::interface::IEnergyGrid> m_heatingGrid;
   CSVStreamMapPtr m_powerGridStreams;
   CSVStreamMapPtr m_heatingGridStreams;
+
+  std::unique_ptr<HeatingSimulationUI> m_heatingSimUI;
 };
 
 #endif

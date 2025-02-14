@@ -61,6 +61,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <regex>
 
 // OSG
 #include <osg/Geometry>
@@ -94,6 +95,7 @@
 // core
 #include <lib/core/simulation/grid.h>
 #include <lib/core/utils/color.h>
+#include <lib/core/simulation/heating.h>
 #include <lib/core/utils/osgUtils.h>
 
 using namespace opencover;
@@ -340,6 +342,7 @@ void EnergyPlugin::setTimestep(int t) {
   for (auto &sensor : m_ennovatisDevicesSensors) sensor->setTimestep(t);
 
   for (auto &[_, sensor] : m_cityGMLObjs) sensor->updateTime(t);
+  m_heatingSimUI->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child) {
@@ -1391,6 +1394,7 @@ void EnergyPlugin::initHeatingGridStreams() {
 void EnergyPlugin::initHeatingGrid() {
   initHeatingGridStreams();
   buildHeatingGrid();
+  applySimulationDataToHeatingGrid();
   m_heatingGridStreams->clear();
 }
 
@@ -1409,6 +1413,50 @@ std::vector<int> EnergyPlugin::createHeatingGridIndices(
     connectivityList.push_back(std::stoi(connection));
   }
   return connectivityList;
+}
+
+void EnergyPlugin::readSimulationDataStream(
+    opencover::utils::read::CSVStream &heatingSimStream) {
+  if (m_heatingGrid == nullptr) return;
+  std::regex consumer_value_split_regex("Consumer_(\\d+)_(.+)");
+  std::regex producer_value_split_regex("Producer_(\\d+)_(.+)");
+  std::smatch match;
+
+  CSVStream::CSVRow row;
+  auto heatingSim = core::simulation::heating::HeatingSimulation();
+  const auto &header = heatingSimStream.getHeader();
+  float val = 0.0f;
+  std::string name(""), valName("");
+  while (heatingSimStream >> row) {
+    for (const auto &col : header) {
+      ACCESS_CSV_ROW(row, col, val);
+      if (std::regex_search(col, match, consumer_value_split_regex)) {
+        name = match[1];
+        valName = match[2];
+        heatingSim.addConsumer(name);
+        heatingSim.addDataToConsumer(name, valName, val);
+      } else if (std::regex_search(col, match, producer_value_split_regex)) {
+        name = match[1];
+        valName = match[2];
+        heatingSim.addProducer(name);
+        heatingSim.addDataToProducer(name, valName, val);
+      } else {
+        if (val == 0) continue;
+        heatingSim.addData(col, val);
+      }
+    }
+  }
+  m_heatingSimUI = std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid, m_colorMap);
+  m_heatingSimUI->updateTimestepColors("outlet_temp");
+}
+
+void EnergyPlugin::applySimulationDataToHeatingGrid() {
+  if (!m_heatingGridStreams) return;
+  auto simulationData = m_heatingGridStreams->find("results");
+  if (simulationData == m_heatingGridStreams->end()) return;
+
+  auto &[_, stream] = *simulationData;
+  readSimulationDataStream(*stream);
 }
 
 void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
@@ -1482,7 +1530,7 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   heatingGroup->setName("HeatingGrid");
   m_heatingGrid = std::make_unique<EnergyGrid>(
       EnergyGridConfig{"HEATING", points, indices, heatingGroup, 0.5f,
-                             additionalConnectionData, infoboardAttributes});
+                       additionalConnectionData, infoboardAttributes});
   m_heatingGrid->initDrawables();
   m_heatingGrid->updateColor(
       osg::Vec4(168.0f / 255.0f, 50.0f / 255.0f, 50.0f / 255.0f, 1.0f));
