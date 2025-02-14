@@ -1,13 +1,14 @@
 #include "EnergyGrid.h"
 
-#include <lib/core/grid.h>
+#include <lib/core/constants.h>
+#include <lib/core/simulation/grid.h>
 #include <lib/core/utils/color.h>
 #include <lib/core/utils/osgUtils.h>
-#include <lib/core/constants.h>
 
 #include <cassert>
 // #include <osg/MatrixTransform>
 // #include <osg/PositionAttitudeTransform>
+#include <cstddef>
 #include <osg/Shape>
 // #include <osg/Transform>
 #include <osg/ref_ptr>
@@ -57,8 +58,6 @@ auto get_string = [](const auto &data) {
 //   osg::ref_ptr<osg::Camera> _camera;
 // };
 // }  // namespace
-
-namespace core {
 
 EnergyGrid::InfoboardSensor::InfoboardSensor(
     osg::ref_ptr<osg::Group> parent,
@@ -119,8 +118,9 @@ void EnergyGrid::initConnections(const grid::Indices &indices, const float &radi
       }
       const auto &to = *points[indice];
 
-      std::string name(from.getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX + " " + to.getName());
-      core::grid::Data additionalData{};
+      std::string name(from.getName() + " " + UIConstants::RIGHT_ARROW_UNICODE_HEX +
+                       " " + to.getName());
+      core::simulation::grid::Data additionalData{};
       if (hasAdditionalData)
         if (additionalConnectionData.size() > i + j)
           additionalData = additionalConnectionData[i + j];
@@ -139,7 +139,8 @@ void EnergyGrid::initDrawablePoints() {
     points->addChild(point);
     std::string toPrint = "";
     for (const auto &[name, data] : point->getAdditionalData()) {
-      toPrint += UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
+      toPrint +=
+          UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
     }
     auto center = point->getPosition();
     auto pointBB = point->getGeode()->getBoundingBox();
@@ -155,6 +156,19 @@ void EnergyGrid::initDrawablePoints() {
   m_config.parent->addChild(points);
 }
 
+osg::ref_ptr<grid::DirectedConnection> EnergyGrid::getConnectionByName(
+    const std::string &name) {
+  for (auto &connection : m_connections)
+    if (connection->getName() == name) return connection;
+  return nullptr;
+}
+
+osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(const std::string &name) {
+  for (auto &point : m_config.points)
+    if (point->getName() == name) return point;
+  return nullptr;
+}
+
 void EnergyGrid::initDrawableConnections() {
   osg::ref_ptr<osg::Group> connections = new osg::Group;
   connections->setName("Connections");
@@ -167,7 +181,8 @@ void EnergyGrid::initDrawableConnections() {
 
     std::string toPrint = "";
     for (const auto &[name, data] : connection->getAdditionalData()) {
-      toPrint += UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
+      toPrint +=
+          UIConstants::TAB_SPACES + name + ": " + std::visit(get_string, data);
     }
     auto center = connection->getCenter();
     auto connectionBB = connection->getGeode()->getBoundingBox();
@@ -235,5 +250,3 @@ void EnergyGrid::updateDrawables() {
     infoboard->updateDrawable();
   }
 }
-
-}  // namespace core

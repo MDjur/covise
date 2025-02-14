@@ -1,16 +1,17 @@
 #ifndef _CITYGMLDEVICESENSOR_H
 #define _CITYGMLDEVICESENSOR_H
 
-#include <lib/core/utils/color.h>
+#include <PluginUtil/coSensor.h>
 #include <lib/core/interfaces/IBuilding.h>
 #include <lib/core/interfaces/IInfoboard.h>
-#include <PluginUtil/coSensor.h>
+#include <lib/core/utils/color.h>
 
 #include <memory>
 #include <osg/Group>
 
 class CityGMLDeviceSensor : public coPickSensor {
- typedef core::utils::color::ColorMapExtended ColorMapExtended;
+  typedef core::utils::color::ColorMapExtended ColorMapExtended;
+
  public:
   CityGMLDeviceSensor(
       osg::ref_ptr<osg::Group> group,
@@ -45,5 +46,4 @@ class CityGMLDeviceSensor : public coPickSensor {
   std::vector<osg::Vec4> m_colors;
   bool m_active = false;
 };
-
 #endif

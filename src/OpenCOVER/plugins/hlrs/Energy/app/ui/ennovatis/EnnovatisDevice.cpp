@@ -179,8 +179,8 @@ void EnnovatisDevice::init() {
   for (auto drawable : drawables) {
     m_deviceGroup->addChild(drawable);
     if (osg::ref_ptr<osg::Geode> geode = drawable->asGeode()) {
-    //   m_defaultStateSets.push_back(
-    //       new osg::Geode(*geode, osg::CopyOp::DEEP_COPY_NODES));
+      //   m_defaultStateSets.push_back(
+      //       new osg::Geode(*geode, osg::CopyOp::DEEP_COPY_NODES));
       m_defaultStateSets.push_back(
           new osg::Geode(*geode, osg::CopyOp::DEEP_COPY_STATESETS));
 
@@ -341,17 +341,17 @@ void EnnovatisDevice::disactivate() {
 
     for (auto i = 0; i < m_defaultStateSets.size(); ++i) {
       auto drawable = m_drawableBuilding->getDrawable(i);
-    //   m_deviceGroup->removeChild(drawable);
-    //   osg::ref_ptr<osg::Geode> geode =
-    //       osg::clone(m_defaultStateSets[i].get(), osg::CopyOp::DEEP_COPY_NODES);
+      //   m_deviceGroup->removeChild(drawable);
+      //   osg::ref_ptr<osg::Geode> geode =
+      //       osg::clone(m_defaultStateSets[i].get(), osg::CopyOp::DEEP_COPY_NODES);
 
-      if(osg::ref_ptr<osg::Geode> geode = drawable->asGeode()) {
+      if (osg::ref_ptr<osg::Geode> geode = drawable->asGeode()) {
         geode->setStateSet(m_defaultStateSets[i]->getStateSet());
         m_deviceGroup->addChild(geode);
       }
 
-    //   drawable->setStateSet(m_defaultStateSets[i]->getStateSet());
-    //   m_deviceGroup->addChild(geode);
+      //   drawable->setStateSet(m_defaultStateSets[i]->getStateSet());
+      //   m_deviceGroup->addChild(geode);
       //   if (osg::ref_ptr<osg::Geode> geode = drawable->asGeode()) {
       //     // osg::ref_ptr<osg::Geode> default_geode = new
       //     // osg::Geode(*m_defaultStateSets[i]->asGeode(),

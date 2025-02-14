@@ -92,7 +92,7 @@
 #include <app/presentation/TxtInfoboard.h>
 
 // core
-#include <lib/core/grid.h>
+#include <lib/core/simulation/grid.h>
 #include <lib/core/utils/color.h>
 #include <lib/core/utils/osgUtils.h>
 
@@ -465,9 +465,9 @@ void EnergyPlugin::addCityGMLObject(const std::string &name,
   auto infoboardPos = boundingbox.center();
   infoboardPos.z() +=
       (boundingbox.zMax() - boundingbox.zMin()) / 2 + boundingbox.zMin();
-  auto infoboard = std::make_unique<core::TxtInfoboard>(
+  auto infoboard = std::make_unique<TxtInfoboard>(
       infoboardPos, name, "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
-  auto building = std::make_unique<core::CityGMLBuilding>(*geodes);
+  auto building = std::make_unique<CityGMLBuilding>(*geodes);
   auto sensor = std::make_unique<CityGMLDeviceSensor>(
       citygmlObjGroup, std::move(infoboard), std::move(building), m_colorMap);
   m_cityGMLObjs.insert({name, std::move(sensor)});
@@ -612,7 +612,7 @@ void EnergyPlugin::setRESTDate(const std::string &toSet, bool isFrom = false) {
     m_req->dtt = time;
 }
 
-core::CylinderAttributes EnergyPlugin::getCylinderAttributes() {
+CylinderAttributes EnergyPlugin::getCylinderAttributes() {
   auto configDefaultColorVec = configFloatArray("Ennovatis", "defaultColorCylinder",
                                                 std::vector<double>{0, 0, 0, 1.f})
                                    ->value();
@@ -631,8 +631,8 @@ core::CylinderAttributes EnergyPlugin::getCylinderAttributes() {
                             configMaxColorVec[2], configMaxColorVec[3]);
   auto minColor = osg::Vec4(configMinColorVec[0], configMinColorVec[1],
                             configMinColorVec[2], configMinColorVec[3]);
-  return core::CylinderAttributes(configRadiusCycl, configDefaultHeightCycl,
-                                  maxColor, minColor, defaultColor);
+  return CylinderAttributes(configRadiusCycl, configDefaultHeightCycl, maxColor,
+                            minColor, defaultColor);
 }
 
 void EnergyPlugin::initEnnovatisDevices() {
@@ -641,12 +641,11 @@ void EnergyPlugin::initEnnovatisDevices() {
   auto cylinderAttributes = getCylinderAttributes();
   for (auto &b : *m_buildings) {
     cylinderAttributes.position = osg::Vec3(b.getX(), b.getY(), b.getHeight());
-    auto drawableBuilding =
-        std::make_unique<core::PrototypeBuilding>(cylinderAttributes);
+    auto drawableBuilding = std::make_unique<PrototypeBuilding>(cylinderAttributes);
     auto infoboardPos = osg::Vec3(b.getX() + cylinderAttributes.radius + 5,
                                   b.getY() + cylinderAttributes.radius + 5,
                                   b.getHeight() + cylinderAttributes.height);
-    auto infoboard = std::make_unique<core::TxtInfoboard>(
+    auto infoboard = std::make_unique<TxtInfoboard>(
         infoboardPos, b.getName(), "DroidSans-Bold.ttf",
         cylinderAttributes.radius * 20, cylinderAttributes.radius * 21, 2.0f, 0.1,
         2);
@@ -991,7 +990,7 @@ void EnergyPlugin::initSimUI() {
 // [ ] - add a button to enable/disable the simulation data
 // [ ] - plan uniform grid structure file => csv file in specific format
 std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
-    utils::read::CSVStream &stream, float &max, float &min, float &sum,
+    opencover::utils::read::CSVStream &stream, float &max, float &min, float &sum,
     int &timesteps) {
   const auto &headers = stream.getHeader();
   FloatMap values;
@@ -1183,7 +1182,7 @@ void EnergyPlugin::initGrid() {
 }
 
 std::unique_ptr<std::vector<std::string>> EnergyPlugin::getBusNames(
-    utils::read::CSVStream &stream) {
+    opencover::utils::read::CSVStream &stream) {
   auto busNames = std::vector<std::string>();
   CSVStream::CSVRow bus;
   std::string busName("");
@@ -1195,7 +1194,7 @@ std::unique_ptr<std::vector<std::string>> EnergyPlugin::getBusNames(
 }
 
 void EnergyPlugin::helper_getAdditionalPowerGridPointData_addData(
-    int busId, core::grid::DataList &additionalData, const core::grid::Data &data) {
+    int busId, core::simulation::grid::DataList &additionalData, const core::simulation::grid::Data &data) {
   if (busId > -1 && busId < additionalData.size()) {
     auto &existingData = additionalData[busId];
     if (existingData.empty())
@@ -1214,9 +1213,9 @@ void EnergyPlugin::helper_getAdditionalPowerGridPointData_handleDuplicate(
     duplicateMap.insert({name, 0});
 }
 
-std::unique_ptr<core::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointData(
+std::unique_ptr<core::simulation::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointData(
     const std::size_t &numOfBus) {
-  using DataList = core::grid::DataList;
+  using DataList = core::simulation::grid::DataList;
 
   // additional bus data
   DataList additionalData(numOfBus);
@@ -1232,7 +1231,7 @@ std::unique_ptr<core::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointD
     CSVStream::CSVRow row;
     // row
     while (*tableStream >> row) {
-      core::grid::Data data;
+      core::simulation::grid::Data data;
       // column
       for (auto &colName : header) {
         if (!checkBoxSelection_powergrid(tableName, colName)) continue;
@@ -1256,10 +1255,10 @@ std::unique_ptr<core::grid::DataList> EnergyPlugin::getAdditionalPowerGridPointD
   return std::make_unique<DataList>(additionalData);
 }
 
-std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
-    utils::read::CSVStream &stream, const float &sphereRadius,
+std::unique_ptr<core::simulation::grid::Points> EnergyPlugin::createPowerGridPoints(
+    opencover::utils::read::CSVStream &stream, const float &sphereRadius,
     const std::vector<std::string> &busNames) {
-  using Points = core::grid::Points;
+  using Points = core::simulation::grid::Points;
 
   CSVStream::CSVRow point;
   float lat = 0, lon = 0;
@@ -1278,28 +1277,28 @@ std::unique_ptr<core::grid::Points> EnergyPlugin::createPowerGridPoints(
     auto busName = busNames[busID];
     auto busData = (*additionalData)[busID];
 
-    osg::ref_ptr<core::grid::Point> p =
-        new core::grid::Point(busName, lon, lat, 0.0f, sphereRadius, busData);
+    osg::ref_ptr<core::simulation::grid::Point> p =
+        new core::simulation::grid::Point(busName, lon, lat, 0.0f, sphereRadius, busData);
     points.push_back(p);
     ++busID;
   }
   return std::make_unique<Points>(points);
 }
 
-std::pair<std::unique_ptr<core::grid::Indices>,
-          std::unique_ptr<core::grid::DataList>>
-EnergyPlugin::getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
-                                                 const size_t &numBus) {
-  using Indices = core::grid::Indices;
-  using DataList = core::grid::DataList;
+std::pair<std::unique_ptr<core::simulation::grid::Indices>,
+          std::unique_ptr<core::simulation::grid::DataList>>
+EnergyPlugin::getPowerGridIndicesAndOptionalData(
+    opencover::utils::read::CSVStream &stream, const size_t &numBus) {
+  using Indices = core::simulation::grid::Indices;
+  using DataList = core::simulation::grid::DataList;
   Indices indices(numBus);
   CSVStream::CSVRow line;
   int from = 0, to = 0;
-  core::grid::DataList additionalData;
+  core::simulation::grid::DataList additionalData;
   // TODO: add window for user to select the columns
   auto header = stream.getHeader();
   while (stream >> line) {
-    core::grid::Data data;
+    core::simulation::grid::Data data;
 
     for (auto colName : header) {
       fs::path filename(stream.getFilename());
@@ -1335,7 +1334,7 @@ void EnergyPlugin::buildPowerGrid() {
 
   // create points
   auto pointsData = m_powerGridStreams->find("bus_geodata");
-  std::unique_ptr<core::grid::Points> points(nullptr);
+  std::unique_ptr<core::simulation::grid::Points> points(nullptr);
   int busId(0);
   float sphereRadius(1.0f);
   if (pointsData != m_powerGridStreams->end()) {
@@ -1345,8 +1344,8 @@ void EnergyPlugin::buildPowerGrid() {
 
   // create line
   auto lineData = m_powerGridStreams->find("line");
-  std::unique_ptr<core::grid::Indices> indices = nullptr;
-  std::unique_ptr<core::grid::DataList> optData = nullptr;
+  std::unique_ptr<core::simulation::grid::Indices> indices = nullptr;
+  std::unique_ptr<core::simulation::grid::DataList> optData = nullptr;
   if (lineData != m_powerGridStreams->end()) {
     auto &[name, lineStream] = *lineData;
     std::tie(indices, optData) =
@@ -1358,10 +1357,11 @@ void EnergyPlugin::buildPowerGrid() {
 
   osg::ref_ptr<osg::Group> powerGroup = new osg::Group();
   auto font = configString("Billboard", "font", "default")->value();
-  core::TxtBoxAttributes infoboardAttributes = core::TxtBoxAttributes(
+  TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   powerGroup->setName("PowerGrid");
-  m_powerGrid = std::make_unique<core::EnergyGrid>(core::EnergyGridConfig{
+  //   m_powerGrid = std::make_unique<core::EnergyGrid>(core::EnergyGridConfig{
+  m_powerGrid = std::make_shared<EnergyGrid>(EnergyGridConfig{
       "POWER", *points, *indices, powerGroup, 0.5f, *optData, infoboardAttributes});
   m_powerGrid->initDrawables();
   m_powerGrid->updateColor(
@@ -1397,14 +1397,14 @@ void EnergyPlugin::initHeatingGrid() {
 std::vector<int> EnergyPlugin::createHeatingGridIndices(
     const std::string &pointName,
     const std::string &connectionsStrWithCommaDelimiter,
-    core::grid::DataList &additionalConnectionData) {
+    core::simulation::grid::DataList &additionalConnectionData) {
   std::vector<int> connectivityList{};
   std::stringstream ss(connectionsStrWithCommaDelimiter);
   std::string connection("");
 
   while (std::getline(ss, connection, ' ')) {
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
-    core::grid::Data connectionData{{"name", pointName + "_" + connection}};
+    core::simulation::grid::Data connectionData{{"name", pointName + "_" + connection}};
     additionalConnectionData.emplace_back(connectionData);
     connectivityList.push_back(std::stoi(connection));
   }
@@ -1415,21 +1415,21 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
   CSVStream::CSVRow row;
   //   int id = 0;
   int maxId = 0;
-  core::grid::Points points{};
-  core::grid::Indices indices{};
-  core::grid::DataList additionalConnectionData{};
-  core::grid::Data pointData{};
+  core::simulation::grid::Points points{};
+  core::simulation::grid::Indices indices{};
+  core::simulation::grid::DataList additionalConnectionData{};
+  core::simulation::grid::Data pointData{};
   std::map<int, int> idMap{};
   osg::ref_ptr<osg::Group> heatingGroup = new osg::Group();
   auto font = configString("Billboard", "font", "default")->value();
-  core::TxtBoxAttributes infoboardAttributes = core::TxtBoxAttributes(
+  TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
 
   auto checkForInvalidValue = [](const std::string &value) {
     return value == INVALID_CELL_VALUE;
   };
 
-  auto addToPointData = [&checkForInvalidValue](core::grid::Data &pointData,
+  auto addToPointData = [&checkForInvalidValue](core::simulation::grid::Data &pointData,
                                                 const std::string &key,
                                                 const std::string &value) {
     if (!checkForInvalidValue(value)) pointData[key] = value;
@@ -1456,8 +1456,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
     if (maxId < strangeId) maxId = strangeId;
 
     // create a point
-    osg::ref_ptr<core::grid::Point> point =
-        new core::grid::Point(name, lon, lat, 0.0f, 1.0f, pointData);
+    osg::ref_ptr<core::simulation::grid::Point> point =
+        new core::simulation::grid::Point(name, lon, lat, 0.0f, 1.0f, pointData);
     points.push_back(point);
     idMap[strangeId] = idx;
 
@@ -1480,8 +1480,8 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
         indices[i][j] = it->second;
 
   heatingGroup->setName("HeatingGrid");
-  m_heatingGrid = std::make_unique<core::EnergyGrid>(
-      core::EnergyGridConfig{"HEATING", points, indices, heatingGroup, 0.5f,
+  m_heatingGrid = std::make_unique<EnergyGrid>(
+      EnergyGridConfig{"HEATING", points, indices, heatingGroup, 0.5f,
                              additionalConnectionData, infoboardAttributes});
   m_heatingGrid->initDrawables();
   m_heatingGrid->updateColor(

@@ -6,11 +6,11 @@
 #include <lib/core/interfaces/IInfoboard.h>
 
 // ennovatis
-#include <lib/ennovatis/channel.h>
+#include <lib/core/utils/osgUtils.h>
 #include <lib/ennovatis/building.h>
+#include <lib/ennovatis/channel.h>
 #include <lib/ennovatis/json.h>
 #include <lib/ennovatis/rest.h>
-#include <lib/core/utils/osgUtils.h>
 
 // cover
 #include <cover/coBillboard.h>
@@ -22,9 +22,9 @@
 #include <osg/Group>
 #include <osg/NodeVisitor>
 #include <osg/Shape>
+#include <osg/StateSet>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
-#include <osg/StateSet>
 #include <osgText/Text>
 
 // std
@@ -70,7 +70,8 @@ class EnnovatisDevice {
   [[nodiscard]] int getSelectedChannelIdx() const;
   [[nodiscard]] auto getSelectedChannelIterator() const;
   [[nodiscard]] auto getResponseObjectForSelectedChannel() const;
-  [[nodiscard]] auto createBillboardTxt(const ennovatis::json_response_object &j_resp_obj);
+  [[nodiscard]] auto createBillboardTxt(
+      const ennovatis::json_response_object &j_resp_obj);
 
   osg::ref_ptr<osg::Group> m_deviceGroup = nullptr;
   std::unique_ptr<core::interface::IInfoboard<std::string>> m_infoBoard;

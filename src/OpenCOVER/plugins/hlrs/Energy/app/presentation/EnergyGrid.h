@@ -1,6 +1,10 @@
 #ifndef _CORE_ENERGYGRIND_H
 #define _CORE_ENERGYGRIND_H
 
+#include <lib/core/interfaces/IEnergyGrid.h>
+#include <lib/core/interfaces/IInfoboard.h>
+#include <lib/core/simulation/grid.h>
+
 #include <memory>
 #include <osg/Geode>
 #include <osg/Group>
@@ -11,11 +15,9 @@
 
 #include "PluginUtil/coSensor.h"
 #include "TxtInfoboard.h"
-#include <lib/core/interfaces/IEnergyGrid.h>
-#include <lib/core/interfaces/IInfoboard.h>
-#include <lib/core/grid.h>
 
-namespace core {
+using namespace core;
+using namespace core::simulation;
 
 /**
  * @struct EnergyGridConfig
@@ -84,9 +86,9 @@ class EnergyGrid : public interface::IEnergyGrid {
                        const grid::DataList &additionalConnectionData);
   void initDrawableConnections();
   void initDrawablePoints();
+
   EnergyGridConfig m_config;
   grid::Connections m_connections;
   std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
 };
-}  // namespace core
 #endif

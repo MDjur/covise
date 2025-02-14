@@ -25,7 +25,8 @@
 #include "presentation/PrototypeBuilding.h"
 
 // core
-#include <lib/core/grid.h>
+#include <lib/core/simulation/grid.h>
+#include <lib/core/simulation/heating.h>
 #include <lib/core/interfaces/IEnergyGrid.h>
 #include <lib/core/utils/color.h>
 #include <lib/core/utils/osgUtils.h>
@@ -77,6 +78,8 @@
 #include <string>
 #include <vector>
 
+using namespace core::simulation;
+
 class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
@@ -124,7 +127,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   typedef NameMapVector<float> FloatMap;
   typedef NameMapVector<energy::DeviceSensor::ptr> DeviceList;
-  typedef NameMapPtr<utils::read::CSVStream> CSVStreamMap;
+  typedef NameMapPtr<opencover::utils::read::CSVStream> CSVStreamMap;
   typedef std::unique_ptr<CSVStreamMap> CSVStreamMapPtr;
   /* #endregion */
 
@@ -163,7 +166,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void updateEnnovatisChannelGrp();
   void initEnnovatisDevices();
   bool updateChannelIDsFromCSV(const std::string &pathToCSV);
-  core::CylinderAttributes getCylinderAttributes();
+  CylinderAttributes getCylinderAttributes();
   /**
    * Initializes the Ennovatis buildings.
    *
@@ -206,26 +209,26 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   /* #region POWERGRID */
   void initPowerGridStreams();
-  std::unique_ptr<FloatMap> getInlfuxDataFromCSV(utils::read::CSVStream &stream,
-                                                 float &max, float &min, float &sum,
+  std::unique_ptr<FloatMap> getInlfuxDataFromCSV(
+      opencover::utils::read::CSVStream &stream, float &max, float &min, float &sum,
                                                  int &timesteps);
-  std::unique_ptr<core::grid::Points> createPowerGridPoints(
-      utils::read::CSVStream &stream, const float &sphereRadius,
+  std::unique_ptr<core::simulation::grid::Points> createPowerGridPoints(
+      opencover::utils::read::CSVStream &stream, const float &sphereRadius,
       const std::vector<std::string> &busNames);
-  std::pair<std::unique_ptr<core::grid::Indices>,
-            std::unique_ptr<core::grid::DataList>>
-  getPowerGridIndicesAndOptionalData(utils::read::CSVStream &stream,
+  std::pair<std::unique_ptr<core::simulation::grid::Indices>,
+            std::unique_ptr<core::simulation::grid::DataList>>
+  getPowerGridIndicesAndOptionalData(opencover::utils::read::CSVStream &stream,
                                      const size_t &numBus);
   std::unique_ptr<std::vector<std::string>> getBusNames(
-      utils::read::CSVStream &stream);
+      opencover::utils::read::CSVStream &stream);
 
   bool checkBoxSelection_powergrid(const std::string &tableName,
                                    const std::string &paramName);
   void helper_getAdditionalPowerGridPointData_addData(
-      int busId, core::grid::DataList &additionalData, const core::grid::Data &data);
+      int busId, core::simulation::grid::DataList &additionalData, const core::simulation::grid::Data &data);
   void helper_getAdditionalPowerGridPointData_handleDuplicate(
       std::string &name, std::map<std::string, uint> &duplicateMap);
-  std::unique_ptr<core::grid::DataList> getAdditionalPowerGridPointData(
+  std::unique_ptr<core::simulation::grid::DataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
   void applyStaticInfluxToCityGML(const std::string &filePath);
   void updatePowerGridSelection(bool on);
@@ -245,10 +248,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
-      core::grid::DataList &additionalData);
-  /* #endregion*/
+      core::simulation::grid::DataList &additionalData);
+  /* #endregion */
 
+  /* #region COOLINGGRID */
   void buildCoolingGrid();
+  /* #endregion */
 
   /* #endregion*/
 
@@ -324,8 +329,10 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
   std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap;
-  std::unique_ptr<core::interface::IEnergyGrid> m_powerGrid;
-  std::unique_ptr<core::interface::IEnergyGrid> m_heatingGrid;
+  //   std::unique_ptr<core::interface::IEnergyGrid> m_powerGrid;
+  //   std::unique_ptr<core::interface::IEnergyGrid> m_heatingGrid;
+  std::shared_ptr<core::interface::IEnergyGrid> m_powerGrid;
+  std::shared_ptr<core::interface::IEnergyGrid> m_heatingGrid;
   CSVStreamMapPtr m_powerGridStreams;
   CSVStreamMapPtr m_heatingGridStreams;
 };
