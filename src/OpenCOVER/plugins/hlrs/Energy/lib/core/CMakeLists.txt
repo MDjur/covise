@@ -2,7 +2,7 @@ USING(OpenSceneGraph)
 set(SOURCES
     utils/color.cpp
     utils/osgUtils.cpp
-    grid.cpp
+    simulation/grid.cpp
 )
 
 set(HEADERS
@@ -18,7 +18,8 @@ set(HEADERS
     interfaces/ITimedependable.h
     utils/color.h
     utils/osgUtils.h
-    grid.h
+    simulation/heating.h
+    simulation/grid.h
     constants.h
 )
 
