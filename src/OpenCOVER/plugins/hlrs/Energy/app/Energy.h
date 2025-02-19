@@ -85,6 +85,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
   enum Components { Strom, Waerme, Kaelte };
+  enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid };
   struct ProjTrans {
     std::string projFrom;
     std::string projTo;
@@ -134,9 +135,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region GENERAL */
-  void switchTo(const osg::ref_ptr<osg::Node> child);
-  void updateColorMap(const covise::ColorMap &map);
-  void initColorMap();
+  void switchTo(const osg::ref_ptr<osg::Node> child, osg::ref_ptr<osg::Switch> parent);
   std::pair<PJ *, PJ_COORD> initProj();
   void projTransLatLon(float &lat, float &lon);
   CSVStreamMapPtr getCSVStreams(const boost::filesystem::path &dirPath);
@@ -207,6 +206,12 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   /* #region SIMULATION */
   void initSimUI();
+  void initEnergyGridUI();
+  void switchEnergyGrid(EnergyGrids grid);
+  void initSimMenu();
+  void updateColorMap(const covise::ColorMap &map);
+  void initColorMap();
+
   void initGrid();
 
   /* #region POWERGRID */
@@ -294,6 +299,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   // Simulation UI
   opencover::ui::Menu *m_simulationMenu = nullptr;
+  opencover::ui::Group *m_energygridGroup = nullptr;
+  opencover::ui::ButtonGroup *m_energygridBtnGroup = nullptr;
+  opencover::ui::Button *m_powerGridBtn = nullptr;
+  opencover::ui::Button *m_heatingGridBtn = nullptr;
+  opencover::ui::Button *m_coolingGridBtn = nullptr;
 
   // Powergrid UI
   opencover::ui::Menu *m_powerGridMenu = nullptr;
@@ -329,6 +339,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   osg::ref_ptr<osg::Sequence> m_sequenceList;
   osg::ref_ptr<osg::MatrixTransform> m_Energy;
   osg::ref_ptr<osg::Group> m_cityGML;
+  osg::ref_ptr<osg::Group> m_heatingGroup;
+  osg::ref_ptr<osg::Group> m_powerGroup;
   std::map<std::string, Geodes> m_cityGMLDefaultStatesets;
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
