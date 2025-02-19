@@ -337,6 +337,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   // switch used to toggle between ennovatis, db and citygml data
   osg::ref_ptr<osg::Switch> m_switch;
+  osg::ref_ptr<osg::Switch> m_grid;
   osg::ref_ptr<osg::Sequence> m_sequenceList;
   osg::ref_ptr<osg::MatrixTransform> m_Energy;
   osg::ref_ptr<osg::Group> m_cityGML;
