@@ -371,6 +371,11 @@ EnergyPlugin::CSVStreamMapPtr EnergyPlugin::getCSVStreams(
   }
   return csv_files;
 }
+
+void EnergyPlugin::setAnimationTimesteps(size_t maxTimesteps, const void *who) {
+  if (maxTimesteps > opencover::coVRAnimationManager::instance()->getNumTimesteps())
+    opencover::coVRAnimationManager::instance()->setNumTimesteps(maxTimesteps, who);
+}
 /* #endregion */
 
 /* #region CITYGML */
@@ -786,11 +791,7 @@ bool EnergyPlugin::loadDB(const std::string &path, const ProjTrans &projTrans) {
     return false;
   }
 
-  if ((int)m_sequenceList->getNumChildren() >
-      coVRAnimationManager::instance()->getNumTimesteps()) {
-    coVRAnimationManager::instance()->setNumTimesteps(
-        m_sequenceList->getNumChildren(), m_sequenceList);
-  }
+  setAnimationTimesteps(m_sequenceList->getNumChildren(), m_sequenceList);
 
   rad = 3.;
   scaleH = 0.1;
@@ -1116,9 +1117,7 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
       sensorIt->second->updateTimestepColors(values);
     }
   }
-
-  if (timesteps > opencover::coVRAnimationManager::instance()->getNumTimesteps())
-    opencover::coVRAnimationManager::instance()->setNumTimesteps(timesteps);
+  setAnimationTimesteps(timesteps, m_cityGML);
 }
 
 bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
@@ -1522,8 +1521,13 @@ void EnergyPlugin::readSimulationDataStream(
       }
     }
   }
-  m_heatingSimUI = std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid, m_colorMap);
-  m_heatingSimUI->updateTimestepColors("outlet_temp");
+  m_heatingSimUI =
+      std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid, m_colorMap);
+  m_heatingSimUI->updateTimestepColors("mass_flow");
+
+  auto timesteps = m_heatingSimUI->getSim().getTimesteps("mass_flow");
+  std::cout << "Number of timesteps: " << timesteps << std::endl;
+  setAnimationTimesteps(timesteps, m_heatingGroup);
 }
 
 void EnergyPlugin::applySimulationDataToHeatingGrid() {

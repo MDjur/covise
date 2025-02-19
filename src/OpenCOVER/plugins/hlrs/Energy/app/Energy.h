@@ -139,6 +139,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::pair<PJ *, PJ_COORD> initProj();
   void projTransLatLon(float &lat, float &lon);
   CSVStreamMapPtr getCSVStreams(const boost::filesystem::path &dirPath);
+  void setAnimationTimesteps(size_t maxTimesteps, const void* who);
   /* #endregion */
 
   /* #region HISTORIC */
