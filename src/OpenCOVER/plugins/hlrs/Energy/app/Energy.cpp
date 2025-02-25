@@ -173,8 +173,7 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_heatingGroup(new osg::Group()),
-      m_powerGroup(new osg::Group()),
-      m_colorMap(nullptr) {
+      m_powerGroup(new osg::Group()) {
   // need to save the config on exit => will only be saved when COVER is closed
   // correctly via q or closing the window
   config()->setSaveOnExit(true);
@@ -407,7 +406,6 @@ void EnergyPlugin::enableCityGML(bool on) {
     auto influxStatic =
         configString("Simulation", "staticInfluxCSV", "default")->value();
     applyStaticInfluxToCityGML(influxStatic);
-    initSimUI();
   } else {
     switchTo(m_sequenceList, m_switch);
   }
@@ -433,7 +431,8 @@ void EnergyPlugin::addCityGMLObject(const std::string &name,
       infoboardPos, name, "DroidSans-Bold.ttf", 50, 50, 2.0f, 0.1, 2);
   auto building = std::make_unique<CityGMLBuilding>(*geodes);
   auto sensor = std::make_unique<CityGMLDeviceSensor>(
-      citygmlObjGroup, std::move(infoboard), std::move(building), m_colorMap);
+      citygmlObjGroup, std::move(infoboard), std::move(building),
+      m_colorMapMenu->getColorMap());
   m_cityGMLObjs.insert({name, std::move(sensor)});
 }
 
@@ -936,75 +935,29 @@ void EnergyPlugin::initColorMap() {
     initSimMenu();
   }
 
-  m_colorMapGroup = new ui::Group(m_simulationMenu, "ColorMap");
-  m_colorMapSelector = std::make_unique<covise::ColorMapSelector>(*m_colorMapGroup);
-  m_colorMapSelector->setCallback([this](const covise::ColorMap &cm) {
-    updateColorMap(m_colorMapSelector->selectedMap());
-  });
-
-  m_colorMap = std::make_shared<core::utils::color::ColorMapExtended>(
-      m_colorMapSelector->selectedMap());
-  m_minAttribute = new ui::Slider(m_colorMapGroup, "min");
-  m_minAttribute->setBounds(0, 1);
-  m_minAttribute->setPresentation(ui::Slider::AsDial);
-  m_minAttribute->setValue(0);
-
-  m_maxAttribute = new ui::Slider(m_colorMapGroup, "max");
-  m_maxAttribute->setBounds(0, 1);
-  m_maxAttribute->setValue(1);
-  m_maxAttribute->setCallback([this](float value, bool moving) {
-    if (!moving) return;
-    if (value < m_minAttribute->value()) {
-      m_maxAttribute->setValue(m_colorMap->max);
-      return;
-    }
-    m_colorMap->max = value;
-    m_heatingSimUI->updateTimestepColors("mass_flow", m_minAttribute->value(),
-                                         m_maxAttribute->value(), false);
-  });
-  m_minAttribute->setCallback([this](float value, bool moving) {
-    if (!moving) return;
-    if (value > m_maxAttribute->value()) {
-      m_minAttribute->setValue(m_colorMap->min);
-      return;
-    }
-    m_colorMap->min = value;
-    m_heatingSimUI->updateTimestepColors("mass_flow", m_minAttribute->value(),
-                                         m_maxAttribute->value(), false);
-  });
-
-  m_numSteps = new ui::Slider(m_colorMapGroup, "steps");
-  m_numSteps->setBounds(32, 1024);
-  m_numSteps->setPresentation(ui::Slider::AsDial);
-  m_numSteps->setScale(ui::Slider::Linear);
-  m_numSteps->setIntegral(true);
-  m_numSteps->setLinValue(32);
-  m_numSteps->setValue(32);
-  m_numSteps->setCallback([this](float value, bool moving) {
-    if (!moving) return;
-    m_colorMap->map = covise::interpolateColorMap(m_colorMap->map, value);
-    m_heatingSimUI->updateTimestepColors("mass_flow", m_minAttribute->value(),
-                                         m_maxAttribute->value(), false);
-  });
+  m_colorMapMenu = std::make_unique<covise::ColorMapMenu>(*m_simulationMenu);
+  m_colorMapMenu->setCallback(
+      [this](const covise::ColorMap &cm) { updateColorMap(cm); });
 }
 
 void EnergyPlugin::updateColorMap(const covise::ColorMap &map) {
-  m_colorMap->map = map;
-
   // heating simulation
-  m_heatingSimUI->updateTimestepColors("mass_flow", m_minAttribute->value(),
-                                       m_maxAttribute->value(), true);
-  auto min_new = m_colorMap->min;
-  auto max_new = m_colorMap->max;
+//   if (m_heatingGroup->getNodeMask()) {
+    m_heatingSimUI->updateTimestepColors("mass_flow", m_colorMapMenu->getMin(),
+                                         m_colorMapMenu->getMax(), true);
+    auto colorMap = m_colorMapMenu->getColorMap();
+    auto min_new = colorMap->min;
+    auto max_new = colorMap->max;
 
-  m_minAttribute->setBounds(min_new, max_new);
-  m_maxAttribute->setBounds(min_new, max_new);
-  std::cout << "ColorMap changed" << std::endl;
-  std::cout << "Min: " << m_minAttribute->value()
-            << " Max: " << m_maxAttribute->value() << std::endl;
+    m_colorMapMenu->setMinBounds(min_new, max_new);
+    m_colorMapMenu->setMaxBounds(min_new, max_new);
+//   } else if (m_powerGroup->getNodeMask()) {
+//     // do something
+//   }
 }
 
 void EnergyPlugin::initSimMenu() {
+  if (m_simulationMenu != nullptr) return;
   m_simulationMenu = new ui::Menu(EnergyTab, "Simulation");
   m_simulationMenu->setText("Simulation");
 }
@@ -1102,14 +1055,14 @@ void EnergyPlugin::applyStaticInfluxToCityGML(
   int timesteps = 0;
   auto values = getInlfuxDataFromCSV(csvStream, max, min, sum, timesteps);
 
-  m_colorMap->max = max;
-  m_colorMap->min = min;
-  m_colorMap->map =
-      covise::interpolateColorMap(m_colorMap->map, m_numSteps->value());
+  auto colorMap = m_colorMapMenu->getColorMap();
+  colorMap->max = max;
+  colorMap->min = min;
+  *colorMap = covise::interpolateColorMap(*colorMap, m_colorMapMenu->getNumSteps());
 
   auto distributionCenter = sum / (timesteps * values->size());
-  m_minAttribute->setBounds(0, distributionCenter);
-  m_maxAttribute->setBounds(distributionCenter, max);
+  m_colorMapMenu->setMinBounds(0, distributionCenter);
+  m_colorMapMenu->setMaxBounds(distributionCenter, max);
 
   for (auto &[name, values] : *values) {
     auto sensorIt = m_cityGMLObjs.find(name);
@@ -1522,7 +1475,10 @@ void EnergyPlugin::readSimulationDataStream(
     }
   }
   m_heatingSimUI =
-      std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid, m_colorMap);
+      //   std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid,
+      //   m_colorMap);
+      std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid,
+                                            m_colorMapMenu->getColorMap());
   m_heatingSimUI->updateTimestepColors("mass_flow");
 
   auto timesteps = m_heatingSimUI->getSim().getTimesteps("mass_flow");

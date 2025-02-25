@@ -35,6 +35,7 @@
 // cover
 #include <OpenConfig/array.h>
 #include <PluginUtil/coSensor.h>
+#include <PluginUtil/coColorMap.h>
 #include <cover/VRViewer.h>
 #include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>
@@ -271,11 +272,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   static EnergyPlugin *m_plugin;
   opencover::coTUITab *coEnergyTab = nullptr;
   opencover::ui::Menu *EnergyTab = nullptr;
-  opencover::ui::Group *m_colorMapGroup = nullptr;
-  opencover::ui::Slider *m_minAttribute = nullptr;
-  opencover::ui::Slider *m_maxAttribute = nullptr;
-  opencover::ui::Slider *m_numSteps = nullptr;
-  std::unique_ptr<covise::ColorMapSelector> m_colorMapSelector = nullptr;
+  std::unique_ptr<covise::ColorMapMenu> m_colorMapMenu = nullptr;
 
   // historical
   opencover::ui::Button *ShowGraph = nullptr;
@@ -346,9 +343,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   std::map<std::string, Geodes> m_cityGMLDefaultStatesets;
   std::map<std::string, std::unique_ptr<CityGMLDeviceSensor>> m_cityGMLObjs;
 
-  std::shared_ptr<core::utils::color::ColorMapExtended> m_colorMap;
-  //   std::unique_ptr<core::interface::IEnergyGrid> m_powerGrid;
-  //   std::unique_ptr<core::interface::IEnergyGrid> m_heatingGrid;
   std::shared_ptr<core::interface::IEnergyGrid> m_powerGrid;
   std::shared_ptr<core::interface::IEnergyGrid> m_heatingGrid;
   CSVStreamMapPtr m_powerGridStreams;

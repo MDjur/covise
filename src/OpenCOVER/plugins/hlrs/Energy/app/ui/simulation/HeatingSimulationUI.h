@@ -23,11 +23,11 @@ class HeatingSimulationUI {
   static_assert(std::is_base_of_v<core::interface::ITimedependable, T>,
                 "T must be derived from IColorable");
 
-  typedef core::utils::color::ColorMapExtended ColorMapExtended;
+  typedef covise::ColorMap ColorMap;
 
  public:
   HeatingSimulationUI(const HeatingSimulation &sim, std::shared_ptr<T> parent,
-                      std::shared_ptr<ColorMapExtended> colorMap)
+                      std::shared_ptr<ColorMap> colorMap)
       : m_simulation(sim), m_parent(parent), m_colorMapRef(colorMap) {
     m_simulation.computeParameters();
   }
@@ -104,7 +104,7 @@ class HeatingSimulationUI {
   }
 
   template <typename base_type>
-  void computeColors(std::shared_ptr<ColorMapExtended> color_map,
+  void computeColors(std::shared_ptr<ColorMap> color_map,
                      const std::string &key, float min, float max,
                      const std::map<std::string, base_type> &baseMap) {
     static_assert(std::is_base_of_v<Base, base_type>,
@@ -132,7 +132,7 @@ class HeatingSimulationUI {
       for (auto i = 0; i < values.size(); ++i) {
         auto interpolated_value =
             interpolate(values[i], minKeyVal, maxKeyVal, min, max);
-        auto color = covise::getColor(interpolated_value, color_map->map, min, max);
+        auto color = covise::getColor(interpolated_value, *color_map, min, max);
         colors[i] = color;
       }
     }
@@ -140,6 +140,6 @@ class HeatingSimulationUI {
 
   HeatingSimulation m_simulation;
   std::weak_ptr<T> m_parent;  // parent which manages drawable
-  std::weak_ptr<ColorMapExtended> m_colorMapRef;
+  std::weak_ptr<ColorMap> m_colorMapRef;
   std::map<std::string, std::vector<osg::Vec4>> m_colors;
 };
