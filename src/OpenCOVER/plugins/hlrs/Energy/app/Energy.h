@@ -349,6 +349,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   CSVStreamMapPtr m_heatingGridStreams;
 
   std::unique_ptr<HeatingSimulationUI> m_heatingSimUI;
+  std::shared_ptr<HeatingSimulation> m_heatingSim;
 };
 
 #endif

@@ -1451,9 +1451,11 @@ void EnergyPlugin::readSimulationDataStream(
   std::smatch match;
 
   CSVStream::CSVRow row;
-  auto heatingSim = core::simulation::heating::HeatingSimulation();
+  m_heatingSim = std::make_shared<core::simulation::heating::HeatingSimulation>();
   const auto &header = heatingSimStream.getHeader();
-  float val = 0.0f;
+  auto &consumers = m_heatingSim->Consumers();
+  auto &producers = m_heatingSim->Producers();
+  double val = 0.0f;
   std::string name(""), valName("");
   while (heatingSimStream >> row) {
     for (const auto &col : header) {
@@ -1461,27 +1463,25 @@ void EnergyPlugin::readSimulationDataStream(
       if (std::regex_search(col, match, consumer_value_split_regex)) {
         name = match[1];
         valName = match[2];
-        heatingSim.addConsumer(name);
-        heatingSim.addDataToConsumer(name, valName, val);
+        consumers.add(name);
+        consumers.addData(name, valName, val);
       } else if (std::regex_search(col, match, producer_value_split_regex)) {
         name = match[1];
         valName = match[2];
-        heatingSim.addProducer(name);
-        heatingSim.addDataToProducer(name, valName, val);
+        producers.add(name);
+        producers.addData(name, valName, val);
       } else {
         if (val == 0) continue;
-        heatingSim.addData(col, val);
+        m_heatingSim->addData(col, val);
       }
     }
   }
   m_heatingSimUI =
-      //   std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid,
-      //   m_colorMap);
-      std::make_unique<HeatingSimulationUI>(heatingSim, m_heatingGrid,
+      std::make_unique<HeatingSimulationUI>(m_heatingSim, m_heatingGrid,
                                             m_colorMapMenu->getColorMap());
   m_heatingSimUI->updateTimestepColors("mass_flow");
 
-  auto timesteps = m_heatingSimUI->getSim().getTimesteps("mass_flow");
+  auto timesteps = m_heatingSim->getTimesteps("mass_flow");
   std::cout << "Number of timesteps: " << timesteps << std::endl;
   setAnimationTimesteps(timesteps, m_heatingGroup);
 }

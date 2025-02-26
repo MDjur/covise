@@ -15,6 +15,7 @@ SET(HEADERS
     app/ui/ennovatis/EnnovatisDevice.h
     app/ui/ennovatis/EnnovatisDeviceSensor.h
     app/ui/citygml/CityGMLDeviceSensor.h
+    app/ui/simulation/BaseSimulationUI.h
     app/ui/simulation/HeatingSimulationUI.h
     app/presentation/PrototypeBuilding.h
     app/presentation/CityGMLBuilding.h
