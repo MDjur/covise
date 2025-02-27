@@ -11,6 +11,8 @@
 #include <iostream>
 #include <memory>
 
+#include "app/presentation/EnergyGrid.h"
+
 using namespace core::simulation;
 
 typedef covise::ColorMap ColorMap;
@@ -40,14 +42,30 @@ class BaseSimulationUI {
                                     float max = 1.0f, bool resetMinMax = false) = 0;
 
  protected:
-  template <typename simulation_object_type>
+  template <typename simulationObject>
+  void updateEnergyGridColors(int timestep, std::shared_ptr<EnergyGrid> energyGrid,
+                              const ObjectContainer<simulationObject> &container) {
+    isDerivedFromObject<simulationObject>();
+    for (const auto &[nameOfConsumer, consumer] : container.get()) {
+      const auto &name = consumer.getName();
+      auto colorIt = this->m_colors.find(name);
+      if (colorIt == this->m_colors.end()) continue;
+
+      const auto &colors = colorIt->second;
+      if (timestep >= colors.size()) continue;
+
+      const auto &color = colors[timestep];
+      if (auto point = energyGrid->getPointByName(name)) {
+        point->updateColor(color);
+      }
+    }
+  }
+
+  template <typename simulationObject>
   void computeColors(
       std::shared_ptr<ColorMap> color_map, const std::string &key, float min,
-      float max,
-      const std::map<std::string, simulation_object_type> &objectContainer) {
-    static_assert(
-        std::is_base_of_v<Object, simulation_object_type>,
-        "base_type must be derived from core::simulation::heating::Object");
+      float max, const std::map<std::string, simulationObject> &objectContainer) {
+    isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
 
     try {
@@ -82,6 +100,13 @@ class BaseSimulationUI {
         colors[i] = color;
       }
     }
+  }
+
+  template <typename simulationObject>
+  void isDerivedFromObject() {
+    static_assert(
+        std::is_base_of_v<Object, simulationObject>,
+        "simulationObject must be derived from core::simulation::heating::Object");
   }
 
   std::weak_ptr<T> m_parent;  // parent which manages drawable

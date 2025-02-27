@@ -31,19 +31,11 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
     if (energyGrid) {
       auto heatingSim = this->heatingSimulationPtr();
       if (!heatingSim) return;
-      for (const auto &[nameOfConsumer, consumer] : heatingSim->Consumers().get()) {
-        const auto &name = consumer.getName();
-        auto colorIt = this->m_colors.find(name);
-        if (colorIt == this->m_colors.end()) continue;
-
-        const auto &colors = colorIt->second;
-        if (timestep >= colors.size()) continue;
-
-        const auto &color = colors[timestep];
-        if (auto point = energyGrid->getPointByName(name)) {
-          point->updateColor(color);
-        }
-      }
+      auto updateEnergyGridColorsForContainer = [&](auto entities) {
+        this->updateEnergyGridColors(timestep, energyGrid, entities);
+      };
+      updateEnergyGridColorsForContainer(heatingSim->Consumers());
+      updateEnergyGridColorsForContainer(heatingSim->Producers());
     }
   }
 
@@ -68,8 +60,12 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
     // compute colors
     auto heatingSim = this->heatingSimulationPtr();
     if (!heatingSim) return;
-    this->computeColors(color_map, key, min, max, heatingSim->Consumers().get());
-    this->computeColors(color_map, key, min, max, heatingSim->Producers().get());
+    auto computeColorsForContainer = [&](auto entities) {
+      this->computeColors(color_map, key, min, max, entities);
+    };
+
+    computeColorsForContainer(heatingSim->Consumers().get());
+    computeColorsForContainer(heatingSim->Producers().get());
   }
 
  private:
