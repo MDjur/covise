@@ -95,6 +95,7 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
                                            const osg::Vec3 &position);
   void applyEmissionShader(osg::ref_ptr<osg::StateSet> objectStateSet,
                            osg::ref_ptr<osg::Texture2D> colormapTexture);
+  void initShader();
 
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;

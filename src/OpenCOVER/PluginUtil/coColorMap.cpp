@@ -283,6 +283,18 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
   return textGeode;
 }
 
+void covise::ColorMapRenderObject::initShader() {
+  // Add a shader to apply the texture as emission.
+  osg::ref_ptr<osg::Program> program = new osg::Program;
+  osg::ref_ptr<osg::Shader> vertexShader = new osg::Shader(osg::Shader::VERTEX);
+  vertexShader->setShaderSource(shader::COLORMAP_VERTEX_EMISSION_SHADER);
+  osg::ref_ptr<osg::Shader> fragmentShader = new osg::Shader(osg::Shader::FRAGMENT);
+  fragmentShader->setShaderSource(shader::COLORMAP_FRAGMENT_EMISSION_SHADER);
+  program->addShader(vertexShader);
+  program->addShader(fragmentShader);
+  m_shader = program;
+}
+
 void covise::ColorMapRenderObject::applyEmissionShader(
     osg::ref_ptr<osg::StateSet> stateSet,
     osg::ref_ptr<osg::Texture2D> colormapTexture) {
@@ -299,14 +311,9 @@ void covise::ColorMapRenderObject::applyEmissionShader(
   stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 
   // Add a shader to apply the texture as emission.
-  osg::Program *program = new osg::Program;
-  osg::Shader *vertexShader = new osg::Shader(osg::Shader::VERTEX);
-  vertexShader->setShaderSource(shader::COLORMAP_VERTEX_EMISSION_SHADER);
-  osg::Shader *fragmentShader = new osg::Shader(osg::Shader::FRAGMENT);
-  fragmentShader->setShaderSource(shader::COLORMAP_FRAGMENT_EMISSION_SHADER);
-  program->addShader(vertexShader);
-  program->addShader(fragmentShader);
-  stateSet->setAttributeAndModes(program, osg::StateAttribute::ON);
+  if (!m_shader) initShader();
+
+  stateSet->setAttributeAndModes(m_shader, osg::StateAttribute::ON);
 }
 
 void covise::ColorMapRenderObject::show(bool on) {
