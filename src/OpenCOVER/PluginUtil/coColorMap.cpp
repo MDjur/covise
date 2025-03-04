@@ -391,7 +391,7 @@ void covise::ColorMapRenderObject::render() {
 
     // apply transformation to object
     osg::Matrixd matrix;
-    matrix.makeLookAt(viewerPosition, objectPositionInViewer, objectUp);
+    // matrix.makeLookAt(viewerPosition, objectPositionInViewer, objectUp);
     matrix.makeRotate(colorMapRotation * rotationNoScale);
     matrix.setTrans(objectPositionInViewer);
     m_colormapTransform->setMatrix(matrix);
@@ -400,7 +400,7 @@ void covise::ColorMapRenderObject::render() {
 
 covise::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
     : m_colorMapGroup(new opencover::ui::Group(&group, "ColorMap")),
-      m_colorMapPositionMenu(new opencover::ui::Menu(&group, "ColorMap_Position")),
+      m_colorMapSettingsMenu(new opencover::ui::Menu(&group, "ColorMapSettings")),
       m_selector(std::make_unique<ColorMapSelector>(*m_colorMapGroup)) {
   init();
 }
@@ -453,32 +453,32 @@ void covise::ColorMapUI::initShow() {
   m_show->setCallback([this](bool on) { show(on); });
 }
 
-void covise::ColorMapUI::initColorMapPositionUI() {
+void covise::ColorMapUI::initColorMapSettings() {
   m_distance_x = createSlider(
       "colormap_distance_x", -5.0f, 5.0f, ui::Slider::AsDial, -0.6f,
       [this](float value, bool moving) { m_renderObject->setDistanceX(value); },
-      m_colorMapPositionMenu);
+      m_colorMapSettingsMenu);
   m_distance_y = createSlider(
       "colormap_distance_y", -5.0f, 5.0f, ui::Slider::AsDial, 1.6f,
       [this](float value, bool moving) { m_renderObject->setDistanceY(value); },
-      m_colorMapPositionMenu);
+      m_colorMapSettingsMenu);
   m_distance_z = createSlider(
       "colormap_distance_z", -5.0f, 5.0f, ui::Slider::AsDial, -0.4f,
       [this](float value, bool moving) { m_renderObject->setDistanceZ(value); },
-      m_colorMapPositionMenu);
+      m_colorMapSettingsMenu);
 
   m_rotation_x = createSlider(
       "colormap_rotation_x", 0.0f, 360.0f, ui::Slider::AsDial, 90.0f,
       [this](float value, bool moving) { m_renderObject->setRotationX(value); },
-      m_colorMapPositionMenu);
+      m_colorMapSettingsMenu);
   m_rotation_y = createSlider(
       "colormap_rotation_y", 0.0f, 360.0f, ui::Slider::AsDial, 25.0f,
       [this](float value, bool moving) { m_renderObject->setRotationY(value); },
-      m_colorMapPositionMenu);
+      m_colorMapSettingsMenu);
   m_rotation_z = createSlider(
       "colormap_rotation_z", 0.0f, 360.0f, ui::Slider::AsDial, 0.0f,
       [this](float value, bool moving) { m_renderObject->setRotationZ(value); },
-      m_colorMapPositionMenu);
+      m_colorMapSettingsMenu);
 }
 
 void covise::ColorMapUI::initUI() {
@@ -495,7 +495,7 @@ void covise::ColorMapUI::initUI() {
                        value < m_minAttribute->value());
       });
   initSteps();
-  initColorMapPositionUI();
+  initColorMapSettings();
 }
 
 void covise::ColorMapUI::initRenderObject() {

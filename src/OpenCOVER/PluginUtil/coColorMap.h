@@ -132,7 +132,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
  private:
   void init();
   void initUI();
-  void initColorMapPositionUI();
+  void initColorMapSettings();
   void initShow();
   void initSteps();
   void initColorMap();
@@ -154,7 +154,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   void show(bool show);
 
   // dont delete these pointers, they are managed by the ui
-  opencover::ui::Menu *m_colorMapPositionMenu = nullptr;
+  opencover::ui::Menu *m_colorMapSettingsMenu = nullptr;
   opencover::ui::Group *m_colorMapGroup = nullptr;
   opencover::ui::Slider *m_minAttribute = nullptr;
   opencover::ui::Slider *m_maxAttribute = nullptr;
