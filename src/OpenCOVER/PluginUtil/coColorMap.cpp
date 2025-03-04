@@ -12,6 +12,7 @@
 #include <memory>
 #include <osg/Array>
 #include <osg/Geometry>
+#include <osg/Material>
 #include <osg/Math>
 #include <osg/MatrixTransform>
 #include <osg/Multisample>
@@ -256,9 +257,9 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createColorMapPlane(
   osg::ref_ptr<osg::Texture2D> texture = createVerticalColorMapTexture(colorMap);
   osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
   if (texture) {
-    // osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
-    stateset->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
+    applyEmissionShader(stateset, texture);
   }
+
   if (m_multisample) {
     osg::ref_ptr<osg::Multisample> multisample = new osg::Multisample;
     stateset->setAttributeAndModes(multisample, osg::StateAttribute::ON);
@@ -280,6 +281,32 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
   osg::ref_ptr<osg::Geode> textGeode = new osg::Geode;
   textGeode->addDrawable(osgText);
   return textGeode;
+}
+
+void covise::ColorMapRenderObject::applyEmissionShader(
+    osg::ref_ptr<osg::StateSet> stateSet,
+    osg::ref_ptr<osg::Texture2D> colormapTexture) {
+  assert(stateSet && "Cannot apply emission shader to uninitialized stateSet");
+  if (colormapTexture) {
+    auto colormap = m_colormap.lock();
+    assert(colormap &&
+           "Given colormapTexture is not valid and colormap weak_ptr is locked.");
+    colormapTexture = createVerticalColorMapTexture(*colormap);
+  }
+  stateSet->setTextureAttributeAndModes(0, colormapTexture, osg::StateAttribute::ON);
+  stateSet->addUniform(
+      new osg::Uniform("emissionMap", 0));  // Assuming texture unit 0
+  stateSet->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+
+  // Add a shader to apply the texture as emission.
+  osg::Program *program = new osg::Program;
+  osg::Shader *vertexShader = new osg::Shader(osg::Shader::VERTEX);
+  vertexShader->setShaderSource(shader::COLORMAP_VERTEX_EMISSION_SHADER);
+  osg::Shader *fragmentShader = new osg::Shader(osg::Shader::FRAGMENT);
+  fragmentShader->setShaderSource(shader::COLORMAP_FRAGMENT_EMISSION_SHADER);
+  program->addShader(vertexShader);
+  program->addShader(fragmentShader);
+  stateSet->setAttributeAndModes(program, osg::StateAttribute::ON);
 }
 
 void covise::ColorMapRenderObject::show(bool on) {
@@ -314,17 +341,8 @@ void covise::ColorMapRenderObject::show(bool on) {
 
     // create a transform node to move the colormap to the right position
     m_colormapTransform = new osg::MatrixTransform();
-
-    osg::Matrixd mat;
-    osg::Quat rotation(osg::DegreesToRadians(90.0), osg::Vec3(1, 0, 0));
-    rotation = osg::Quat(osg::DegreesToRadians(45.0), osg::Vec3(0, 1, 0)) *
-               rotation;  // rotate to the right
-    mat.makeTranslate(osg::Vec3(-0.5, 0.0, -0.5));
-    mat.preMult(osg::Matrixd(rotation));
-    m_colormapTransform->setMatrix(mat);
     m_colormapTransform->addChild(colormapGroup);
     m_colormapTransform->setName("ColorMap");
-    auto viewMat = VRViewer::instance()->getViewerMat();
 
     cover->getObjectsRoot()->addChild(m_colormapTransform);
   } else {

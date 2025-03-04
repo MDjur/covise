@@ -21,6 +21,14 @@
 #include "util/coExport.h"
 
 namespace covise {
+namespace shader {
+constexpr const char *COLORMAP_VERTEX_EMISSION_SHADER =
+    "void main() { gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; "
+    "gl_TexCoord[0] = gl_MultiTexCoord0; }";
+constexpr const char *COLORMAP_FRAGMENT_EMISSION_SHADER =
+    "uniform sampler2D emissionMap; void main() { gl_FragColor = "
+    "texture2D(emissionMap, gl_TexCoord[0]); }";
+}  // namespace shader
 
 struct ColorMap {
   std::vector<float> r, g, b, a, samplingPoints;
@@ -85,6 +93,8 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
       const ColorMap &colorMap);
   osg::ref_ptr<osg::Geode> createTextGeode(const std::string &text,
                                            const osg::Vec3 &position);
+  void applyEmissionShader(osg::ref_ptr<osg::StateSet> objectStateSet,
+                           osg::ref_ptr<osg::Texture2D> colormapTexture);
 
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
