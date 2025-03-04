@@ -5,12 +5,14 @@
 #include <OpenVRUI/coUpdateManager.h>
 #include <cover/coVRPluginSupport.h>
 #include <cover/ui/Button.h>
+#include <cover/ui/CovconfigLink.h>
 #include <cover/ui/Group.h>
 #include <cover/ui/Menu.h>
 #include <cover/ui/SelectionList.h>
 #include <cover/ui/Slider.h>
 
 #include <map>
+#include <memory>
 #include <osg/Geode>
 #include <osg/MatrixTransform>
 #include <osg/Texture2D>
@@ -34,6 +36,19 @@ struct ColorMap {
   std::vector<float> r, g, b, a, samplingPoints;
   float min = 0.0, max = 0.0;
   int steps = 32;
+};
+
+struct ColorMapLabelConfig {
+  std::string font = "DejaVuSans-Bold.ttf";
+  osg::Vec4 color = osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+  float charSize = 0.01f;
+};
+
+struct ColorMapRenderConfig {
+  bool multisample = true;
+  float distanceX = -0.6f, distanceY = 1.6f, distanceZ = -0.4f;
+  float rotationX = 90.0f, rotationY = 25.0f, rotationZ = 0.0f;
+  ColorMapLabelConfig labelConfig;
 };
 
 typedef std::map<std::string, ColorMap> ColorMaps;
@@ -77,14 +92,8 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
     return true;
   }
 
-  void setMultisample(bool multisample) { m_multisample = multisample; }
-  void setDistanceX(float distance) { m_distance_x = distance; }
-  void setDistanceY(float distance) { m_distance_y = distance; }
-  void setDistanceZ(float distance) { m_distance_z = distance; }
-
-  void setRotationX(float rotation) { m_rotation_x = rotation; }
-  void setRotationY(float rotation) { m_rotation_y = rotation; }
-  void setRotationZ(float rotation) { m_rotation_z = rotation; }
+  ColorMapRenderConfig &getConfig() { return m_config; }
+  const ColorMapRenderConfig &getConfig() const { return m_config; }
 
  private:
   void render();
@@ -99,13 +108,8 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
 
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
-  bool m_multisample = true;
-  float m_distance_x = -0.6f;
-  float m_distance_y = 1.6f;
-  float m_distance_z = -0.4f;
-  float m_rotation_x = 90.0f;
-  float m_rotation_y = 25.0f;
-  float m_rotation_z = 0.0f;
+  osg::ref_ptr<osg::Program> m_shader;
+  ColorMapRenderConfig m_config;
 };
 
 class PLUGIN_UTILEXPORT ColorMapUI {
@@ -170,8 +174,11 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   opencover::ui::Slider *m_rotation_y = nullptr;
   opencover::ui::Slider *m_rotation_z = nullptr;
 
+  opencover::ui::Slider *m_charSize = nullptr;
+
   std::unique_ptr<ColorMapSelector> m_selector;
   std::unique_ptr<ColorMapRenderObject> m_renderObject;
+//   std::unique_ptr<opencover::config::File> m_config = nullptr;
   std::shared_ptr<ColorMap> m_colorMap;
 };
 
