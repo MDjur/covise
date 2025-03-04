@@ -2,11 +2,24 @@
 
 #include <config/CoviseConfig.h>
 #include <config/coConfig.h>
+#include <cover/VRViewer.h>
+#include <cover/coVRPluginSupport.h>
 #include <cover/ui/Slider.h>
 
 #include <cassert>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <osg/Geometry>
+#include <osg/MatrixTransform>
+#include <osg/Multisample>
+#include <osg/PositionAttitudeTransform>
+#include <osgText/Text>
+#include <sstream>
+
+#include <osg/Array>
+#include <osg/Math>
+#include <osg/Vec3d>
 
 using namespace std;
 using namespace opencover;
@@ -164,15 +177,216 @@ void covise::ColorMapSelector::init() {
   m_selector->setCallback([this](int index) { updateSelectedMap(); });
 }
 
-covise::ColorMapMenu::ColorMapMenu(opencover::ui::Group &group)
+osg::ref_ptr<osg::Texture2D>
+covise::ColorMapRenderObject::createVerticalColorMapTexture(
+    const ColorMap &colorMap) {
+  if (colorMap.r.empty() || colorMap.g.empty() || colorMap.b.empty() ||
+      colorMap.a.empty() || colorMap.samplingPoints.empty()) {
+    return nullptr;
+  }
+
+  int width = 1;  // 1D texture, now vertical
+  int height = colorMap.steps;
+
+  osg::ref_ptr<osg::Image> image = new osg::Image;
+  image->allocateImage(width, height, 1, GL_RGBA, GL_FLOAT);
+
+  float *imageData = (float *)image->data();
+
+  for (int y = 0; y < height; ++y) {
+    float samplePoint = (float)y / (height - 1);
+
+    for (size_t i = 1; i < colorMap.samplingPoints.size(); ++i) {
+      if (samplePoint <= colorMap.samplingPoints[i]) {
+        float t = (samplePoint - colorMap.samplingPoints[i - 1]) /
+                  (colorMap.samplingPoints[i] - colorMap.samplingPoints[i - 1]);
+
+        float r = colorMap.r[i - 1] + t * (colorMap.r[i] - colorMap.r[i - 1]);
+        float g = colorMap.g[i - 1] + t * (colorMap.g[i] - colorMap.g[i - 1]);
+        float b = colorMap.b[i - 1] + t * (colorMap.b[i] - colorMap.b[i - 1]);
+        float a = colorMap.a[i - 1] + t * (colorMap.a[i] - colorMap.a[i - 1]);
+
+        imageData[y * 4 + 0] = r;
+        imageData[y * 4 + 1] = g;
+        imageData[y * 4 + 2] = b;
+        imageData[y * 4 + 3] = a;
+
+        break;
+      }
+    }
+  }
+
+  osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
+  texture->setImage(image);
+  texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::LINEAR);
+  texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::LINEAR);
+  texture->setWrap(osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+  texture->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
+
+  return texture;
+}
+
+osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createColorMapPlane(
+    const covise::ColorMap &colorMap) {
+  osg::ref_ptr<osg::Geode> geode = new osg::Geode;
+  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+
+  osg::ref_ptr<osg::Vec3Array> vertices = new osg::Vec3Array;
+  vertices->push_back(osg::Vec3(0, 0, 0));
+  vertices->push_back(osg::Vec3(1, 0, 0));
+  vertices->push_back(osg::Vec3(1, 1, 0));
+  vertices->push_back(osg::Vec3(0, 1, 0));
+
+  geometry->setVertexArray(vertices);
+
+  osg::ref_ptr<osg::Vec2Array> texcoords = new osg::Vec2Array;
+  texcoords->push_back(osg::Vec2(0, 0));
+  texcoords->push_back(osg::Vec2(1, 0));
+  texcoords->push_back(osg::Vec2(1, 1));
+  texcoords->push_back(osg::Vec2(0, 1));
+  geometry->setTexCoordArray(0, texcoords);
+
+  osg::ref_ptr<osg::DrawElementsUInt> quad =
+      new osg::DrawElementsUInt(osg::PrimitiveSet::QUADS, 0);
+  for (auto i = 0; i < 4; ++i) quad->push_back(i);
+
+  geometry->addPrimitiveSet(quad);
+
+  geode->addDrawable(geometry);
+
+  osg::ref_ptr<osg::Texture2D> texture = createVerticalColorMapTexture(colorMap);
+  osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
+  if (texture) {
+    // osg::ref_ptr<osg::StateSet> stateset = geode->getOrCreateStateSet();
+    stateset->setTextureAttributeAndModes(0, texture, osg::StateAttribute::ON);
+  }
+  if (m_multisample) {
+    osg::ref_ptr<osg::Multisample> multisample = new osg::Multisample;
+    stateset->setAttributeAndModes(multisample, osg::StateAttribute::ON);
+  }
+
+  return geode;
+}
+
+osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
+    const std::string &text, const osg::Vec3 &position) {
+  osg::ref_ptr<osgText::Text> osgText = new osgText::Text;
+  osgText->setText(text);
+  osgText->setFont("DejaVuSans-Bold.ttf");
+  osgText->setCharacterSize(0.01f);  // Adjust size
+  osgText->setPosition(position);
+  osgText->setColor(osg::Vec4(1.0f, 1.0f, 1.0f, 1.0f));  // White text
+  osgText->setAlignment(osgText::Text::LEFT_CENTER);
+
+  osg::ref_ptr<osg::Geode> textGeode = new osg::Geode;
+  textGeode->addDrawable(osgText);
+  return textGeode;
+}
+
+void covise::ColorMapRenderObject::show(bool on) {
+  if (on) {
+    auto colorMap = m_colormap.lock();
+    if (!colorMap) {
+      std::cerr << "ColorMapRenderObject: ColorMap is not set or in use."
+                << std::endl;
+      return;
+    }
+
+    auto colormapPlane = createColorMapPlane(*m_colormap.lock());
+
+    // position colormap
+    osg::ref_ptr<osg::PositionAttitudeTransform> pat =
+        new osg::PositionAttitudeTransform();
+    pat->setPosition(osg::Vec3(0.0f, 0.0f, 0.0f));
+    pat->setScale(osg::Vec3(0.1f, 0.8f, 1.0f));
+    pat->addChild(colormapPlane);
+
+    osg::ref_ptr<osg::Group> colormapGroup = new osg::Group();
+    colormapGroup->addChild(pat);
+
+    // add text labels for the sampling points
+    for (size_t i = 0; i < colorMap->samplingPoints.size(); ++i) {
+      std::stringstream ss;
+      ss << std::fixed << std::setprecision(2) << colorMap->samplingPoints[i];
+      osg::ref_ptr<osg::Geode> textGeode = createTextGeode(
+          ss.str(), osg::Vec3(-0.1f, colorMap->samplingPoints[i] * 0.8f, 0.0f));
+      colormapGroup->addChild(textGeode);
+    }
+
+    // create a transform node to move the colormap to the right position
+    m_colormapTransform = new osg::MatrixTransform();
+
+    osg::Matrixd mat;
+    osg::Quat rotation(osg::DegreesToRadians(90.0), osg::Vec3(1, 0, 0));
+    rotation = osg::Quat(osg::DegreesToRadians(45.0), osg::Vec3(0, 1, 0)) *
+               rotation;  // rotate to the right
+    mat.makeTranslate(osg::Vec3(-0.5, 0.0, -0.5));
+    mat.preMult(osg::Matrixd(rotation));
+    m_colormapTransform->setMatrix(mat);
+    m_colormapTransform->addChild(colormapGroup);
+    m_colormapTransform->setName("ColorMap");
+    auto viewMat = VRViewer::instance()->getViewerMat();
+
+    cover->getObjectsRoot()->addChild(m_colormapTransform);
+  } else {
+    cover->getObjectsRoot()->removeChild(m_colormapTransform);
+  }
+}
+
+void covise::ColorMapRenderObject::render() {
+  if (m_colormapTransform) {
+    // First, cover->getInvBaseMat() transforms world coordinates into the plugin's
+    // base coordinate system.
+    //
+    // Then, cover->getViewerMat() transforms the results of
+    // the previous operation, from the plugins base coordinate system, into the
+    // viewers coordinate system.
+    //
+    // Therefore, the combined result is a matrix that transforms coordinates from
+    // the plugin's base coordinate system directly into the viewer's coordinate
+    // system.
+    auto transformMatrix = cover->getViewerMat() * cover->getInvBaseMat();
+
+    // object position in plugins base coordinates => -z is forward => normally; in
+    // COVER y is forward
+    osg::Vec3d objectPositionInBase(m_distance_x, m_distance_y, m_distance_z);
+
+    // transform to viewer coordinates
+    auto objectPositionInViewer = objectPositionInBase * transformMatrix;
+    auto viewerPosition = cover->getViewerMat().getTrans();
+
+    osg::Vec3d objectUp(0.0, 0.0,1.0);
+
+    // hold rotation of object
+    osg::Quat colorMapRotation(osg::DegreesToRadians(m_rotation_x),
+                               osg::Vec3(1, 0, 0));
+    colorMapRotation =
+        osg::Quat(osg::DegreesToRadians(m_rotation_y), osg::Vec3(0, 1, 0)) *
+        colorMapRotation;
+    colorMapRotation =
+        osg::Quat(osg::DegreesToRadians(m_rotation_z), osg::Vec3(0, 0, 1)) *
+        colorMapRotation;
+
+    // apply transformation to object
+    osg::Matrixd matrix;
+    // matrix.makeLookAt(viewerPosition, objectPositionInBase, objectUp);
+    matrix.makeRotate(colorMapRotation * transformMatrix.getRotate());
+    // matrix.makeRotate(colorMapRotation * rotation);
+    // matrix.makeRotate(rotation * colorMapRotation);
+    matrix.setTrans(objectPositionInViewer);
+    m_colormapTransform->setMatrix(matrix);
+  }
+}
+
+covise::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
     : m_colorMapGroup(new opencover::ui::Group(&group, "ColorMap")),
       m_selector(std::make_unique<ColorMapSelector>(*m_colorMapGroup)) {
   init();
 }
 
-void covise::ColorMapMenu::sliderCallback(opencover::ui::Slider *slider,
-                                          float &toSet, float value, bool moving,
-                                          bool predicateCheck) {
+void covise::ColorMapUI::sliderCallback(opencover::ui::Slider *slider, float &toSet,
+                                        float value, bool moving,
+                                        bool predicateCheck) {
   if (!moving) return;
   if (predicateCheck) {
     slider->setValue(toSet);
@@ -181,7 +395,7 @@ void covise::ColorMapMenu::sliderCallback(opencover::ui::Slider *slider,
   toSet = value;
 }
 
-opencover::ui::Slider *covise::ColorMapMenu::createSlider(
+opencover::ui::Slider *covise::ColorMapUI::createSlider(
     const std::string &name, const ui::Slider::ValueType &min,
     const ui::Slider::ValueType &max, const ui::Slider::Presentation &presentation,
     const ui::Slider::ValueType &initial,
@@ -194,29 +408,31 @@ opencover::ui::Slider *covise::ColorMapMenu::createSlider(
   return slider;
 }
 
-void covise::ColorMapMenu::initSteps() {
+void covise::ColorMapUI::initSteps() {
   m_numSteps = createSlider(
       "steps", 1, 1024, ui::Slider::AsDial, 1, [this](float value, bool moving) {
+        if (value < 1) return;
         if (!moving) return;
-        *m_colorMap = covise::interpolateColorMap(*m_colorMap, value);
+        *m_colorMap = covise::interpolateColorMap(m_selector->selectedMap(), value);
+        rebuildColorMap();
       });
   m_numSteps->setScale(ui::Slider::Linear);
   m_numSteps->setIntegral(true);
   m_numSteps->setLinValue(32);
 }
 
-void covise::ColorMapMenu::initColorMap() {
+void covise::ColorMapUI::initColorMap() {
+  assert(m_selector && "ColorMapSelector must be initialized before ColorMap");
   m_colorMap = std::make_shared<ColorMap>(m_selector->selectedMap());
 }
 
-void covise::ColorMapMenu::initShow() {
+void covise::ColorMapUI::initShow() {
+  assert(m_colorMapGroup && "ColorMapGroup must be initialized before show");
   m_show = new ui::Button(m_colorMapGroup, "Show");
-  m_show->setCallback([this](bool) {
-    std::cout << "ColorMapMenu::show not implemented" << std::endl;
-  });
+  m_show->setCallback([this](bool on) { show(on); });
 }
 
-void covise::ColorMapMenu::initUI() {
+void covise::ColorMapUI::initUI() {
   initShow();
   initColorMap();
   m_minAttribute = createSlider(
@@ -230,18 +446,56 @@ void covise::ColorMapMenu::initUI() {
                        value < m_minAttribute->value());
       });
   initSteps();
+
+  m_distance_x = createSlider(
+      "distance_x", -1050.0f, 1050.0f, ui::Slider::AsDial, -700.0f,
+      [this](float value, bool moving) { m_renderObject->setDistanceX(value); });
+  m_distance_y = createSlider(
+      "distance_y", -1050.0f, 1500.0f, ui::Slider::AsDial, 1500.0f,
+      [this](float value, bool moving) { m_renderObject->setDistanceY(value); });
+  m_distance_z = createSlider(
+      "distance_z", -1050.0f, 1050.0f, ui::Slider::AsDial, -400.0f,
+      [this](float value, bool moving) { m_renderObject->setDistanceZ(value); });
+
+  m_rotation_x = createSlider(
+      "rotation_x", 0.0f, 360.0f, ui::Slider::AsDial, 90.0f,
+      [this](float value, bool moving) { m_renderObject->setRotationX(value); });
+  m_rotation_y = createSlider(
+      "rotation_y", 0.0f, 360.0f, ui::Slider::AsDial, 25.0f,
+      [this](float value, bool moving) { m_renderObject->setRotationY(value); });
+  m_rotation_z = createSlider(
+      "rotation_z", 0.0f, 360.0f, ui::Slider::AsDial, 0,
+      [this](float value, bool moving) { m_renderObject->setRotationZ(value); });
 }
 
-void covise::ColorMapMenu::init() { initUI(); }
+void covise::ColorMapUI::initRenderObject() {
+  assert(m_colorMap && "ColorMap must be initialized before render object");
+  m_renderObject = std::make_unique<ColorMapRenderObject>(m_colorMap);
+}
 
-void covise::ColorMapMenu::setCallback(
+void covise::ColorMapUI::init() {
+  initUI();
+  initRenderObject();
+}
+
+void covise::ColorMapUI::rebuildColorMap() {
+  assert(m_colorMap && "ColorMap must be initialized before rebuilding");
+  assert(m_renderObject && "RenderObject must be initialized before rebuilding");
+  m_renderObject->show(false);
+  m_renderObject->show(true);
+}
+
+void covise::ColorMapUI::setCallback(
     const std::function<void(const ColorMap &)> &f) {
   m_selector->setCallback([this, f](const ColorMap &cm) {
     *m_colorMap = interpolateColorMap(cm, m_numSteps->value());
     f(*m_colorMap);
+    rebuildColorMap();
   });
 }
 
-auto covise::ColorMapMenu::getColor(float val) {
+auto covise::ColorMapUI::getColor(float val) {
   return covise::getColor(val, *m_colorMap, m_colorMap->min, m_colorMap->max);
 }
+
+void covise::ColorMapUI::show(bool show) { m_renderObject->show(show); }

@@ -2,6 +2,8 @@
 #ifndef COVUSE_UTIL_COMORMAP_H
 #define COVUSE_UTIL_COMORMAP_H
 
+#include <OpenVRUI/coUpdateManager.h>
+#include <cover/coVRPluginSupport.h>
 #include <cover/ui/Button.h>
 #include <cover/ui/Group.h>
 #include <cover/ui/Menu.h>
@@ -9,6 +11,9 @@
 #include <cover/ui/Slider.h>
 
 #include <map>
+#include <osg/Geode>
+#include <osg/MatrixTransform>
+#include <osg/Texture2D>
 #include <osg/Vec4>
 #include <string>
 #include <vector>
@@ -49,9 +54,52 @@ class PLUGIN_UTILEXPORT ColorMapSelector {
   void init();
 };
 
-class PLUGIN_UTILEXPORT ColorMapMenu {
+class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
  public:
-  ColorMapMenu(opencover::ui::Group &group);
+  ColorMapRenderObject(std::shared_ptr<ColorMap> colorMap) : m_colormap(colorMap) {
+    opencover::cover->getUpdateManager()->add(this);
+  }
+  ~ColorMapRenderObject() override {
+    opencover::cover->getUpdateManager()->remove(this);
+  }
+  void show(bool on = false);
+
+  bool update() override {
+    render();
+    return true;
+  }
+
+  void setMultisample(bool multisample) { m_multisample = multisample; }
+  void setDistanceX(float distance) { m_distance_x = distance; }
+  void setDistanceY(float distance) { m_distance_y = distance; }
+  void setDistanceZ(float distance) { m_distance_z = distance; }
+
+  void setRotationX(float rotation) { m_rotation_x = rotation; }
+  void setRotationY(float rotation) { m_rotation_y = rotation; }
+  void setRotationZ(float rotation) { m_rotation_z = rotation; }
+
+ private:
+  void render();
+  osg::ref_ptr<osg::Geode> createColorMapPlane(const ColorMap &colorMap);
+  osg::ref_ptr<osg::Texture2D> createVerticalColorMapTexture(
+      const ColorMap &colorMap);
+  osg::ref_ptr<osg::Geode> createTextGeode(const std::string &text,
+                                           const osg::Vec3 &position);
+
+  std::weak_ptr<ColorMap> m_colormap;
+  osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
+  bool m_multisample = true;
+  float m_distance_x = -700.0f;
+  float m_distance_y = 1500.0f;
+  float m_distance_z = -400.0f;
+  float m_rotation_x = 90.0f;
+  float m_rotation_y = 25.0f;
+  float m_rotation_z = 0.0f;
+};
+
+class PLUGIN_UTILEXPORT ColorMapUI {
+ public:
+  ColorMapUI(opencover::ui::Group &group);
 
   void setMinBounds(float min, float max) {
     setSliderBounds(m_minAttribute, min, max);
@@ -77,6 +125,8 @@ class PLUGIN_UTILEXPORT ColorMapMenu {
   void initShow();
   void initSteps();
   void initColorMap();
+  void initRenderObject();
+  void rebuildColorMap();
   opencover::ui::Slider *createSlider(
       const std::string &name, const opencover::ui::Slider::ValueType &min,
       const opencover::ui::Slider::ValueType &max,
@@ -89,6 +139,8 @@ class PLUGIN_UTILEXPORT ColorMapMenu {
   void sliderCallback(opencover::ui::Slider *slider, float &toSet, float value,
                       bool moving, bool predicateCheck = false);
 
+  void show(bool show);
+
   // dont delete these pointers, they are managed by the ui
   opencover::ui::Group *m_colorMapGroup = nullptr;
   opencover::ui::Slider *m_minAttribute = nullptr;
@@ -96,9 +148,19 @@ class PLUGIN_UTILEXPORT ColorMapMenu {
   opencover::ui::Slider *m_numSteps = nullptr;
   opencover::ui::Button *m_show = nullptr;
 
+  opencover::ui::Slider *m_distance_x = nullptr;
+  opencover::ui::Slider *m_distance_y = nullptr;
+  opencover::ui::Slider *m_distance_z = nullptr;
+
+  opencover::ui::Slider *m_rotation_x = nullptr;
+  opencover::ui::Slider *m_rotation_y = nullptr;
+  opencover::ui::Slider *m_rotation_z = nullptr;
+
   std::unique_ptr<ColorMapSelector> m_selector;
+  std::unique_ptr<ColorMapRenderObject> m_renderObject;
   std::shared_ptr<ColorMap> m_colorMap;
 };
+
 }  // namespace covise
 
 #endif
