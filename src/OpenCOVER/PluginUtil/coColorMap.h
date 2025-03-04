@@ -89,9 +89,9 @@ class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
   std::weak_ptr<ColorMap> m_colormap;
   osg::ref_ptr<osg::MatrixTransform> m_colormapTransform;
   bool m_multisample = true;
-  float m_distance_x = -700.0f;
-  float m_distance_y = 1500.0f;
-  float m_distance_z = -400.0f;
+  float m_distance_x = -0.6f;
+  float m_distance_y = 1.6f;
+  float m_distance_z = -0.4f;
   float m_rotation_x = 90.0f;
   float m_rotation_y = 25.0f;
   float m_rotation_z = 0.0f;
@@ -122,6 +122,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
  private:
   void init();
   void initUI();
+  void initColorMapPositionUI();
   void initShow();
   void initSteps();
   void initColorMap();
@@ -132,7 +133,8 @@ class PLUGIN_UTILEXPORT ColorMapUI {
       const opencover::ui::Slider::ValueType &max,
       const opencover::ui::Slider::Presentation &presentation,
       const opencover::ui::Slider::ValueType &initial,
-      std::function<void(float, bool)> callback);
+      std::function<void(float, bool)> callback,
+      opencover::ui::Group *group = nullptr);
   void setSliderBounds(opencover::ui::Slider *slider, float min, float max) {
     slider->setBounds(min, max);
   }
@@ -142,6 +144,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
   void show(bool show);
 
   // dont delete these pointers, they are managed by the ui
+  opencover::ui::Menu *m_colorMapPositionMenu = nullptr;
   opencover::ui::Group *m_colorMapGroup = nullptr;
   opencover::ui::Slider *m_minAttribute = nullptr;
   opencover::ui::Slider *m_maxAttribute = nullptr;
