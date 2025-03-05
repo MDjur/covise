@@ -935,7 +935,7 @@ void EnergyPlugin::initColorMap() {
     initSimMenu();
   }
 
-  m_colorMapMenu = std::make_unique<covise::ColorMapMenu>(*m_simulationMenu);
+  m_colorMapMenu = std::make_unique<covise::ColorMapUI>(*m_simulationMenu);
   m_colorMapMenu->setCallback(
       [this](const covise::ColorMap &cm) { updateColorMap(cm); });
 }
