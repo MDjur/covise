@@ -262,7 +262,7 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createColorMapPlane(
     applyEmissionShader(stateset, texture);
   }
 
-  if (m_config.multisample) {
+  if (m_config.Mutlisample()) {
     osg::ref_ptr<osg::Multisample> multisample = new osg::Multisample;
     stateset->setAttributeAndModes(multisample, osg::StateAttribute::ON);
   }
@@ -274,10 +274,10 @@ osg::ref_ptr<osg::Geode> covise::ColorMapRenderObject::createTextGeode(
     const std::string &text, const osg::Vec3 &position) {
   osg::ref_ptr<osgText::Text> osgText = new osgText::Text;
   osgText->setText(text);
-  osgText->setFont(m_config.labelConfig.font);
-  osgText->setCharacterSize(m_config.labelConfig.charSize);  // Adjust size
+  osgText->setFont(m_config.LabelConfig().font);
+  osgText->setCharacterSize(m_config.LabelConfig().charSize);  // Adjust size
   osgText->setPosition(position);
-  osgText->setColor(m_config.labelConfig.color);  // White text
+  osgText->setColor(m_config.LabelConfig().color);  // White text
   osgText->setAlignment(osgText::Text::LEFT_CENTER);
 
   osg::ref_ptr<osg::Geode> textGeode = new osg::Geode;
@@ -378,30 +378,14 @@ void covise::ColorMapRenderObject::render() {
     auto transformMatrixNoScale =
         osg::Matrixd::rotate(rotationNoScale) * osg::Matrixd::translate(translation);
 
-    // object position in plugins base coordinates => -z is forward => normally; in
-    // COVER y is forward
-    osg::Vec3d objectPositionInBase(m_config.distanceX, m_config.distanceY,
-                                    m_config.distanceZ);
-
     // transform to viewer coordinates
-    auto objectPositionInViewer = objectPositionInBase * transformMatrixNoScale;
-    auto viewerPosition = cover->getViewerMat().getTrans();
-
-    osg::Vec3d objectUp(0.0, 0.0, 1.0);
-
-    // apply rotation to colormap
-    osg::Quat colorMapRotation(osg::DegreesToRadians(m_config.rotationX),
-                               osg::Vec3(1, 0, 0));
-    colorMapRotation =
-        osg::Quat(osg::DegreesToRadians(m_config.rotationY), osg::Vec3(0, 1, 0)) *
-        colorMapRotation;
-    colorMapRotation =
-        osg::Quat(osg::DegreesToRadians(m_config.rotationZ), osg::Vec3(0, 0, 1)) *
-        colorMapRotation;
+    auto objectPositionInViewer =
+        m_config.ObjectPositionInBase() * transformMatrixNoScale;
 
     // apply transformation to object
     osg::Matrixd matrix;
-    matrix.makeRotate(colorMapRotation * rotationNoScale);
+    // matrix.makeRotate(colorMapRotation * rotationNoScale);
+    matrix.makeRotate(m_config.ColorMapRotation() * rotationNoScale);
     matrix.setTrans(objectPositionInViewer);
     m_colormapTransform->setMatrix(matrix);
   }
@@ -410,7 +394,7 @@ void covise::ColorMapRenderObject::render() {
 covise::ColorMapUI::ColorMapUI(opencover::ui::Group &group)
     : m_colorMapGroup(new opencover::ui::Group(&group, "ColorMap")),
       m_colorMapSettingsMenu(new opencover::ui::Menu(&group, "ColorMapSettings")),
-    //   m_config(new opencover::config::File("ColorMapConfig")),
+      //   m_config(new opencover::config::File("ColorMapConfig")),
       m_selector(std::make_unique<ColorMapSelector>(*m_colorMapGroup)) {
   init();
 }
@@ -464,49 +448,57 @@ void covise::ColorMapUI::initShow() {
 }
 
 void covise::ColorMapUI::initColorMapSettings() {
+  assert(m_renderObject && "RenderObject need to be initialized before calling it.");
+  auto renderConfig = m_renderObject->getConfig();
   m_distance_x = createSlider(
-      "colormap_distance_x", -5.0f, 5.0f, ui::Slider::AsDial, -0.6f,
+      "colormap_distance_x", -5.0f, 5.0f, ui::Slider::AsDial,
+      renderConfig.DistanceX(),
       [this](float value, bool moving) {
-        m_renderObject->getConfig().distanceX = value;
+        m_renderObject->getConfig().DistanceX() = value;
       },
       m_colorMapSettingsMenu);
   m_distance_y = createSlider(
-      "colormap_distance_y", -5.0f, 5.0f, ui::Slider::AsDial, 1.6f,
+      "colormap_distance_y", -5.0f, 5.0f, ui::Slider::AsDial,
+      renderConfig.DistanceY(),
       [this](float value, bool moving) {
-        m_renderObject->getConfig().distanceY = value;
+        m_renderObject->getConfig().DistanceY() = value;
       },
       m_colorMapSettingsMenu);
   m_distance_z = createSlider(
-      "colormap_distance_z", -5.0f, 5.0f, ui::Slider::AsDial, -0.4f,
+      "colormap_distance_z", -5.0f, 5.0f, ui::Slider::AsDial,
+      renderConfig.DistanceZ(),
       [this](float value, bool moving) {
-        m_renderObject->getConfig().distanceZ = value;
+        m_renderObject->getConfig().DistanceZ() = value;
       },
       m_colorMapSettingsMenu);
 
   m_rotation_x = createSlider(
-      "colormap_rotation_x", 0.0f, 360.0f, ui::Slider::AsDial, 90.0f,
+      "colormap_rotation_x", 0.0f, 360.0f, ui::Slider::AsDial,
+      renderConfig.RotationAngleX(),
       [this](float value, bool moving) {
-        m_renderObject->getConfig().rotationX = value;
+        m_renderObject->getConfig().setRotationAngleX(value);
       },
       m_colorMapSettingsMenu);
   m_rotation_y = createSlider(
-      "colormap_rotation_y", 0.0f, 360.0f, ui::Slider::AsDial, 25.0f,
+      "colormap_rotation_y", 0.0f, 360.0f, ui::Slider::AsDial,
+      renderConfig.RotationAngleY(),
       [this](float value, bool moving) {
-        m_renderObject->getConfig().rotationY = value;
+        m_renderObject->getConfig().setRotationAngleY(value);
       },
       m_colorMapSettingsMenu);
   m_rotation_z = createSlider(
-      "colormap_rotation_z", 0.0f, 360.0f, ui::Slider::AsDial, 0.0f,
+      "colormap_rotation_z", 0.0f, 360.0f, ui::Slider::AsDial,
+      renderConfig.RotationAngleZ(),
       [this](float value, bool moving) {
-        m_renderObject->getConfig().rotationZ = value;
+        m_renderObject->getConfig().setRotationAngleZ(value);
       },
       m_colorMapSettingsMenu);
-
   m_charSize = createSlider(
-      "charSize", 0.01, 0.04, ui::Slider::AsDial, 0.01,
+      "charSize", 0.01, 0.04, ui::Slider::AsDial,
+      renderConfig.LabelConfig().charSize,
       [this](float value, bool moving) {
         if (!moving) return;
-        m_renderObject->getConfig().labelConfig.charSize = value;
+        m_renderObject->getConfig().LabelConfig().charSize = value;
         rebuildColorMap();
       },
       m_colorMapSettingsMenu);
@@ -526,6 +518,7 @@ void covise::ColorMapUI::initUI() {
                        value < m_minAttribute->value());
       });
   initSteps();
+  initRenderObject();
   initColorMapSettings();
 }
 
@@ -534,10 +527,7 @@ void covise::ColorMapUI::initRenderObject() {
   m_renderObject = std::make_unique<ColorMapRenderObject>(m_colorMap);
 }
 
-void covise::ColorMapUI::init() {
-  initUI();
-  initRenderObject();
-}
+void covise::ColorMapUI::init() { initUI(); }
 
 void covise::ColorMapUI::rebuildColorMap() {
   assert(m_colorMap && "ColorMap must be initialized before rebuilding");

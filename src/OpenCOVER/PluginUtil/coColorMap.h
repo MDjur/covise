@@ -20,16 +20,22 @@
 #include <string>
 #include <vector>
 
+#include "osg/Math"
+#include "osg/Vec3d"
 #include "util/coExport.h"
 
 namespace covise {
 namespace shader {
 constexpr const char *COLORMAP_VERTEX_EMISSION_SHADER =
-    "void main() { gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; "
-    "gl_TexCoord[0] = gl_MultiTexCoord0; }";
+    "void main() { "
+    "   gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; "
+    "   gl_TexCoord[0] = gl_MultiTexCoord0; "
+    "}";
 constexpr const char *COLORMAP_FRAGMENT_EMISSION_SHADER =
-    "uniform sampler2D emissionMap; void main() { gl_FragColor = "
-    "texture2D(emissionMap, gl_TexCoord[0]); }";
+    "uniform sampler2D emissionMap;"
+    "void main() { "
+    "   gl_FragColor = texture2D(emissionMap, gl_TexCoord[0]);"
+    "}";
 }  // namespace shader
 
 struct ColorMap {
@@ -44,11 +50,57 @@ struct ColorMapLabelConfig {
   float charSize = 0.01f;
 };
 
-struct ColorMapRenderConfig {
-  bool multisample = true;
-  float distanceX = -0.6f, distanceY = 1.6f, distanceZ = -0.4f;
-  float rotationX = 90.0f, rotationY = 25.0f, rotationZ = 0.0f;
+class ColorMapRenderConfig {
+  auto computeColorMapRotation() const {
+    return osg::Quat(osg::DegreesToRadians(rotationAngleX), osg::Vec3(1, 0, 0)) *
+           osg::Quat(osg::DegreesToRadians(rotationAngleY), osg::Vec3(0, 1, 0)) *
+           osg::Quat(osg::DegreesToRadians(rotationAngleZ), osg::Vec3(0, 0, 1));
+  }
+
+ public:
+  ColorMapRenderConfig()
+      : multisample(true),
+        rotationAngleX(90.0f),
+        rotationAngleY(0.0f),
+        rotationAngleZ(25.0f),
+        objectPositionInBase(-0.6f, 1.6f, -0.4f),
+        colorMapRotation(computeColorMapRotation()) {}
+  void setRotationAngleX(float rotationX) {
+    this->rotationAngleX = rotationX;
+    recomputeColorMapRotation();
+  }
+  void setRotationAngleY(float rotationY) {
+    this->rotationAngleY = rotationY;
+    recomputeColorMapRotation();
+  }
+  void setRotationAngleZ(float rotationZ) {
+    this->rotationAngleZ = rotationZ;
+    recomputeColorMapRotation();
+  }
+
+  auto &Mutlisample() { return multisample; }
+  auto &LabelConfig() { return labelConfig; }
+  auto &DistanceX() { return objectPositionInBase.x(); }
+  auto &DistanceY() { return objectPositionInBase.y(); }
+  auto &DistanceZ() { return objectPositionInBase.z(); }
+  const auto &RotationAngleX() const { return rotationAngleX; }
+  const auto &RotationAngleY() const { return rotationAngleY; }
+  const auto &RotationAngleZ() const { return rotationAngleZ; }
+  const auto &ColorMapRotation() const { return colorMapRotation; }
+  const auto &ObjectPositionInBase() const { return objectPositionInBase; }
+
+ private:
+  void recomputeColorMapRotation() { colorMapRotation = computeColorMapRotation(); }
+
+  bool multisample;
+  float rotationAngleX, rotationAngleY, rotationAngleZ;
   ColorMapLabelConfig labelConfig;
+
+  // object position in plugins base coordinates => -z is forward => normally; in
+  // COVER y is forward
+  osg::Vec3d objectPositionInBase;
+  osg::Vec3d objectUp;
+  osg::Quat colorMapRotation;
 };
 
 typedef std::map<std::string, ColorMap> ColorMaps;
@@ -79,7 +131,8 @@ class PLUGIN_UTILEXPORT ColorMapSelector {
 
 class PLUGIN_UTILEXPORT ColorMapRenderObject : public vrui::coUpdateable {
  public:
-  ColorMapRenderObject(std::shared_ptr<ColorMap> colorMap) : m_colormap(colorMap) {
+  ColorMapRenderObject(std::shared_ptr<ColorMap> colorMap)
+      : m_colormap(colorMap), m_config() {
     opencover::cover->getUpdateManager()->add(this);
   }
   ~ColorMapRenderObject() override {
@@ -178,7 +231,7 @@ class PLUGIN_UTILEXPORT ColorMapUI {
 
   std::unique_ptr<ColorMapSelector> m_selector;
   std::unique_ptr<ColorMapRenderObject> m_renderObject;
-//   std::unique_ptr<opencover::config::File> m_config = nullptr;
+  //   std::unique_ptr<opencover::config::File> m_config = nullptr;
   std::shared_ptr<ColorMap> m_colorMap;
 };
 
