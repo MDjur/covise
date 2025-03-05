@@ -17,6 +17,7 @@ SET(HEADERS
     app/ui/citygml/CityGMLDeviceSensor.h
     app/ui/simulation/BaseSimulationUI.h
     app/ui/simulation/HeatingSimulationUI.h
+    app/ui/simulation/PowerSimulationUI.h
     app/presentation/PrototypeBuilding.h
     app/presentation/CityGMLBuilding.h
     app/presentation/TxtInfoboard.h
@@ -34,16 +35,16 @@ SET(SOURCES
     app/presentation/CityGMLBuilding.cpp
     app/presentation/TxtInfoboard.cpp
     app/presentation/EnergyGrid.cpp
-    app/ui/simulation/HeatingSimulationUI.cpp
+    # app/ui/simulation/HeatingSimulationUI.cpp
 )
 
 set(Name "EnergyCampus")
-# if u want to use c++20 for ui/SensorManager.h
-#set_property(TARGET ${Name} PROPERTY CXX_STANDARD 20)
 SET(EnergyLib_INSTALL TRUE)
 add_subdirectory(lib)
 cover_add_plugin(${Name} nlohmann_json::nlohmann_json EnergyLib coCurlHTTPClient coThreadUtil coStringUtil coReadCSVUtil ${HEADERS} ${SOURCES})
 target_include_directories(${Name} PRIVATE
 	"${CMAKE_CURRENT_BINARY_DIR}/lib/ennovatis/include")
 target_compile_options(${Name} PRIVATE -fPIC)
+# if u want to use c++20 for ui/SensorManager.h
+# target_compile_features(${Name} PRIVATE cxx_std_20)
 add_subdirectory(test)

@@ -1193,11 +1193,16 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
   }
 }
 
+void EnergyPlugin::applySimulationDataToPowerGrid() {
+    // only data for citygml
+}
+
 void EnergyPlugin::initPowerGrid() {
   initPowerGridStreams();
   initPowerGridUI({"trafo3w_std_types", "trafo_std_types", "trafo", "parameters",
                    "dtypes", "bus_geodata", "fuse_std_types", "line_std_types"});
   buildPowerGrid();
+  applySimulationDataToPowerGrid();
   m_powerGridStreams->clear();
 }
 
