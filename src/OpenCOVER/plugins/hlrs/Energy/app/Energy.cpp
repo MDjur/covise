@@ -34,7 +34,7 @@
 #include "ui/ennovatis/EnnovatisDeviceSensor.h"
 #include <build_options.h>
 #include <config/CoviseConfig.h>
-
+#include <util/string_util.h>
 // COVER
 #include <PluginUtil/colors/coColorMap.h>
 
@@ -2359,9 +2359,8 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
-    auto conData = std::make_unique<grid::ConnectionData>(name, fromPoint, toPoint,
-                                                          radius, nullptr, data);
-    connections.push_back(new grid::DirectedConnection(*conData));
+    grid::ConnectionData conData{name, fromPoint, toPoint, radius, nullptr, data};
+    connections.push_back(new grid::DirectedConnection(conData));
     from_last = to_new;
   }
   return new grid::Line(name, connections);
@@ -2592,12 +2591,13 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
     const grid::Points &points, osg::ref_ptr<grid::Point> from,
     const std::string &connectionsStrWithCommaDelimiter,
     grid::ConnectionDataList &additionalData) {
-  std::stringstream ss(connectionsStrWithCommaDelimiter);
   std::string connection("");
-  grid::Connections connections;
+  grid::Connections gridConnections;
   auto pointName = from->getName();
   std::string lineName{pointName};
-  while (std::getline(ss, connection, ' ')) {
+  auto connections = split(connectionsStrWithCommaDelimiter, ' ');
+  for(const auto & connection : connections)
+  {
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
     grid::Data connectionData{{"name", pointName + "_" + connection}};
     additionalData.emplace_back(std::vector{connectionData});
@@ -2618,13 +2618,14 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
       std::cerr << "Point with id " << toID << " not found in points." << std::endl;
       continue;
     }
-    grid::ConnectionData connData(pointName + "_" + connection, from, to, 0.5f,
-                                  nullptr, connectionData);
+    grid::ConnectionData connData{pointName + "_" + connection, from, to, 0.5f,
+                                  nullptr, connectionData};
     grid::DirectedConnection directed(
         connData, grid::ConnectionType::LineWithColorInterpolation);
-    connections.push_back(new grid::DirectedConnection(directed));
+    gridConnections.push_back(new grid::DirectedConnection(directed));
   }
-  return new grid::Line(lineName, connections);
+
+  return new grid::Line(lineName, gridConnections);
 }
 
 void EnergyPlugin::readSimulationDataStream(

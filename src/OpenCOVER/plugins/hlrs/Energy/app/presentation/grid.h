@@ -50,16 +50,6 @@ class Point : public osg::MatrixTransform {
 };
 
 struct ConnectionData {
-  ConnectionData(const std::string &name, osg::ref_ptr<Point> start,
-                 osg::ref_ptr<Point> end, const float &radius,
-                 osg::ref_ptr<osg::TessellationHints> hints = nullptr,
-                 const Data &additionalData = Data())
-      : name(name),
-        start(start),
-        end(end),
-        radius(radius),
-        hints(hints),
-        additionalData(additionalData) {};
   std::string name;
   osg::ref_ptr<Point> start;
   osg::ref_ptr<Point> end;

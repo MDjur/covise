@@ -91,7 +91,7 @@ Line::Line(std::string name, const Connections &connections) : m_name(name) {
   init(connections);
 }
 
-void Line::init(const std::vector<osg::ref_ptr<DirectedConnection>> &connections) {
+void Line::init(const Connections &connections) {
   if (connections.empty()) {
     std::cerr << "Line: No connections provided\n";
     return;

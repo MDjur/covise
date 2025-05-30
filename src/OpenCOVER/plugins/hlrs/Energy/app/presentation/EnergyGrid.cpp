@@ -106,7 +106,6 @@ void EnergyGrid::initConnectionsByIndex(
   for (auto i = 0; i < indices.size(); ++i) {
     auto from = points[i];
     for (auto j = 0; j < indices[i].size(); ++j) {
-      std::unique_ptr<grid::ConnectionData> data;
 
       if (i < 0 || i >= points.size()) {
         std::cerr << "Invalid Index for points: " << i << "\n";
@@ -129,9 +128,9 @@ void EnergyGrid::initConnectionsByIndex(
         if (additionalConnectionData.size() > i)
           if (additionalConnectionData[i].size() > j)
             additionalData = additionalConnectionData[i][j];
-      data = std::make_unique<grid::ConnectionData>(name, from, to, radius, nullptr,
-                                                    additionalData);
-      m_connections.push_back(new grid::DirectedConnection(*data));
+      grid::ConnectionData data{name, from, to, radius, nullptr,
+                                                    additionalData};
+      m_connections.push_back(new grid::DirectedConnection(data));
     }
   }
 }
