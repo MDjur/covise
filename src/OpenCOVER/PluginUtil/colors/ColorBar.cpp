@@ -17,6 +17,7 @@
 #include <cover/ui/Button.h>
 #include <cover/ui/Slider.h>
 #include <cover/ui/SpecialElement.h>
+#include <cover/ui/SelectionList.h>
 
 #include <cover/VRVruiRenderInterface.h>
 #include <cover/coVRMSController.h>
@@ -691,6 +692,32 @@ CoverColorBar::CoverColorBar(ui::Group *menu)
             map_.setSteps(steps);
             displayColorMap();
             m_callback(map_);
+        }
+    });
+    m_selector = new ui::SelectionList("ColorMapSelector", this);
+    colorsMenu_->add(m_selector);
+    auto &maps = ConfigColorMaps();
+    std::vector<std::string> names;
+    names.reserve(maps.size());
+    for (const auto &map : maps)
+        names.push_back(map.name);
+    m_selector->setList(names);
+    m_selector->setCallback([this](int index){
+        if (index < 0 || index >= static_cast<int>(m_selector->items().size()))
+            return;
+        auto &maps = ConfigColorMaps();
+        if (index < static_cast<int>(maps.size()))
+        {
+            auto species = map_.species();
+            auto unit = map_.unit();
+            auto steps = map_.steps();
+            map_ = ColorMap(maps[index], map_.min(), map_.max());
+            map_.setSpecies(species);
+            map_.setUnit(unit);
+            map_.setSteps(steps);
+            displayColorMap();
+            if(m_callback)
+                m_callback(map_);
         }
     });
 
