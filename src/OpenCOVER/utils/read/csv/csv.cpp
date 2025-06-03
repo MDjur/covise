@@ -45,6 +45,10 @@ std::stringstream CSVStream::getLine() {
   // skip comments
   while (!m_currentline.empty() && m_currentline[0] == '#')
     std::getline(m_inputFileStream, m_currentline);
+
+  // remove carriage return characters
+  if (m_currentline.find('\r') != std::string::npos)
+    m_currentline.erase(m_currentline.find('\r'), 1);
   std::stringstream ss(m_currentline);
   return ss;
 }
