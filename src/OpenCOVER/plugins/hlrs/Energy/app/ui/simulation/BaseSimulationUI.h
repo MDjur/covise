@@ -62,9 +62,11 @@ class BaseSimulationUI {
     }
   }
 
+  const opencover::ColorMap *m_colorMap = nullptr;
   template <typename simulationObject>
   void computeColors(const opencover::ColorMap &color_map, const std::map<std::string, simulationObject> &objectContainer)
   {
+    m_colorMap = &color_map;
     isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
 
@@ -111,8 +113,8 @@ class BaseSimulationUI {
         std::is_base_of_v<Object, simulationObject>,
         "simulationObject must be derived from core::simulation::heating::Object");
   }
-
   std::weak_ptr<T> m_parent;  // parent which manages drawable
   std::weak_ptr<Simulation> m_simulation;
+private:
   std::map<std::string, std::vector<osg::Vec4>> m_colors;
 };

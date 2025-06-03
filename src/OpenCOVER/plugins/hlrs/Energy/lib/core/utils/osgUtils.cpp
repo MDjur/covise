@@ -284,7 +284,7 @@ void deleteChildrenRecursive(osg::Group *grp) {
   }
 }
 
-osg::ref_ptr<osg::Geode> createCylinderBetweenPoints(
+osg::ref_ptr<osg::Geode> createOsgCylinderBetweenPoints(
     osg::Vec3 start, osg::Vec3 end, float radius, osg::Vec4 cylinderColor,
     osg::ref_ptr<osg::TessellationHints> hints) {
   osg::ref_ptr geode = new osg::Geode;
@@ -400,6 +400,52 @@ osg::ref_ptr<osg::DrawElementsUInt> createIndicesForTube(int lengthSegments,
   return indices;
 }
 
+void smoothGeometry(osg::ref_ptr<osg::Geometry> geometry) {
+  osgUtil::SmoothingVisitor sv;
+  geometry->accept(sv);
+}
+
+constexpr int SHADER_INDEX_ATTRIB = 5;
+
+osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
+  osg::Vec3 start, osg::Vec3 end, float radius, int circleSegments, int lengthSegments,
+  osg::ref_ptr<osg::TessellationHints> hints) {
+
+  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+  osg::Vec3 direction = start - end;
+  direction.normalize();
+  direction = -direction;
+
+  auto basePoints = calculatePointsAlongLine(start, end, lengthSegments);
+
+  auto [vertices, normals] = generateVerticesAndNormalsForTube(
+      basePoints, direction, circleSegments, radius);
+
+  // Generate indices.
+  auto indices = createIndicesForTube(lengthSegments, circleSegments);
+
+  geometry->setVertexArray(vertices);
+  geometry->setNormalArray(normals, osg::Array::BIND_PER_VERTEX);
+  geometry->addPrimitiveSet(indices);
+  
+  //shader attribute mapping from vertices to data value in texture
+  osg::IntArray *intArray = new osg::IntArray;
+  for (size_t i = 0; i < lengthSegments + 1; i++)
+  {
+    for (size_t j = 0; j < circleSegments; j++)
+    {
+      intArray->push_back(i);
+    }
+  }
+  intArray->setBinding(osg::Array::BIND_PER_VERTEX);
+  geometry->setVertexAttribArray(SHADER_INDEX_ATTRIB, intArray,
+                                 osg::Array::BIND_PER_VERTEX);
+  // Set the color array for color interpolation between start and end.
+  smoothGeometry(geometry);
+
+  return geometry;
+}
+
 osg::ref_ptr<osg::Vec4Array>
 createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
     int lengthSegments, int circleSegments, const osg::Vec4 &colorStart,
@@ -412,45 +458,26 @@ createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
   return colors;
 }
 
-void smoothGeometry(osg::ref_ptr<osg::Geometry> geometry) {
-  osgUtil::SmoothingVisitor sv;
-  geometry->accept(sv);
-}
-
 osg::ref_ptr<osg::Geode> createCylinderBetweenPointsColorInterpolation(
     const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
     float radius, int circleSegments, int lengthSegments,
     const osg::Vec4 &startColor, const osg::Vec4 &endColor,
     osg::ref_ptr<osg::TessellationHints> hints) {
+
   osg::ref_ptr<osg::Geode> geode = new osg::Geode;
-  osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
+  osg::ref_ptr<osg::Geometry> geometry = createCylinderBetweenPoints(
+      start, end, radius, circleSegments, lengthSegments, hints);
   osg::ref_ptr<osg::Material> material = new osg::Material;
-  osg::Vec3 direction = start - end;
-  direction.normalize();
-  direction = -direction;
 
-  auto basePoints = calculatePointsAlongLine(start, end, lengthSegments);
-
+  
   // NOTE: for debugging basePoints
-  //   for (size_t i = 0; i < basePoints.size(); ++i) {
-  //     auto p = basePoints[i];
-  //     osg::ref_ptr<osg::Sphere> sph = new osg::Sphere(p, 0.25f);
+  // osg::Vec3Array* vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray());
+  // for (const auto& vertex : *vertices) {
+  //     osg::ref_ptr<osg::Sphere> sph = new osg::Sphere(vertex, 0.25f);
   //     osg::ref_ptr<osg::ShapeDrawable> d = new osg::ShapeDrawable(sph);
   //     d->setColor(osg::Vec4(0.0f, 1.0f, 1.0f, 1.0f));
   //     geode->addChild(d);
-  //   }
-
-  auto [vertices, normals] = generateVerticesAndNormalsForTube(
-      basePoints, direction, circleSegments, radius);
-
-  // Generate indices.
-  auto indices = createIndicesForTube(lengthSegments, circleSegments);
-
-  geometry->setVertexArray(vertices);
-  geometry->setNormalArray(normals, osg::Array::BIND_PER_VERTEX);
-  geometry->addPrimitiveSet(indices);
-
-  smoothGeometry(geometry);
+  // }
 
   geode->addDrawable(geometry);
 

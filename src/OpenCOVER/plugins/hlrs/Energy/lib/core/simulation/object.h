@@ -52,7 +52,9 @@ class ObjectContainer {
   }
 
   const auto &get() const { return m_elements; }
+  const auto begin() const { return m_elements.begin(); }
   auto begin() { return m_elements.begin(); }
+  const auto end() const { return m_elements.end(); }
   auto end() { return m_elements.end(); }
   auto find(const std::string &name) { return m_elements.find(name); }
   T& operator[](const std::string& name) { return m_elements.at(name); }

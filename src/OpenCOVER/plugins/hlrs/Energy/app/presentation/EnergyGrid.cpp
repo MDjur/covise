@@ -266,3 +266,68 @@ void EnergyGrid::updateDrawables() {
     infoboard->updateDrawable();
   }
 }
+//toDo: streamline update for m_connections, m_lines and m_config.lines
+void EnergyGrid::updateTime(int timestep)
+{
+  for(auto &conn : m_connections)
+    conn->updateTimestep(timestep);
+  for(auto &line : m_lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->updateTimestep(timestep);
+  for(auto &line : m_config.lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->updateTimestep(timestep);
+}
+
+
+
+void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap)
+{
+  for(auto &conn : m_connections)
+    conn->setColorMap(colorMap);
+  for(auto &line : m_lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->setColorMap(colorMap);
+  for(auto &line : m_config.lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->setColorMap(colorMap);
+}
+
+void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::string & species) {
+  for(auto &conn : m_connections) {
+    
+    auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
+    auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+    if (fromData && toData) {
+      conn->setData(*fromData, *toData);
+    } else {
+      std::cerr << "No data found for connection: " << conn->getName() << "\n";
+    }
+  }
+  for(auto &line : m_lines) {
+    for(auto &[_, conn] : line->getConnections()) {
+      
+      auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
+      auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+      if (fromData && toData) {
+        conn->setData(*fromData, *toData);
+      } else {
+        std::cerr << "No data found for connection: " << conn->getName() << "\n";
+      }
+    }
+  }
+  for(auto &line : m_config.lines) {
+    for(auto &[_, conn] : line->getConnections()) {
+      
+      auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
+      auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+      if (fromData && toData) {
+        conn->setData(*fromData, *toData);
+      } else {
+        std::cerr << "No data found for connection: " << conn->getName() << "\n";
+      }
+    }
+  }
+
+
+}
