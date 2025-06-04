@@ -377,6 +377,7 @@ bool EnergyPlugin::update() {
   for (auto &[name, sensor] : m_cityGMLObjs) sensor->update();
 
   for (auto &energyGrid : m_energyGrids) {
+    if(!energyGrid.grid) continue;
     energyGrid.grid->update();
   }
 
@@ -2509,7 +2510,7 @@ void EnergyPlugin::buildPowerGrid() {
   }
 
   // create grid
-  if (lines.empty() || points.empty()) return;
+  if (lines[0].empty() || lines[1].empty() || points.empty()) return;
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
   auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
