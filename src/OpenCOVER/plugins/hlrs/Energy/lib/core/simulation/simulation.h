@@ -48,6 +48,15 @@ const UnitMap UNIT_MAP = UnitMap({
     {{"celcius", "temp", "inlet_temp", "outlet_temp"}, "°C"},
     {{"electricity_selling_price"}, "Cent/kWh"},
     {{"heating_cost"}, "€"},
+    {{"loading_percent", "percent"}, "%"},
+    {{"voltage", "volt"}, "V"},
+    {{"current", "ampere"}, "A"},
+    {{"resistance", "ohm"}, "Ω"},
+    {{"power_factor", "cos_phi"}, ""},
+    {{"efficiency", "eta"}, ""},
+    {{"reactive_power", "q"}, "var"},
+    {{"active_power", "p"}, "W"},
+    {{"apparent_power", "s"}, "VA"},
 });
 
 struct ScalarProperty {
