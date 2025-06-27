@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -71,28 +72,25 @@ class Simulation {
     m_data[key].push_back(value);
   }
 
+  const auto &ScalarProp(const std::string &key) const {
+    auto it = m_scalarProperties.find(key);
+    if (it == m_scalarProperties.end())
+      throw std::out_of_range("Key not found Simulation: " + key);
+    return it->second;
+  }
+
   auto &getData() { return m_data; }
-  const auto &getMinMax(const std::string &key) {
-    return m_scalarProperties.at(key).min;
-  }
-  const auto &getMax(const std::string &key) const {
-    return m_scalarProperties.at(key).max;
-  }
-  const auto &getMin(const std::string &key) const {
-    return m_scalarProperties.at(key).min;
-  }
+
+  auto getMax(const std::string &key) const { return ScalarProp(key).max; }
+  auto getMin(const std::string &key) const { return ScalarProp(key).min; }
   auto getMinMax(const std::string &key) const {
     return std::make_pair(getMin(key), getMax(key));
   }
-  const auto &getTimesteps(const std::string &key) const {
-    return m_scalarProperties.at(key).timesteps;
+  auto getTimesteps(const std::string &key) const {
+    return ScalarProp(key).timesteps;
   }
-  const auto &getSpecies(const std::string &key) const {
-    return m_scalarProperties.at(key).species;
-  }
-  const auto &getUnit(const std::string &key) const {
-    return m_scalarProperties.at(key).unit;
-  }
+  auto getSpecies(const std::string &key) const { return ScalarProp(key).species; }
+  auto getUnit(const std::string &key) const { return ScalarProp(key).unit; }
   const auto &getScalarProperties() const { return m_scalarProperties; }
   auto &getScalarProperties() { return m_scalarProperties; }
 
