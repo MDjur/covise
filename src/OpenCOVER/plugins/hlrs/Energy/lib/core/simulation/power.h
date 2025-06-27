@@ -30,6 +30,11 @@ class Transformator : public Object {
       : Object(name, data) {}
 };
 
+class Cable : public Object {
+ public:
+  Cable(const std::string &name, const Data &data = {}) : Object(name, data) {}
+};
+
 class PowerSimulation : public Simulation {
  public:
   PowerSimulation() = default;
@@ -38,14 +43,17 @@ class PowerSimulation : public Simulation {
   auto &Buses() { return m_buses; }
   auto &Generators() { return m_generators; }
   auto &Transformators() { return m_transformators; }
+  auto &Cables() { return m_cables; }
   const auto &Buses() const { return m_buses; }
   const auto &Generators() const { return m_generators; }
   const auto &Transformators() const { return m_transformators; }
+  const auto &Cables() const { return m_cables; }
 
  private:
   ObjectContainer<Bus> m_buses;
   ObjectContainer<Generator> m_generators;
   ObjectContainer<Transformator> m_transformators;
+  ObjectContainer<Cable> m_cables;
 };
 
 }  // namespace core::simulation::power
