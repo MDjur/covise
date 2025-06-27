@@ -10,8 +10,8 @@ using namespace core::simulation::power;
 template <typename T>
 class PowerSimulationUI : public BaseSimulationUI<T> {
  public:
-  PowerSimulationUI(std::shared_ptr<PowerSimulation> sim, std::shared_ptr<T> parent, const opencover::ColorMap &colorMap)
-      : BaseSimulationUI<T>(sim, parent, colorMap) {}
+  PowerSimulationUI(std::shared_ptr<PowerSimulation> sim, std::shared_ptr<T> parent)
+      : BaseSimulationUI<T>(sim, parent) {}
   ~PowerSimulationUI() = default;
   PowerSimulationUI(const PowerSimulationUI &) = delete;
   PowerSimulationUI &operator=(const PowerSimulationUI &) = delete;
@@ -29,6 +29,7 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
         this->updateEnergyGridColors(timestep, energyGrid, entities);
       };
       updateEnergyGridColorsForContainer(powerSim->Buses());
+      updateEnergyGridColorsForContainer(powerSim->Cables());
       updateEnergyGridColorsForContainer(powerSim->Generators());
       updateEnergyGridColorsForContainer(powerSim->Transformators());
     }
@@ -53,6 +54,7 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
     };
 
     computeColorsForContainer(powerSim->Buses().get());
+    computeColorsForContainer(powerSim->Cables().get());
     computeColorsForContainer(powerSim->Generators().get());
     computeColorsForContainer(powerSim->Transformators().get());
   }
