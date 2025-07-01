@@ -1,10 +1,16 @@
 USING(PROJ)
 USING(GDAL)
 USING(CURL)
+covise_find_package(Arrow)
 covise_find_package(nlohmann_json 3.10.0)
 
 if (NOT nlohmann_json_FOUND)
     #message("nlohmann_json not found")
+    return()
+endif()
+
+if (NOT Arrow_FOUND)
+    message("Arrow library not found. Please install it or set the Arrow_DIR variable.")
     return()
 endif()
 
@@ -43,7 +49,7 @@ SET(SOURCES
 set(Name "EnergyCampus")
 SET(EnergyLib_INSTALL TRUE)
 add_subdirectory(lib)
-cover_add_plugin(${Name} nlohmann_json::nlohmann_json libEnergy coCurlHTTPClient coThreadUtil coStringUtil coReadCSVUtil ${HEADERS} ${SOURCES})
+cover_add_plugin(${Name} nlohmann_json::nlohmann_json Arrow::arrow_shared libEnergy coCurlHTTPClient coThreadUtil coStringUtil coReadCSVUtil ${HEADERS} ${SOURCES})
 target_include_directories(${Name} PRIVATE
 	"${CMAKE_CURRENT_BINARY_DIR}/lib/ennovatis/include")
 set_target_properties(${Name} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
