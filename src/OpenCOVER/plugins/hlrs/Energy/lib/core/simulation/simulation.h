@@ -49,7 +49,7 @@ const UnitMap UNIT_MAP = UnitMap({
     {{"electricity_selling_price"}, "Cent/kWh"},
     {{"heating_cost"}, "€"},
     {{"loading_percent", "percent"}, "%"},
-    {{"voltage", "volt"}, "V"},
+    {{"voltage", "volt", "vm_pu"}, "V"},
     {{"current", "ampere"}, "A"},
     {{"resistance", "ohm"}, "Ω"},
     {{"power_factor", "cos_phi"}, ""},
