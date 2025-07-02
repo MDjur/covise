@@ -585,7 +585,8 @@ std::pair<std::map<std::string, PVData>, float> EnergyPlugin::loadPVData(
   std::map<std::string, PVData> pvDataMap;
   float maxPVIntensity = 0;
 
-  while (pvStream >> row) {
+  //   while (pvStream >> row) {
+  while (pvStream.readNextRow(row)) {
     processPVRow(row, pvDataMap, maxPVIntensity);
   }
 
@@ -853,7 +854,7 @@ auto EnergyPlugin::readStaticCampusData(CSVStream &stream, float &max, float &mi
   std::vector<StaticPowerCampusData> yearlyValues;
   if (!stream || stream.getHeader().size() < 1) return yearlyValues;
   CSVStream::CSVRow row;
-  while (stream >> row) {
+  while (stream.readNextRow(row)) {
     StaticPowerCampusData data;
     ACCESS_CSV_ROW(row, "gml_id", data.citygml_id);
     ACCESS_CSV_ROW(row, "energy_mwh", data.yearlyConsumption);
@@ -1459,7 +1460,8 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
     helper_initTimestepGrp(maxTimesteps, timestepGroup);
 
-    while (csvStream >> row) {
+    // while (csvStream >> row) {
+    while (csvStream.readNextRow(row)) {
       DeviceInfo deviceInfo;
       auto lat = std::stod(row["lat"]);
       auto lon = std::stod(row["lon"]);
@@ -1595,7 +1597,8 @@ std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
   FloatMap values;
   if (stream && headers.size() > 1) {
     CSVStream::CSVRow row;
-    while (stream >> row) {
+    // while (stream >> row) {
+    while (stream.readNextRow(row)) {
       for (auto cityGMLBuildingName : headers) {
         auto sensor = m_cityGMLObjs.find(cityGMLBuildingName);
         if (sensor == m_cityGMLObjs.end()) continue;
@@ -1622,7 +1625,8 @@ auto EnergyPlugin::readStaticPowerData(CSVStream &stream, float &max, float &min
   std::vector<StaticPowerData> powerData;
   if (!stream || stream.getHeader().size() < 1) return powerData;
   CSVStream::CSVRow row;
-  while (stream >> row) {
+  //   while (stream >> row) {
+  while (stream.readNextRow(row)) {
     StaticPowerData data;
     ACCESS_CSV_ROW(row, "name", data.name);
     ACCESS_CSV_ROW(row, "2019", data.val2019);
@@ -2145,7 +2149,8 @@ std::vector<EnergyPlugin::IDLookupTable> EnergyPlugin::retrieveBusNameIdMapping(
   CSVStream::CSVRow bus;
   std::string busName(""), type("");
   int id = 0;
-  while (stream >> bus) {
+  //   while (stream >> bus) {
+  while (stream.readNextRow(bus)) {
     ACCESS_CSV_ROW(bus, "name", busName);
     ACCESS_CSV_ROW(bus, "id", id);
     if (bus.find("grid") != bus.end())
@@ -2198,7 +2203,8 @@ std::unique_ptr<grid::PointDataList> EnergyPlugin::getAdditionalPowerGridPointDa
     std::map<std::string, uint> duplicate{};
     CSVStream::CSVRow row;
     // row
-    while (tableStream >> row) {
+    // while (tableStream >> row) {
+    while (tableStream.readNextRow(row)) {
       grid::Data data;
       // column
       for (auto &colName : header) {
@@ -2238,7 +2244,8 @@ std::vector<grid::PointsMap> EnergyPlugin::createPowerGridPoints(
   // TODO: need to be adjusted
   auto additionalData = getAdditionalPowerGridPointData(numPoints);
 
-  while (stream >> point) {
+  //   while (stream >> point) {
+  while (stream.readNextRow(point)) {
     ACCESS_CSV_ROW(point, "x", lon);
     ACCESS_CSV_ROW(point, "y", lat);
     ACCESS_CSV_ROW(point, "id", busID);
@@ -2376,7 +2383,7 @@ EnergyPlugin::getPowerGridLines(COVERUtils::read::CSVStream &stream,
   std::string geoBuses = "";
   std::string name = "", type = "";
   auto header = stream.getHeader();
-  while (stream >> row) {
+  while (stream.readNextRow(row)) {
     grid::Data data;
 
     for (auto colName : header) {
@@ -2424,7 +2431,8 @@ EnergyPlugin::getPowerGridIndicesAndOptionalData(COVERUtils::read::CSVStream &st
   int from = 0, to = 0;
   std::string geoBuses = "";
   auto header = stream.getHeader();
-  while (stream >> line) {
+  //   while (stream >> line) {
+  while (stream.readNextRow(line)) {
     grid::Data data;
 
     for (auto colName : header) {
@@ -2634,7 +2642,7 @@ void EnergyPlugin::readSimulationDataStream(
   auto &producers = sim->Producers();
   double val = 0.0f;
   std::string name(""), valName("");
-  while (heatingSimStream >> row) {
+  while (heatingSimStream.readNextRow(row)) {
     for (const auto &col : header) {
       ACCESS_CSV_ROW(row, col, val);
       if (std::regex_search(col, match, consumer_value_split_regex)) {
@@ -2716,7 +2724,8 @@ std::pair<grid::Points, grid::Data> EnergyPlugin::createHeatingGridPointsAndData
                                                 const std::string &value) {
     if (!checkForInvalidValue(value)) pointData[key] = value;
   };
-  while (heatingStream >> row) {
+  //   while (heatingStream >> row) {
+  while (heatingStream.readNextRow(row)) {
     ACCESS_CSV_ROW(row, "connections", connections);
     ACCESS_CSV_ROW(row, "id", name);
     ACCESS_CSV_ROW(row, "Latitude", lat);
