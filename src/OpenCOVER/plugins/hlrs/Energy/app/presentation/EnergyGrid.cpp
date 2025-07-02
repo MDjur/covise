@@ -2,7 +2,7 @@
 
 #include <cover/coVRSelectionManager.h>
 #include <lib/core/constants.h>
-#include <lib/core/simulation/grid.h>
+// #include <lib/core/simulation/grid.h>
 #include <lib/core/utils/color.h>
 #include <lib/core/utils/osgUtils.h>
 
@@ -165,7 +165,8 @@ void EnergyGrid::findCorrectHeightForLine(float radius,
 }
 
 void EnergyGrid::initDrawableLines() {
-  using namespace core::simulation::grid;
+//   using namespace core::simulation::grid;
+  using namespace grid;
   osg::ref_ptr<osg::Group> lines = new osg::Group;
   lines->setName("Lines");
   const auto &sphereRadius =

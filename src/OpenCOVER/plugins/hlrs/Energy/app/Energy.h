@@ -15,6 +15,9 @@
 #ifndef _Energy_PLUGIN_H
 #define _Energy_PLUGIN_H
 
+// presentation
+#include "presentation/grid.h"
+
 // ui
 #include "lib/core/interfaces/ISolarPanel.h"
 #include "lib/core/simulation/object.h"
@@ -33,7 +36,7 @@
 
 // core
 #include <cover/coTUIListener.h>
-#include <lib/core/simulation/grid.h>
+// #include <lib/core/simulation/grid.h>
 #include <lib/core/simulation/heating.h>
 #include <lib/core/interfaces/IEnergyGrid.h>
 #include <lib/core/utils/color.h>

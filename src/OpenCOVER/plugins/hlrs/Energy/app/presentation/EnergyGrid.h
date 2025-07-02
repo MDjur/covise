@@ -1,9 +1,11 @@
 #ifndef _CORE_ENERGYGRIND_H
 #define _CORE_ENERGYGRIND_H
 
+#include "grid.h"
 #include <lib/core/interfaces/IEnergyGrid.h>
 #include <lib/core/interfaces/IInfoboard.h>
-#include <lib/core/simulation/grid.h>
+// #include <lib/core/simulation/grid.h>
+
 
 #include <memory>
 #include <osg/Geode>
@@ -17,7 +19,7 @@
 #include "TxtInfoboard.h"
 
 using namespace core;
-using namespace core::simulation;
+// using namespace core::simulation;
 
 enum class EnergyGridConnectionType { Index, Line };
 

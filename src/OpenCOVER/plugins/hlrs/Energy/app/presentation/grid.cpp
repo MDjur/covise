@@ -1,6 +1,7 @@
 #include "grid.h"
 
-#include <utils/osgUtils.h>
+// #include <utils/osgUtils.h>
+#include <lib/core/utils/osgUtils.h>
 
 #include <algorithm>
 #include <cassert>
@@ -21,8 +22,12 @@ void updateMinMax(osg::Vec3 &minExtends, osg::Vec3 &maxExtends,
   maxExtends.z() = std::max(maxExtends.z(), point.z());
 }
 }  // namespace
+   //
+using namespace core;
 
-namespace core::simulation::grid {
+namespace grid {
+
+// namespace core::simulation::grid {
 Point::Point(const std::string &name, const float &x, const float &y, const float &z,
              const float &radius, const Data &additionalData)
     : osg::MatrixTransform(),
@@ -177,4 +182,6 @@ void Line::computeBoundingBox() {
   m_boundingBox.set(minExtends, maxExtends);
 }
 
-}  // namespace core::simulation::grid
+// }  // namespace core::simulation::grid
+
+}

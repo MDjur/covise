@@ -101,7 +101,7 @@
 #include <app/presentation/TxtInfoboard.h>
 
 // core
-#include <lib/core/simulation/grid.h>
+// #include <lib/core/simulation/grid.h>
 #include <lib/core/utils/color.h>
 #include <lib/core/simulation/heating.h>
 #include <lib/core/utils/osgUtils.h>

@@ -9,9 +9,12 @@
 #include <osg/ref_ptr>
 #include <variant>
 
-#include "../utils/color.h"
+#include <lib/core/utils/color.h>
 
-namespace core::simulation::grid {
+// #include "../utils/color.h"
+
+namespace grid {
+// namespace core::simulation::grid {
 // grid::Data is a map of std::string and variants that can hold int, float, or
 // string
 typedef std::map<std::string, std::variant<float, int, std::string>> Data;
@@ -148,4 +151,5 @@ typedef std::vector<std::vector<int>> Indices;
 typedef std::map<int, Data> PointDataList;
 typedef std::vector<std::vector<Data>> ConnectionDataList;
 
-}  // namespace core::simulation::grid
+// }  // namespace core::simulation::grid
+}

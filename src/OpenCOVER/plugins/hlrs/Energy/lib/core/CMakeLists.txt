@@ -3,7 +3,6 @@ set(SOURCES
     utils/color.cpp
     utils/osgUtils.cpp
     utils/math.cpp
-    simulation/grid.cpp
     simulation/heating.cpp
     simulation/power.cpp
     simulation/simulation.cpp
@@ -25,7 +24,6 @@ set(HEADERS
     utils/osgUtils.h
     utils/math.h
     simulation/heating.h
-    simulation/grid.h
     simulation/simulation.h
     simulation/power.h
     simulation/object.h
