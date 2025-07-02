@@ -46,8 +46,8 @@ class ObjectContainer {
   }
 
   template <typename... Args>
-  void addData(const std::string &name, Args &&...args) {
-    if (auto it = m_elements.find(name); it != m_elements.end())
+  void addDataToContainerObject(const std::string &containerName, Args &&...args) {
+    if (auto it = m_elements.find(containerName); it != m_elements.end())
       it->second.addData(std::forward<Args>(args)...);
   }
 
