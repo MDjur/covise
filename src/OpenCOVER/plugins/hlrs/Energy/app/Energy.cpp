@@ -553,7 +553,6 @@ void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
                                 std::map<std::string, PVData> &pvDataMap,
                                 float &maxPVIntensity) {
   PVData pvData;
-//   ACCESS_CSV_ROW(row, "id", pvData.cityGMLID);
   ACCESS_CSV_ROW(row, "gml_id", pvData.cityGMLID);
 
   if (m_cityGMLObjs.find(pvData.cityGMLID) == m_cityGMLObjs.end()) {
@@ -565,7 +564,7 @@ void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
   ACCESS_CSV_ROW(row, "energy_yearly_kwh_max", pvData.energyYearlyKWhMax);
   ACCESS_CSV_ROW(row, "pv_area_qm", pvData.pvAreaQm);
   ACCESS_CSV_ROW(row, "area_qm", pvData.area);
-//   ACCESS_CSV_ROW(row, "co2savings", pvData.co2savings);
+  //   ACCESS_CSV_ROW(row, "co2savings", pvData.co2savings);
   ACCESS_CSV_ROW(row, "n_modules_max", pvData.numPanelsMax);
 
   if (pvData.pvAreaQm == 0) {
@@ -575,7 +574,7 @@ void EnergyPlugin::processPVRow(const CSVStream::CSVRow &row,
   }
 
   maxPVIntensity =
-    //   std::max(pvData.energyYearlyKWhMax / pvData.pvAreaQm, maxPVIntensity);
+      //   std::max(pvData.energyYearlyKWhMax / pvData.pvAreaQm, maxPVIntensity);
       std::max(pvData.energyYearlyKWhMax / pvData.area, maxPVIntensity);
   pvDataMap.insert({pvData.cityGMLID, pvData});
 }
@@ -705,6 +704,9 @@ void EnergyPlugin::processSolarPanelDrawables(
     if (name.find("RoofSurface") == std::string::npos) {
       continue;
     }
+
+    // osg::ref_ptr<osg::Geode> geode = drawable->asGeode();
+    // core::utils::color::overrideGeodeColor(geode, config.colorIntensity);
 
     if (data.numPanelsMax == 0) continue;
     config.numMaxPanels = data.numPanelsMax;
@@ -893,7 +895,6 @@ void EnergyPlugin::applyStaticDataCampusToCityGML(const std::string &filePath,
       auto &gmlObj = it->second;
       gmlObj->updateTimestepColors({v.yearlyConsumption},
                                    m_cityGmlColorMap->colorMap());
-
       gmlObj->updateTxtBoxTexts(
           {"Yearly Consumption: " + std::to_string(v.yearlyConsumption) + " MWh"});
     }
@@ -1585,8 +1586,7 @@ void EnergyPlugin::initPowerGridStreams() {
   }
 }
 
-// TODO:
-// [ ] - add a button to enable/disable the simulation data
+// [X] - add a button to enable/disable the simulation data
 // [ ] - plan uniform grid structure file => csv file in specific format
 std::unique_ptr<EnergyPlugin::FloatMap> EnergyPlugin::getInlfuxDataFromCSV(
     COVERUtils::read::CSVStream &stream, float &max, float &min, float &sum,
@@ -1684,6 +1684,7 @@ void EnergyPlugin::applyStaticDataToCityGML(const std::string &filePathToInfluxC
   float sum = 0;
 
   auto values = readStaticPowerData(csvStream, max, min, sum);
+  //   max = 7000.0f;
   if (updateColorMap) {
     m_cityGmlColorMap->setMinMax(min, max);
     m_cityGmlColorMap->setSpecies("Yearly Consumption");
@@ -2767,17 +2768,17 @@ void EnergyPlugin::readHeatingGridStream(CSVStream &heatingStream) {
 
   auto &heatingGrid = m_energyGrids[egridIdx];
   heatingGrid.group->setName(heatingGrid.name);
-  heatingGrid.grid = std::make_unique<EnergyGridOsg>(
-      EnergyGridConfig{"HEATING",
-                       points,
-                       {},
-                       {},
-                       heatingGrid.group,
-                       0.5f,
-                       additionalConnectionData,
-                       infoboardAttributes,
-                       EnergyGridConnectionType::Line,
-                       lines});
+  heatingGrid.grid =
+      std::make_unique<EnergyGrid>(EnergyGridConfig{"HEATING",
+                                                    points,
+                                                    {},
+                                                    {},
+                                                    heatingGrid.group,
+                                                    0.5f,
+                                                    additionalConnectionData,
+                                                    infoboardAttributes,
+                                                    EnergyGridConnectionType::Line,
+                                                    lines});
   heatingGrid.grid->initDrawables();
   addEnergyGridToGridSwitch(heatingGrid.group);
   switchEnergyGrid(EnergyGridType::HeatingGrid);

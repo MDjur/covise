@@ -492,11 +492,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
   // // Coolinggrid UI
   // opencover::ui::Menu *m_coolingGridMenu = nullptr;
 
-  float rad, scaleH;
-  int m_selectedComp = 0;
-  std::string m_powerGridDir;
-  std::vector<double> m_offset;
-
   ennovatis::BuildingsPtr m_buildings;
   DeviceList m_SDlist;
   std::shared_ptr<ennovatis::rest_request> m_req;
@@ -526,6 +521,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
   //   std::unique_ptr<SolarPanelList> m_solarPanels;
   SolarPanelList m_solarPanels;
   //   std::unique_ptr<SolarPanel> m_solarPanel;
+  //
+  std::vector<double> m_offset;
+  std::string m_powerGridDir;
+  float rad, scaleH;
+  int m_selectedComp = 0;
 };
 
 #endif
