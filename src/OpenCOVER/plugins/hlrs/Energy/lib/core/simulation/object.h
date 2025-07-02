@@ -25,6 +25,12 @@ class Object {
     m_data[key].push_back(value);
   }
 
+  Data::const_iterator begin() const { return m_data.begin(); }
+  Data::const_iterator end() const { return m_data.end(); }
+  void emplace_back(const std::string &key, const double &value) {
+    m_data[key].emplace_back(value);
+  }
+
  private:
   std::string m_name;
   Data m_data;  // timestep data
