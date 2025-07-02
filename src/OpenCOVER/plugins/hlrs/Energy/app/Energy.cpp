@@ -21,9 +21,6 @@
 \****************************************************************************/
 
 #include "Energy.h"
-#include "lib/core/constants.h"
-#include "lib/core/simulation/object.h"
-#include "lib/core/simulation/power.h"
 #include "ui/historic/Device.h"
 #include "ui/ennovatis/EnnovatisDevice.h"
 #include "ui/ennovatis/EnnovatisDeviceSensor.h"
@@ -45,13 +42,6 @@
 #include <cover/ui/View.h>
 #include <utils/read/csv/csv.h>
 #include <utils/string/LevenshteinDistane.h>
-
-// Ennovatis
-#include <lib/ennovatis/building.h>
-#include <lib/ennovatis/csv.h>
-#include <lib/ennovatis/date.h>
-#include <lib/ennovatis/rest.h>
-#include <lib/ennovatis/sax.h>
 
 // std
 #include <algorithm>
@@ -107,6 +97,19 @@
 #include <lib/core/utils/color.h>
 #include <lib/core/simulation/heating.h>
 #include <lib/core/utils/osgUtils.h>
+#include <lib/core/constants.h>
+#include <lib/core/simulation/object.h>
+#include <lib/core/simulation/power.h>
+
+// Ennovatis
+#include <lib/ennovatis/building.h>
+#include <lib/ennovatis/csv.h>
+#include <lib/ennovatis/date.h>
+#include <lib/ennovatis/rest.h>
+#include <lib/ennovatis/sax.h>
+
+#include <utils/thread/ConcurrentQueue.h>
+#include <date/date.h>
 
 using namespace opencover;
 using namespace COVERUtils::read;
