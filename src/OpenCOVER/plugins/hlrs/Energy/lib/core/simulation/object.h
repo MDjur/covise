@@ -54,6 +54,9 @@ class ObjectContainer {
   const auto &get() const { return m_elements; }
   auto begin() { return m_elements.begin(); }
   auto end() { return m_elements.end(); }
+  auto find(const std::string &name) { return m_elements.find(name); }
+  T& operator[](const std::string& name) { return m_elements.at(name); }
+  const T& operator[](const std::string& name) const { return m_elements.at(name); }
 
  private:
   std::map<std::string, T> m_elements;
