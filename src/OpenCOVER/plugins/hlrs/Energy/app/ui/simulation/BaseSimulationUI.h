@@ -65,7 +65,6 @@ class BaseSimulationUI {
   template <typename simulationObject>
   void computeColors(const opencover::ColorMap &color_map, const std::map<std::string, simulationObject> &objectContainer)
   {
-
     isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
 
