@@ -20,6 +20,14 @@
  **                                                                        **
 \****************************************************************************/
 
+// NEEDS TO BE INCLUDED FIRST
+// apache arrow
+// colliding with qt signals => compiler sees this as parameter name => QT replaces
+// signals with QT_SIGNALS which expands to public
+// QT_ANNOTATE_ACCESS_SPECIFIER(qt_signal)
+// By simply put the includes for arrow before qt
+// includes. In our case before everything we can resolve the issue.
+#include <lib/apache/arrow.h>
 #include "Energy.h"
 #include "ui/historic/Device.h"
 #include "ui/ennovatis/EnnovatisDevice.h"
@@ -168,7 +176,6 @@ float computeDistributionCenter(const std::vector<float> &values) {
   for (auto &value : values) sum += value;
   return sum / values.size();
 }
-
 }  // namespace
 
 /* #region GENERAL */
@@ -186,11 +193,11 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_energyGrids({
-          EnergyGrid{"PowerGrid", "Leistung", "kWh", EnergyGridType::PowerGrid},
-          EnergyGrid{"HeatingGrid", "mass_flow", "kg/s",
-                     EnergyGridType::HeatingGrid},
-          EnergyGrid{"PowerGridSonder", "Leistung", "kWh",
-                     EnergyGridType::PowerGridSonder},
+          EnergySimulation{"PowerGrid", "vm_pu", "V", EnergyGridType::PowerGrid},
+          EnergySimulation{"HeatingGrid", "mass_flow", "kg/s",
+                           EnergyGridType::HeatingGrid},
+          EnergySimulation{"PowerGridSonder", "Leistung", "kWh",
+                           EnergyGridType::PowerGridSonder},
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -376,10 +383,13 @@ bool EnergyPlugin::update() {
 void EnergyPlugin::setTimestep(int t) {
   m_sequenceList->setValue(t);
   for (auto &sensor : m_ennovatisDevicesSensors) sensor->setTimestep(t);
-
   for (auto &[_, sensor] : m_cityGMLObjs) sensor->updateTime(t);
-  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  m_energyGrids[idx].simUI->updateTime(t);
+
+  // this is a workaround for the fact that the energy grids are added in the same
+  // order as they appear in the the constructor
+
+  auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
+  energyGrid.simUI->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
@@ -1813,7 +1823,226 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
 }
 
 void EnergyPlugin::applySimulationDataToPowerGrid() {
-  // only data for citygml
+  auto simPath = configString("Simulation", "powerSimDir", "default")->value();
+
+  if (simPath.empty()) {
+    std::cerr << "No simulation data path configured." << std::endl;
+    return;
+  }
+
+  std::map<std::string, std::string> arrowFiles;
+  for (auto &entry : fs::directory_iterator(simPath)) {
+    if (fs::is_regular_file(entry)) {
+      if (entry.path().extension() == ".arrow") {
+        auto path = entry.path();
+        arrowFiles.emplace(path.stem().string(), path.string());
+      }
+    }
+  }
+
+  if (arrowFiles.empty()) {
+    std::cerr << "No .arrow files found in the simulation data path." << std::endl;
+    return;
+  }
+
+  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu"];
+  // auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
+  // auto arrowReader = apache::ArrowReader(loading_percent);
+  auto vmPuReader = apache::ArrowReader(vm_pu_path);
+
+  // const auto &schema = arrowReader.getSchema();
+  const auto &schemaVmPu = vmPuReader.getSchema();
+  // const auto &columnNames = schema->fields();
+  const auto &columnNamesVmPu = schemaVmPu->fields();
+
+  std::cout << "Schema of the Arrow file:" << std::endl;
+  for (const auto &field : schemaVmPu->fields()) {
+    std::cout << "Field: " << field->name()
+              << ", Type: " << field->type()->ToString() << std::endl;
+  }
+
+  auto sim = std::make_shared<power::PowerSimulation>();
+  // auto &cables = sim->Cables();
+
+  auto &buses = sim->Buses();
+  //   auto &transformators = sim->Transformators();
+  //   auto &generators = sim->Generators();
+  //
+  //   auto chunk = arrowReader.readColumnFromTable("");
+  // int64_t chunk_offset(0);
+  int64_t chunk_offset_vm_pu(0);
+  // auto table = arrowReader.getTable();
+  auto tableVmPu = vmPuReader.getTable();
+  //   for (const auto &column: table->columns()) {
+  std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings",
+                                  "pv-penetration"};
+  for (int j = 0; j < tableVmPu->num_columns(); ++j) {
+    auto columnName = columnNamesVmPu[j]->name();
+    // columnName = std::regex_replace(columnName, std::regex("\\."), "_");
+    std::replace(columnName.begin(), columnName.end(), ' ', '_');
+    if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
+          return toSkip == columnName;
+        }))
+      continue;
+    auto column = tableVmPu->column(j);
+    chunk_offset_vm_pu = 0;
+    for (int i = 0; i < column->num_chunks(); ++i) {
+      auto chunk = column->chunk(i);
+      switch (chunk->type_id()) {
+        case arrow::Type::DOUBLE: {
+          auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
+          auto rawValues = darr->raw_values();
+          auto containerIt = buses.find(columnName);
+          if (containerIt == buses.end()) {
+            buses.add(columnName);
+            auto &data = buses[columnName].getData();
+            data["vm_pu"] = {};
+            data["vm_pu"].resize(column->length());
+          }
+          auto &vmPuVec = buses[columnName].getData()["vm_pu"];
+          std::copy(rawValues, rawValues + darr->length(),
+                    vmPuVec.begin() + chunk_offset_vm_pu);
+          chunk_offset_vm_pu += darr->length();
+          break;
+        }
+        case arrow::Type::STRING:
+        case arrow::Type::NA:
+        case arrow::Type::BOOL:
+        case arrow::Type::UINT8:
+        case arrow::Type::INT8:
+        case arrow::Type::UINT16:
+        case arrow::Type::INT16:
+        case arrow::Type::UINT32:
+        case arrow::Type::INT32:
+        case arrow::Type::UINT64:
+        case arrow::Type::INT64:
+        case arrow::Type::HALF_FLOAT:
+        case arrow::Type::FLOAT:
+        case arrow::Type::BINARY:
+        case arrow::Type::FIXED_SIZE_BINARY:
+        case arrow::Type::DATE32:
+        case arrow::Type::DATE64:
+        case arrow::Type::TIMESTAMP:
+        case arrow::Type::TIME32:
+        case arrow::Type::TIME64:
+        case arrow::Type::INTERVAL_MONTHS:
+        case arrow::Type::INTERVAL_DAY_TIME:
+        case arrow::Type::DECIMAL128:
+        case arrow::Type::DECIMAL256:
+        case arrow::Type::LIST:
+        case arrow::Type::STRUCT:
+        case arrow::Type::SPARSE_UNION:
+        case arrow::Type::DENSE_UNION:
+        case arrow::Type::DICTIONARY:
+        case arrow::Type::MAP:
+        case arrow::Type::EXTENSION:
+        case arrow::Type::FIXED_SIZE_LIST:
+        case arrow::Type::DURATION:
+        case arrow::Type::LARGE_STRING:
+        case arrow::Type::LARGE_BINARY:
+        case arrow::Type::LARGE_LIST:
+        case arrow::Type::INTERVAL_MONTH_DAY_NANO:
+        case arrow::Type::RUN_END_ENCODED:
+        case arrow::Type::STRING_VIEW:
+        case arrow::Type::BINARY_VIEW:
+        case arrow::Type::LIST_VIEW:
+        case arrow::Type::LARGE_LIST_VIEW:
+        case arrow::Type::DECIMAL32:
+        case arrow::Type::DECIMAL64:
+        case arrow::Type::MAX_ID:
+          break;
+      }
+    }
+  }
+  // for (int j = 0; j < table->num_columns(); ++j) {
+  //   auto columnName = columnNames[j]->name();
+  //   columnName = std::regex_replace(columnName, std::regex("\\."), "_");
+  //   if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
+  //         return toSkip == columnName;
+  //       }))
+  //     continue;
+  //   auto column = table->column(j);
+  //   chunk_offset = 0;
+  //   for (int i = 0; i < column->num_chunks(); ++i) {
+  //     auto chunk = column->chunk(i);
+  //     switch (chunk->type_id()) {
+  //       case arrow::Type::DOUBLE: {
+  //         auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
+  //         auto rawValues = darr->raw_values();
+  //         auto containerIt = cables.find(columnName);
+  //         if (containerIt == cables.end()) {
+  //           cables.add(columnName);
+  //           auto &data = cables[columnName].getData();
+  //           data["loading_percent"] = {};
+  //           data["loading_percent"].resize(column->length());
+  //         }
+  //         auto &loadingPercentVec =
+  //         cables[columnName].getData()["loading_percent"]; std::copy(rawValues,
+  //         rawValues + darr->length(),
+  //                   loadingPercentVec.begin() + chunk_offset);
+  //         chunk_offset += darr->length();
+  //         break;
+  //       }
+  //       case arrow::Type::STRING:
+  //       case arrow::Type::NA:
+  //       case arrow::Type::BOOL:
+  //       case arrow::Type::UINT8:
+  //       case arrow::Type::INT8:
+  //       case arrow::Type::UINT16:
+  //       case arrow::Type::INT16:
+  //       case arrow::Type::UINT32:
+  //       case arrow::Type::INT32:
+  //       case arrow::Type::UINT64:
+  //       case arrow::Type::INT64:
+  //       case arrow::Type::HALF_FLOAT:
+  //       case arrow::Type::FLOAT:
+  //       case arrow::Type::BINARY:
+  //       case arrow::Type::FIXED_SIZE_BINARY:
+  //       case arrow::Type::DATE32:
+  //       case arrow::Type::DATE64:
+  //       case arrow::Type::TIMESTAMP:
+  //       case arrow::Type::TIME32:
+  //       case arrow::Type::TIME64:
+  //       case arrow::Type::INTERVAL_MONTHS:
+  //       case arrow::Type::INTERVAL_DAY_TIME:
+  //       case arrow::Type::DECIMAL128:
+  //       case arrow::Type::DECIMAL256:
+  //       case arrow::Type::LIST:
+  //       case arrow::Type::STRUCT:
+  //       case arrow::Type::SPARSE_UNION:
+  //       case arrow::Type::DENSE_UNION:
+  //       case arrow::Type::DICTIONARY:
+  //       case arrow::Type::MAP:
+  //       case arrow::Type::EXTENSION:
+  //       case arrow::Type::FIXED_SIZE_LIST:
+  //       case arrow::Type::DURATION:
+  //       case arrow::Type::LARGE_STRING:
+  //       case arrow::Type::LARGE_BINARY:
+  //       case arrow::Type::LARGE_LIST:
+  //       case arrow::Type::INTERVAL_MONTH_DAY_NANO:
+  //       case arrow::Type::RUN_END_ENCODED:
+  //       case arrow::Type::STRING_VIEW:
+  //       case arrow::Type::BINARY_VIEW:
+  //       case arrow::Type::LIST_VIEW:
+  //       case arrow::Type::LARGE_LIST_VIEW:
+  //       case arrow::Type::DECIMAL32:
+  //       case arrow::Type::DECIMAL64:
+  //       case arrow::Type::MAX_ID:
+  //         break;
+  //     }
+  //   }
+  // }
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+
+  if (m_energyGrids[idx].grid == nullptr) return;
+  auto &powerGrid = m_energyGrids[idx];
+  powerGrid.simUI = std::make_unique<PowerSimUI>(sim, powerGrid.grid);
+  powerGrid.sim = std::move(sim);
+
+  // std::cout << "Number of timesteps: " << table->num_rows() << std::endl;
+  // setAnimationTimesteps(table->num_rows(), powerGrid.group);
+  std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
+  setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
 }
 
 void EnergyPlugin::initPowerGrid() {
@@ -2281,14 +2510,14 @@ void EnergyPlugin::buildPowerGrid() {
                                  infoboardAttributes, EnergyGridConnectionType::Line,
                                  lines[1]);
 
-  auto powerGrid = std::make_unique<EnergyGridOsg>(econfig, false);
+  auto powerGrid = std::make_unique<EnergyGrid>(econfig, false);
   powerGrid->initDrawables();
   powerGrid->updateColor(
       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   egrid.grid = std::move(powerGrid);
   addEnergyGridToGridSwitch(egrid.group);
 
-  auto powerGridSonder = std::make_unique<EnergyGridOsg>(econfigSonder, false);
+  auto powerGridSonder = std::make_unique<EnergyGrid>(econfigSonder, false);
   powerGridSonder->initDrawables();
   powerGridSonder->updateColor(
       osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
@@ -2411,12 +2640,12 @@ void EnergyPlugin::readSimulationDataStream(
         name = match[1];
         valName = match[2];
         consumers.add(name);
-        consumers.addData(name, valName, val);
+        consumers.addDataToContainerObject(name, valName, val);
       } else if (std::regex_search(col, match, producer_value_split_regex)) {
         name = match[1];
         valName = match[2];
         producers.add(name);
-        producers.addData(name, valName, val);
+        producers.addDataToContainerObject(name, valName, val);
       } else {
         if (val == 0) continue;
         sim->addData(col, val);

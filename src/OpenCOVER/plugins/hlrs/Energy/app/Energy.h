@@ -17,6 +17,7 @@
 
 // ui
 #include "lib/core/interfaces/ISolarPanel.h"
+#include "lib/core/simulation/object.h"
 #include "lib/core/simulation/power.h"
 #include "lib/core/simulation/simulation.h"
 #include "ui/citygml/CityGMLDeviceSensor.h"
@@ -160,27 +161,11 @@ class EnergyPlugin : public opencover::coVRPlugin,
   typedef std::unique_ptr<CSVStreamMap> CSVStreamMapPtr;
 
   typedef std::vector<std::unique_ptr<core::interface::ISolarPanel>> SolarPanelList;
-  typedef ::EnergyGrid EnergyGridOsg;
   /* #endregion */
 
   struct ColorMapMenu {
     opencover::ui::Menu *menu;
     std::unique_ptr<opencover::CoverColorBar> selector;
-  };
-
-  struct EnergyGrid {
-    const std::string name;
-    const std::string species;
-    const std::string unit;
-    const EnergyGridType type;
-    opencover::ui::Button *simulationUIBtn = nullptr;
-    opencover::ui::Menu *menu = nullptr;
-    opencover::ui::SelectionList *scalarSelector = nullptr;
-    osg::ref_ptr<osg::MatrixTransform> group = nullptr;
-    std::shared_ptr<core::interface::IEnergyGrid> grid;
-    std::shared_ptr<Simulation> sim;
-    std::unique_ptr<BaseSimUI> simUI;
-    std::map<std::string, ColorMapMenu> colorMapRegistry;
   };
 
   auto getEnergyGridTypeIndex(EnergyGridType type) { return static_cast<int>(type); }
@@ -274,6 +259,32 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region SIMULATION */
+  struct EnergySimulation {
+    const std::string name;
+    const std::string species;
+    const std::string unit;
+    const EnergyGridType type;
+    opencover::ui::Button *simulationUIBtn = nullptr;
+    opencover::ui::Menu *menu = nullptr;
+    opencover::ui::SelectionList *scalarSelector = nullptr;
+    osg::ref_ptr<osg::MatrixTransform> group = nullptr;
+    std::shared_ptr<core::interface::IEnergyGrid> grid;
+    std::shared_ptr<Simulation> sim;
+    std::unique_ptr<BaseSimUI> simUI;
+    std::map<std::string, ColorMapMenu> colorMapRegistry;
+  };
+
+  struct InfluxData {
+    sys_time<minutes> time;  // RFC3339 format
+    double value;
+    std::string field;
+    std::string measurement;
+    std::string district;
+    bool hkw;
+    bool new_building;
+    bool pv_penetration;
+  };
+
   void initSimUI();
   void initEnergyGridUI();
   void initEnergyGridColorMaps();
@@ -427,7 +438,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_gridControlButton = nullptr;
   opencover::ui::Button *m_energySwitchControlButton = nullptr;
 
-  std::array<EnergyGrid, static_cast<std::size_t>(EnergyGridType::NUM_ENERGY_TYPES)>
+  std::array<EnergySimulation,
+             static_cast<std::size_t>(EnergyGridType::NUM_ENERGY_TYPES)>
       m_energyGrids;
   std::unique_ptr<opencover::CoverColorBar> m_cityGmlColorMap;
 
