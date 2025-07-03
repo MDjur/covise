@@ -389,7 +389,7 @@ void EnergyPlugin::setTimestep(int t) {
   // order as they appear in the the constructor
 
   auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
-  energyGrid.simUI->updateTime(t);
+  if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
