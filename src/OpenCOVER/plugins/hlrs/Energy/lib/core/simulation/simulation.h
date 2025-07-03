@@ -110,11 +110,11 @@ class Simulation {
 
  protected:
   template <typename T>
-  void computeParameter(const ObjectContainer<T> &baseMap) {
+  void computeParameter(const ObjectContainer<T> &container) {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
-    for (const auto &[_, base] : baseMap.get()) {
-      const auto &data = base.getData();
+    for (const auto &[_, object] : container.get()) {
+      const auto &data = object.getData();
       for (const auto &[key, values] : data) {
         setUnit(key);
         computeMinMax(key, values, 0.05);  // 5% trimming
