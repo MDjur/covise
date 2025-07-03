@@ -1,22 +1,30 @@
 #include "simulation.h"
 
 #include <algorithm>
+#include <cmath>
+
+namespace {
+std::pair<double, double> robustMinMax(const std::vector<double> &values,
+                                       double trimPercent = 0.01) {
+  if (values.empty()) return {0.0, 0.0};
+  std::vector<double> sorted = values;
+  std::sort(sorted.begin(), sorted.end());
+  size_t n = sorted.size();
+  size_t trim = static_cast<size_t>(std::round(n * trimPercent));
+  size_t lower = std::min(trim, n - 1);
+  size_t upper = std::max(n - trim - 1, lower);
+  return {sorted[lower], sorted[upper]};
+}
+}  // namespace
 
 namespace core::simulation {
 
 void Simulation::computeMinMax(const std::string &key,
-                               const std::vector<double> &values) {
-  const auto &[min_elem, max_elem] =
-      std::minmax_element(values.begin(), values.end());
-  if (auto it = m_scalarProperties.find(key); it == m_scalarProperties.end()) {
-    auto &property = m_scalarProperties[key];
-    property.min = *min_elem;
-    property.max = *max_elem;
-  } else {
-    auto &property = it->second;
-    if (*min_elem < property.min) property.min = *min_elem;
-    if (*max_elem > property.max) property.max = *max_elem;
-  }
+                               const std::vector<double> &values,
+                               const double &trimPercent) {
+  auto [min_elem, max_elem] = robustMinMax(values, trimPercent);
+  m_scalarProperties[key].min = min_elem;
+  m_scalarProperties[key].max = max_elem;
 }
 
 void Simulation::computeMaxTimestep(const std::string &key,

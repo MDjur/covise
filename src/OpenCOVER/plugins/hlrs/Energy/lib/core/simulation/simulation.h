@@ -113,14 +113,19 @@ class Simulation {
   void computeParameter(const ObjectContainer<T> &container) {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
+
+    std::map<std::string, std::vector<double>> allValues{};
     for (const auto &[_, object] : container.get()) {
       const auto &data = object.getData();
-      for (const auto &[key, values] : data) {
-        setUnit(key);
-        computeMinMax(key, values, 0.05);  // 5% trimming
-        computeMaxTimestep(key, values);
-        m_scalarProperties[key].species = key;
-      }
+      for (const auto &[key, values] : data)
+        allValues[key].insert(allValues[key].end(), values.begin(), values.end());
+    }
+
+    for (const auto &[key, values] : allValues) {
+      setUnit(key);
+      computeMinMax(key, values, 0.01);  // 1% trimming
+      computeMaxTimestep(key, values);
+      m_scalarProperties[key].species = key;
     }
   }
 
