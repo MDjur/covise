@@ -216,7 +216,11 @@ osg::ref_ptr<grid::DirectedConnection> EnergyGrid::getConnectionByName(
 
 const osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(
     const std::string &name) const {
+
+    // TODO: need to rework this after workshop => for now it works
   for (auto &point : m_config.points)
+    if (point->getName() == name) return point;
+  for (auto &[_, point] : m_config.pointsMap)
     if (point->getName() == name) return point;
   return nullptr;
 }
