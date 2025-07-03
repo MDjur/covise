@@ -117,7 +117,7 @@
 #include <lib/ennovatis/sax.h>
 
 #include <utils/thread/ConcurrentQueue.h>
-#include <date/date.h>
+// #include <date/date.h>
 
 using namespace opencover;
 using namespace COVERUtils::read;
