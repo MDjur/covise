@@ -165,7 +165,6 @@ void EnergyGrid::findCorrectHeightForLine(float radius,
 }
 
 void EnergyGrid::initDrawableLines() {
-//   using namespace core::simulation::grid;
   using namespace grid;
   osg::ref_ptr<osg::Group> linesGroup = new osg::Group;
   linesGroup->setName("Lines");
@@ -205,12 +204,6 @@ void EnergyGrid::initDrawablePoints() {
     }
   }
 
-  for (auto &[id, point] : m_config.pointsMap) {
-    if (point.valid()) {
-      initDrawableGridObject(points, point);
-    }
-  }
-
   m_config.parent->addChild(points);
 }
 
@@ -240,7 +233,6 @@ void EnergyGrid::initDrawableConnections() {
 }
 
 void EnergyGrid::initDrawables() {
-  initDrawablePoints();
   switch (m_config.connectionType) {
     case EnergyGridConnectionType::Index:
       initDrawableConnections();
@@ -251,21 +243,19 @@ void EnergyGrid::initDrawables() {
     default:
       std::cerr << "Invalid connection type\n";
   }
+  initDrawablePoints();
 }
 
 void EnergyGrid::updateColor(const osg::Vec4 &color) {
-  for (auto &connection : m_connections) {
+  for (auto &connection : m_connections)
     utils::color::overrideGeodeColor(connection->getGeode(), color);
-  }
-  for (auto &point : m_config.points) {
+  for (auto &point : m_config.points)
     utils::color::overrideGeodeColor(point->getGeode(), color);
-  }
-  for (auto &line : m_config.lines) {
-    for (auto &[name, connection] : line->getConnections()) {
+  for (auto &[_, point] : m_config.pointsMap)
+    utils::color::overrideGeodeColor(point->getGeode(), color);
+  for (auto &line : m_config.lines)
+    for (auto &[name, connection] : line->getConnections())
       utils::color::overrideGeodeColor(connection->getGeode(), color);
-    }
-    // utils::color::overrideGeodeColor(line->getGeode(), color);
-  }
 }
 
 void EnergyGrid::updateDrawables() {
