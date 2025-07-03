@@ -48,15 +48,18 @@ const UnitMap UNIT_MAP = UnitMap({
     {{"celcius", "temp", "inlet_temp", "outlet_temp"}, "°C"},
     {{"electricity_selling_price"}, "Cent/kWh"},
     {{"heating_cost"}, "€"},
-    {{"loading_percent", "percent"}, "%"},
-    {{"voltage", "volt", "vm_pu"}, "V"},
+    {{"voltage", "volt"}, "V"},
     {{"current", "ampere"}, "A"},
+    {{"i_ka"}, "kA"},
     {{"resistance", "ohm"}, "Ω"},
     {{"power_factor", "cos_phi"}, ""},
     {{"efficiency", "eta"}, ""},
     {{"reactive_power", "q"}, "var"},
     {{"active_power", "p"}, "W"},
     {{"apparent_power", "s"}, "VA"},
+    {{"vm_pu"}, "pu (voltage per unit)"},
+    {{"q_mvar"}, "Mvar"},
+    {{"loading_percent", "percent"}, "%"},
 });
 
 struct ScalarProperty {
@@ -114,7 +117,7 @@ class Simulation {
       const auto &data = base.getData();
       for (const auto &[key, values] : data) {
         setUnit(key);
-        computeMinMax(key, values);
+        computeMinMax(key, values, 0.05);  // 5% trimming
         computeMaxTimestep(key, values);
         m_scalarProperties[key].species = key;
       }
@@ -122,7 +125,8 @@ class Simulation {
   }
 
   virtual void computeMinMax(const std::string &key,
-                             const std::vector<double> &values);
+                             const std::vector<double> &values,
+                             const double &trimPercent = 0.00);
   virtual void computeMaxTimestep(const std::string &key,
                                   const std::vector<double> &values);
   virtual void setUnit(const std::string &key);
