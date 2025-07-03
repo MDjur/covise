@@ -277,16 +277,16 @@ class EnergyPlugin : public opencover::coVRPlugin,
     std::map<std::string, ColorMapMenu> colorMapRegistry;
   };
 
-  struct InfluxData {
-    sys_time<minutes> time;  // RFC3339 format
-    double value;
-    std::string field;
-    std::string measurement;
-    std::string district;
-    bool hkw;
-    bool new_building;
-    bool pv_penetration;
-  };
+//   struct InfluxData {
+//     sys_time<minutes> time;  // RFC3339 format
+//     double value;
+//     std::string field;
+//     std::string measurement;
+//     std::string district;
+//     bool hkw;
+//     bool new_building;
+//     bool pv_penetration;
+//   };
 
   void initSimUI();
   void initEnergyGridUI();
