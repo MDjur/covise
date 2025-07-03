@@ -130,7 +130,7 @@ bool Line::overlap(const Line &other) const {
                        auto otherStart = otherCon->getStart();
                        auto otherEnd = otherCon->getEnd();
 
-                       // check if the name is simply reverse
+                       // check if the name is simply in reverse order
                        std::string otherReverseName =
                            otherEnd->getName() + " > " + otherStart->getName();
 

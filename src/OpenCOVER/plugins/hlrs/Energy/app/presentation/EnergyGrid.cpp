@@ -140,7 +140,7 @@ void EnergyGrid::findCorrectHeightForLine(float radius,
                                           osg::ref_ptr<grid::Line> line,
                                           grid::Lines &processedLines) {
   if (m_ignoreOverlap) return;
-  int redundantCount = 1;
+  int redundantCount = 0;
   bool overlap = true;
 
   std::set<osg::ref_ptr<grid::Line>> lastMatch;
@@ -167,8 +167,8 @@ void EnergyGrid::findCorrectHeightForLine(float radius,
 void EnergyGrid::initDrawableLines() {
 //   using namespace core::simulation::grid;
   using namespace grid;
-  osg::ref_ptr<osg::Group> lines = new osg::Group;
-  lines->setName("Lines");
+  osg::ref_ptr<osg::Group> linesGroup = new osg::Group;
+  linesGroup->setName("Lines");
   const auto &sphereRadius =
       m_config.lines[0]->getConnections().begin()->second->getStart()->getRadius();
   grid::Lines overlappingLines;
@@ -177,9 +177,9 @@ void EnergyGrid::initDrawableLines() {
     // move redundant line below the first one
     findCorrectHeightForLine(sphereRadius, line, overlappingLines);
     overlappingLines.push_back(line);
-    initDrawableGridObject(lines, line);
+    initDrawableGridObject(linesGroup, line);
   }
-  m_config.parent->addChild(lines);
+  m_config.parent->addChild(linesGroup);
 }
 
 std::string EnergyGrid::createDataString(const grid::Data &data) const {
