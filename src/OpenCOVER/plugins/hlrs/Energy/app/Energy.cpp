@@ -198,9 +198,9 @@ EnergyPlugin::EnergyPlugin()
         //                    EnergyGridType::HeatingGrid},
         //   EnergySimulation{"PowerGridSonder", "Leistung", "kWh",
         //                    EnergyGridType::PowerGridSonder},
-          EnergyGrid{"PowerGrid", EnergyGridType::PowerGrid},
-          EnergyGrid{"HeatingGrid", EnergyGridType::HeatingGrid},
-          EnergyGrid{"PowerGridSonder", EnergyGridType::PowerGridSonder},
+          EnergySimulation{"PowerGrid", EnergyGridType::PowerGrid},
+          EnergySimulation{"HeatingGrid", EnergyGridType::HeatingGrid},
+          EnergySimulation{"PowerGridSonder", EnergyGridType::PowerGridSonder},
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -2146,8 +2146,7 @@ void EnergyPlugin::initEnergyGridColorMaps() {
   }
 }
 
-void EnergyPlugin::updateGridData(EnergyGrid &energyGrid) {
-
+void EnergyPlugin::updateGridData(EnergySimulation &energyGrid) {
   energyGrid.grid->setData(*energyGrid.sim, energyGrid.scalarSelector->selectedItem());
 }
 
@@ -2842,7 +2841,7 @@ void EnergyPlugin::buildHeatingGrid() {
   if (m_heatingGridStreams.empty()) return;
 
   // find correct csv
-  auto heatingIt = m_heatingGridStreams.find("heating_network_2");
+  auto heatingIt = m_heatingGridStreams.find("heating_network_simple");
   if (heatingIt == m_heatingGridStreams.end()) return;
 
   auto &[_, heatingStream] = *heatingIt;

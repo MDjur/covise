@@ -128,7 +128,7 @@ osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromD
   }
   for(const auto &val : toData)
   {
-    values[index] = toData[index - fromData.size()]; 
+    values[index] = toData[index - fromData.size()];
     ++index;
   }
 
@@ -176,7 +176,7 @@ void DirectedConnection::setColorMap(const opencover::ColorMap &colorMap)
   auto state = drawable->getOrCreateStateSet();
   m_shader->apply(state);
   drawable->setStateSet(state);
-  
+
 }
 
 void DirectedConnection::updateTimestep(int timestep)

@@ -130,15 +130,15 @@ class Simulation {
   }
 
   template <typename T>
-  const std::vector<double> *getTimedependentScalar(const ObjectContainer<T> &baseMap,
+  const std::vector<double> *getTimedependentScalar(const ObjectContainer<T> &container,
                                           const std::string &species,
                                           const std::string &node) const{
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
     std::vector<double> result;
-    for (const auto &[name, base] : baseMap) {
-      if (base.getName() == node) {
-        const auto &data = base.getData();
+    for (const auto &[name, object] : container) {
+      if (object.getName() == node) {
+        const auto &data = object.getData();
         if (data.find(species) != data.end()) {
           return &data.at(species);
         }

@@ -295,7 +295,7 @@ void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap)
 
 void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::string & species) {
   for(auto &conn : m_connections) {
-    
+
     auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
     auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
     if (fromData && toData) {
@@ -306,7 +306,7 @@ void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::str
   }
   for(auto &line : m_lines) {
     for(auto &[_, conn] : line->getConnections()) {
-      
+
       auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
       auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
       if (fromData && toData) {
@@ -318,7 +318,7 @@ void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::str
   }
   for(auto &line : m_config.lines) {
     for(auto &[_, conn] : line->getConnections()) {
-      
+
       auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
       auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
       if (fromData && toData) {
