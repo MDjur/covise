@@ -392,11 +392,13 @@ void EnergyPlugin::setTimestep(int t) {
   // this is a workaround for the fact that the energy grids are added in the same
   // order as they appear in the the constructor
 
-//   auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
-//   if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
-  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  m_energyGrids[idx].simUI->updateTime(t);
-  m_energyGrids[idx].grid->updateTime(t);
+  auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
+  if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
+  if (energyGrid.type == EnergyGridType::HeatingGrid)
+    energyGrid.grid->updateTime(t);
+//   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+//   m_energyGrids[idx].simUI->updateTime(t);
+//   m_energyGrids[idx].grid->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
