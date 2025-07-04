@@ -15,11 +15,12 @@ using namespace core::simulation::heating;
 template <typename T>
 class HeatingSimulationUI : public BaseSimulationUI<T> {
  public:
-  HeatingSimulationUI(std::shared_ptr<HeatingSimulation> sim, std::shared_ptr<T> parent)
+  HeatingSimulationUI(std::shared_ptr<HeatingSimulation> sim,
+                      std::shared_ptr<T> parent)
       : BaseSimulationUI<T>(sim, parent) {}
   ~HeatingSimulationUI() = default;
-  HeatingSimulationUI(const HeatingSimulationUI &) = delete;
-  HeatingSimulationUI &operator=(const HeatingSimulationUI &) = delete;
+  HeatingSimulationUI(const HeatingSimulationUI&) = delete;
+  HeatingSimulationUI& operator=(const HeatingSimulationUI&) = delete;
 
   void updateTime(int timestep) override {
     auto parent = this->m_parent.lock();
@@ -47,11 +48,9 @@ class HeatingSimulationUI : public BaseSimulationUI<T> {
   }
 
   void updateTimestepColors(const opencover::ColorMap& map) override {
-
     // compute colors
     auto heatingSim = this->heatingSimulationPtr();
-    if (!heatingSim) 
-      return;
+    if (!heatingSim) return;
     auto computeColorsForContainer = [&](auto entities) {
       this->computeColors(map, entities);
     };

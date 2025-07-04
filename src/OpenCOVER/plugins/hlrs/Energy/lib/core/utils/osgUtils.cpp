@@ -408,9 +408,8 @@ void smoothGeometry(osg::ref_ptr<osg::Geometry> geometry) {
 constexpr int SHADER_INDEX_ATTRIB = 5;
 
 osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
-  osg::Vec3 start, osg::Vec3 end, float radius, int circleSegments, int lengthSegments,
-  osg::ref_ptr<osg::TessellationHints> hints) {
-
+    osg::Vec3 start, osg::Vec3 end, float radius, int circleSegments,
+    int lengthSegments, osg::ref_ptr<osg::TessellationHints> hints) {
   osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
   osg::Vec3 direction = start - end;
   direction.normalize();
@@ -427,13 +426,11 @@ osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
   geometry->setVertexArray(vertices);
   geometry->setNormalArray(normals, osg::Array::BIND_PER_VERTEX);
   geometry->addPrimitiveSet(indices);
-  
-  //shader attribute mapping from vertices to data value in texture
+
+  // shader attribute mapping from vertices to data value in texture
   osg::IntArray *intArray = new osg::IntArray;
-  for (size_t i = 0; i < lengthSegments + 1; i++)
-  {
-    for (size_t j = 0; j < circleSegments; j++)
-    {
+  for (size_t i = 0; i < lengthSegments + 1; i++) {
+    for (size_t j = 0; j < circleSegments; j++) {
       intArray->push_back(i);
     }
   }
@@ -463,16 +460,15 @@ osg::ref_ptr<osg::Geode> createCylinderBetweenPointsColorInterpolation(
     float radius, int circleSegments, int lengthSegments,
     const osg::Vec4 &startColor, const osg::Vec4 &endColor,
     osg::ref_ptr<osg::TessellationHints> hints) {
-
   osg::ref_ptr<osg::Geode> geode = new osg::Geode;
   osg::ref_ptr<osg::Geometry> geometry = createCylinderBetweenPoints(
       start, end, radius, circleSegments, lengthSegments, hints);
   osg::ref_ptr<osg::Material> material = new osg::Material;
 
-  
   // NOTE: for debugging basePoints
-  // osg::Vec3Array* vertices = dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray());
-  // for (const auto& vertex : *vertices) {
+  // osg::Vec3Array* vertices =
+  // dynamic_cast<osg::Vec3Array*>(geometry->getVertexArray()); for (const auto&
+  // vertex : *vertices) {
   //     osg::ref_ptr<osg::Sphere> sph = new osg::Sphere(vertex, 0.25f);
   //     osg::ref_ptr<osg::ShapeDrawable> d = new osg::ShapeDrawable(sph);
   //     d->setColor(osg::Vec4(0.0f, 1.0f, 1.0f, 1.0f));

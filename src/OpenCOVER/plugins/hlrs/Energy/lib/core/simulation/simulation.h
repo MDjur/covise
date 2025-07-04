@@ -107,9 +107,10 @@ class Simulation {
   auto &getScalarProperties() { return m_scalarProperties; }
 
   virtual void computeParameters() {};
-  virtual const std::vector<double> *getTimedependentScalar(const std::string &species, const std::string& node) const = 0;
+  virtual const std::vector<double> *getTimedependentScalar(
+      const std::string &species, const std::string &node) const = 0;
 
-  protected:
+ protected:
   template <typename T>
   void computeParameter(const ObjectContainer<T> &container) {
     static_assert(std::is_base_of_v<Object, T>,
@@ -130,9 +131,9 @@ class Simulation {
   }
 
   template <typename T>
-  const std::vector<double> *getTimedependentScalar(const ObjectContainer<T> &container,
-                                          const std::string &species,
-                                          const std::string &node) const{
+  const std::vector<double> *getTimedependentScalar(
+      const ObjectContainer<T> &container, const std::string &species,
+      const std::string &node) const {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
     std::vector<double> result;
