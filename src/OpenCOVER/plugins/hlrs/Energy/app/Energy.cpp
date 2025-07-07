@@ -394,10 +394,11 @@ void EnergyPlugin::setTimestep(int t) {
 
   auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
   // needed for updating spheres
-//   if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
+  //   if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
   if (energyGrid.grid) energyGrid.grid->updateTime(t);
-//   if (energyGrid.type == EnergyGridType::HeatingGrid) energyGrid.grid->updateTime(t);
-  //   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  //   if (energyGrid.type == EnergyGridType::HeatingGrid)
+  //   energyGrid.grid->updateTime(t); auto idx =
+  //   getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   //   m_energyGrids[idx].simUI->updateTime(t);
   //   m_energyGrids[idx].grid->updateTime(t);
 }
@@ -1838,85 +1839,89 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
 }
 
 void EnergyPlugin::applySimulationDataToPowerGrid() {
-    auto simPath = configString("Simulation", "powerSimDir", "default")->value();
-    if (simPath.empty()) {
-        std::cerr << "No simulation data path configured." << std::endl;
-        return;
-    }
+  auto simPath = configString("Simulation", "powerSimDir", "default")->value();
+  if (simPath.empty()) {
+    std::cerr << "No simulation data path configured." << std::endl;
+    return;
+  }
 
-    std::map<std::string, std::string> arrowFiles;
-    for (auto &entry : fs::directory_iterator(simPath)) {
-        if (fs::is_regular_file(entry) && entry.path().extension() == ".arrow") {
-            arrowFiles.emplace(entry.path().stem().string(), entry.path().string());
+  std::map<std::string, std::string> arrowFiles;
+  for (auto &entry : fs::directory_iterator(simPath)) {
+    if (fs::is_regular_file(entry) && entry.path().extension() == ".arrow") {
+      arrowFiles.emplace(entry.path().stem().string(), entry.path().string());
+    }
+  }
+
+  if (arrowFiles.empty()) {
+    std::cerr << "No .arrow files found in the simulation data path." << std::endl;
+    return;
+  }
+
+  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu_NEW"];
+  auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent_NEW"];
+  apache::ArrowReader arrowReader(loading_percent);
+  apache::ArrowReader vmPuReader(vm_pu_path);
+
+  auto table = arrowReader.getTable();
+  auto tableVmPu = vmPuReader.getTable();
+  auto columnNames = table->schema()->fields();
+  auto columnNamesVmPu = tableVmPu->schema()->fields();
+
+  std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings",
+                                  "pv-penetration"};
+
+  auto isSkipped = [&skip](const std::string &name) {
+    return std::any_of(skip.begin(), skip.end(),
+                       [&](const auto &s) { return s == name; });
+  };
+
+  auto sim = std::make_shared<power::PowerSimulation>();
+  auto &cables = sim->Cables();
+  auto &buses = sim->Buses();
+
+  // Helper to process columns
+  auto processColumns = [&](const std::shared_ptr<arrow::Table> &tbl,
+                            auto &container, const std::string &dataKey) {
+    for (int j = 0; j < tbl->num_columns(); ++j) {
+      auto columnName = columnNames[j]->name();
+      std::replace(columnName.begin(), columnName.end(), ' ', '_');
+      if (isSkipped(columnName)) continue;
+      auto column = tbl->column(j);
+      int64_t chunk_offset = 0;
+      for (int i = 0; i < column->num_chunks(); ++i) {
+        auto chunk = column->chunk(i);
+        if (chunk->type_id() == arrow::Type::DOUBLE) {
+          auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
+          auto rawValues = darr->raw_values();
+          if (container.find(columnName) == container.end()) {
+            container.add(columnName);
+            auto &data = container[columnName].getData();
+            data[dataKey] = {};
+            data[dataKey].resize(column->length());
+          }
+          auto &vec = container[columnName].getData()[dataKey];
+          std::copy(rawValues, rawValues + darr->length(),
+                    vec.begin() + chunk_offset);
+          chunk_offset += darr->length();
         }
+      }
     }
+  };
 
-    if (arrowFiles.empty()) {
-        std::cerr << "No .arrow files found in the simulation data path." << std::endl;
-        return;
-    }
+  // Process bus voltages
+  processColumns(tableVmPu, buses, "vm_pu");
 
-    auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu_NEW"];
-    auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent_NEW"];
-    apache::ArrowReader arrowReader(loading_percent);
-    apache::ArrowReader vmPuReader(vm_pu_path);
+  // Process cable loading
+  processColumns(table, cables, "loading_percent");
 
-    auto table = arrowReader.getTable();
-    auto tableVmPu = vmPuReader.getTable();
-    auto columnNames = table->schema()->fields();
-    auto columnNamesVmPu = tableVmPu->schema()->fields();
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+  if (m_energyGrids[idx].grid == nullptr) return;
+  auto &powerGrid = m_energyGrids[idx];
+  powerGrid.simUI = std::make_unique<PowerSimUI>(sim, powerGrid.grid);
+  powerGrid.sim = std::move(sim);
 
-    std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings", "pv-penetration"};
-
-    auto isSkipped = [&skip](const std::string &name) {
-        return std::any_of(skip.begin(), skip.end(), [&](const auto &s) { return s == name; });
-    };
-
-    auto sim = std::make_shared<power::PowerSimulation>();
-    auto &cables = sim->Cables();
-    auto &buses = sim->Buses();
-
-    // Helper to process columns
-    auto processColumns = [&](const std::shared_ptr<arrow::Table> &tbl, auto &container, const std::string &dataKey) {
-        for (int j = 0; j < tbl->num_columns(); ++j) {
-            auto columnName = columnNames[j]->name();
-            std::replace(columnName.begin(), columnName.end(), ' ', '_');
-            if (isSkipped(columnName)) continue;
-            auto column = tbl->column(j);
-            int64_t chunk_offset = 0;
-            for (int i = 0; i < column->num_chunks(); ++i) {
-                auto chunk = column->chunk(i);
-                if (chunk->type_id() == arrow::Type::DOUBLE) {
-                    auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
-                    auto rawValues = darr->raw_values();
-                    if (container.find(columnName) == container.end()) {
-                        container.add(columnName);
-                        auto &data = container[columnName].getData();
-                        data[dataKey] = {};
-                        data[dataKey].resize(column->length());
-                    }
-                    auto &vec = container[columnName].getData()[dataKey];
-                    std::copy(rawValues, rawValues + darr->length(), vec.begin() + chunk_offset);
-                    chunk_offset += darr->length();
-                }
-            }
-        }
-    };
-
-    // Process bus voltages
-    processColumns(tableVmPu, buses, "vm_pu");
-
-    // Process cable loading
-    processColumns(table, cables, "loading_percent");
-
-    auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
-    if (m_energyGrids[idx].grid == nullptr) return;
-    auto &powerGrid = m_energyGrids[idx];
-    powerGrid.simUI = std::make_unique<PowerSimUI>(sim, powerGrid.grid);
-    powerGrid.sim = std::move(sim);
-
-    std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
-    setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
+  std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
+  setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
 }
 
 void EnergyPlugin::initPowerGrid() {
@@ -2256,7 +2261,8 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
-    grid::ConnectionData conData{name, fromPoint, toPoint, radius, false, nullptr, data};
+    grid::ConnectionData conData{name,  fromPoint, toPoint, radius,
+                                 false, nullptr,   data};
     connections.push_back(
         new grid::DirectedConnection(conData, grid::ConnectionType::LineWithShader));
     from_last = to_new;
@@ -2414,15 +2420,15 @@ void EnergyPlugin::buildPowerGrid() {
 
   auto powerGrid = std::make_unique<EnergyGrid>(econfig, false);
   powerGrid->initDrawables();
-//   powerGrid->updateColor(
-//       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
+  //   powerGrid->updateColor(
+  //       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   egrid.grid = std::move(powerGrid);
   addEnergyGridToGridSwitch(egrid.group);
 
   auto powerGridSonder = std::make_unique<EnergyGrid>(econfigSonder, false);
   powerGridSonder->initDrawables();
-//   powerGridSonder->updateColor(
-//       osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
+  //   powerGridSonder->updateColor(
+  //       osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   egridSonder.grid = std::move(powerGridSonder);
   addEnergyGridToGridSwitch(egridSonder.group);
 
