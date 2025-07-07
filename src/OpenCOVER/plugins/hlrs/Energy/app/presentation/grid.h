@@ -100,8 +100,8 @@ class DirectedConnection : public osg::MatrixTransform {
   void setDataInShader(const std::vector<double> &fromData,
                const std::vector<double> &toData);
   void setData1DInShader(const std::vector<double> &data, float min, float max);
-  // shader needs to have same uniform buffer like share/covise/materials/EnergyGrid.xml
-  void updateColorMapInShader(const opencover::ColorMap &colorMap, const std::string &shaderName = "EnergyGrid");
+  // shader needs to have same uniform buffer like share/covise/materials/EnergyGrid_Line.xml
+  void updateColorMapInShader(const opencover::ColorMap &colorMap, const std::string &shaderName = "EnergyGrid_Line");
   void updateTimestepInShader(int timestep);
 
  private:
