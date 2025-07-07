@@ -262,10 +262,23 @@ class EnergyPlugin : public opencover::coVRPlugin,
   /* #endregion */
 
   /* #region SIMULATION */
+  //   struct EnergySimulation {
+  //     const std::string name;
+  //     const std::string species;
+  //     const std::string unit;
+  //     const EnergyGridType type;
+  //     opencover::ui::Button *simulationUIBtn = nullptr;
+  //     opencover::ui::Menu *menu = nullptr;
+  //     opencover::ui::SelectionList *scalarSelector = nullptr;
+  //     osg::ref_ptr<osg::MatrixTransform> group = nullptr;
+  //     std::shared_ptr<core::interface::IEnergyGrid> grid;
+  //     std::shared_ptr<Simulation> sim;
+  //     std::unique_ptr<BaseSimUI> simUI;
+  //     std::map<std::string, ColorMapMenu> colorMapRegistry;
+  //   };
+
   struct EnergySimulation {
     const std::string name;
-    const std::string species;
-    const std::string unit;
     const EnergyGridType type;
     opencover::ui::Button *simulationUIBtn = nullptr;
     opencover::ui::Menu *menu = nullptr;
@@ -277,16 +290,16 @@ class EnergyPlugin : public opencover::coVRPlugin,
     std::map<std::string, ColorMapMenu> colorMapRegistry;
   };
 
-//   struct InfluxData {
-//     sys_time<minutes> time;  // RFC3339 format
-//     double value;
-//     std::string field;
-//     std::string measurement;
-//     std::string district;
-//     bool hkw;
-//     bool new_building;
-//     bool pv_penetration;
-//   };
+  //   struct InfluxData {
+  //     sys_time<minutes> time;  // RFC3339 format
+  //     double value;
+  //     std::string field;
+  //     std::string measurement;
+  //     std::string district;
+  //     bool hkw;
+  //     bool new_building;
+  //     bool pv_penetration;
+  //   };
 
   void initSimUI();
   void initEnergyGridUI();
@@ -295,6 +308,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initSimMenu();
   void updateColorMap(const opencover::ColorMap &map, EnergyGridType grid);
   void initColorMap();
+  void updateGridData(EnergySimulation &energyGrid);
   void initGrid();
   void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
 

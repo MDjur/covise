@@ -1,6 +1,7 @@
 #pragma once
 
 #include <PluginUtil/colors/coColorBar.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <lib/core/interfaces/IColorable.h>
 #include <lib/core/interfaces/IDrawables.h>
 #include <lib/core/interfaces/ITimedependable.h>
@@ -13,7 +14,6 @@
 #include <memory>
 
 #include "app/presentation/EnergyGrid.h"
-#include <PluginUtil/colors/coColorMap.h>
 
 using namespace core::simulation;
 
@@ -37,10 +37,10 @@ class BaseSimulationUI {
   BaseSimulationUI &operator=(const BaseSimulationUI &) = delete;
 
   virtual void updateTime(int timestep) = 0;
-  //toDo: make these const
-  virtual float min(const std::string& species) = 0;
-  virtual float max(const std::string& species)  = 0;
-  virtual void updateTimestepColors(const opencover::ColorMap& map) = 0;
+  // toDo: make these const
+  virtual float min(const std::string &species) = 0;
+  virtual float max(const std::string &species) = 0;
+  virtual void updateTimestepColors(const opencover::ColorMap &map) = 0;
 
  protected:
   template <typename simulationObject>
@@ -62,9 +62,12 @@ class BaseSimulationUI {
     }
   }
 
+  const opencover::ColorMap *m_colorMap = nullptr;
   template <typename simulationObject>
-  void computeColors(const opencover::ColorMap &color_map, const std::map<std::string, simulationObject> &objectContainer)
-  {
+  void computeColors(
+      const opencover::ColorMap &color_map,
+      const std::map<std::string, simulationObject> &objectContainer) {
+    m_colorMap = &color_map;
     isDerivedFromObject<simulationObject>();
     double minKeyVal = 0.0, maxKeyVal = 1.0;
 
@@ -79,7 +82,8 @@ class BaseSimulationUI {
       minKeyVal = simulation->getMin(color_map.species());
       maxKeyVal = simulation->getMax(color_map.species());
     } catch (const std::out_of_range &e) {
-      std::cerr << "Key not found in minMaxValues: " << color_map.species() << std::endl;
+      std::cerr << "Key not found in minMaxValues: " << color_map.species()
+                << std::endl;
       return;
     }
 
@@ -100,7 +104,7 @@ class BaseSimulationUI {
       for (auto i = 0; i < values.size(); ++i) {
         auto interpolated_value = core::utils::math::interpolate(
             values[i], minKeyVal, maxKeyVal, color_map.min(), color_map.max());
-            colors[i] = color_map.getColor(interpolated_value);
+        colors[i] = color_map.getColor(interpolated_value);
       }
     }
   }
@@ -111,8 +115,9 @@ class BaseSimulationUI {
         std::is_base_of_v<Object, simulationObject>,
         "simulationObject must be derived from core::simulation::heating::Object");
   }
-
   std::weak_ptr<T> m_parent;  // parent which manages drawable
   std::weak_ptr<Simulation> m_simulation;
+
+ private:
   std::map<std::string, std::vector<osg::Vec4>> m_colors;
 };

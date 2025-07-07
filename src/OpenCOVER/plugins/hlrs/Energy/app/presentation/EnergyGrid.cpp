@@ -106,7 +106,6 @@ void EnergyGrid::initConnectionsByIndex(
   for (auto i = 0; i < indices.size(); ++i) {
     auto from = points[i];
     for (auto j = 0; j < indices[i].size(); ++j) {
-      std::unique_ptr<grid::ConnectionData> data;
 
       if (i < 0 || i >= points.size()) {
         std::cerr << "Invalid Index for points: " << i << "\n";
@@ -129,9 +128,9 @@ void EnergyGrid::initConnectionsByIndex(
         if (additionalConnectionData.size() > i)
           if (additionalConnectionData[i].size() > j)
             additionalData = additionalConnectionData[i][j];
-      data = std::make_unique<grid::ConnectionData>(name, from, to, radius, nullptr,
-                                                    additionalData);
-      m_connections.push_back(new grid::DirectedConnection(*data));
+      grid::ConnectionData data{name, from, to, radius, false, nullptr,
+                                                    additionalData};
+      m_connections.push_back(new grid::DirectedConnection(data));
     }
   }
 }
@@ -265,5 +264,89 @@ void EnergyGrid::updateColor(const osg::Vec4 &color) {
 void EnergyGrid::updateDrawables() {
   for (auto &infoboard : m_infoboards) {
     infoboard->updateDrawable();
+  }
+}
+//toDo: streamline update for m_connections, m_lines and m_config.lines
+void EnergyGrid::updateTime(int timestep)
+{
+  for(auto &conn : m_connections)
+    conn->updateTimestepInShader(timestep);
+  for(auto &line : m_lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->updateTimestepInShader(timestep);
+  for(auto &line : m_config.lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->updateTimestepInShader(timestep);
+}
+
+
+
+void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap)
+{
+  for(auto &conn : m_connections)
+    conn->updateColorMapInShader(colorMap);
+  for(auto &line : m_lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->updateColorMapInShader(colorMap);
+  for(auto &line : m_config.lines)
+    for(auto &[_, conn] : line->getConnections())
+      conn->updateColorMapInShader(colorMap);
+}
+
+void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::string & species, bool interpolate) {
+  for(auto &conn : m_connections) {
+
+    auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
+    auto toData = fromData;
+    if (interpolate)
+        toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+    if (fromData && toData) {
+      conn->setDataInShader(*fromData, *toData);
+    } else {
+      std::cerr << "No data found for connection: " << conn->getName() << "\n";
+    }
+  }
+  for(auto &line : m_lines) {
+    for(auto &[_, conn] : line->getConnections()) {
+
+      auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
+      auto toData = fromData;
+      if (interpolate)
+        toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+      if (fromData && toData) {
+        conn->setDataInShader(*fromData, *toData);
+      } else {
+        std::cerr << "No data found for connection: " << conn->getName() << "\n";
+      }
+    }
+  }
+  for (auto &line : m_config.lines) {
+    if (interpolate) {
+      for (auto &[_, conn] : line->getConnections()) {
+        auto fromData =
+            sim.getTimedependentScalar(species, conn->getStart()->getName());
+        auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+        if (fromData && toData) {
+          conn->setDataInShader(*fromData, *toData);
+        } else {
+          std::cerr << "No data found for connection: " << conn->getName() << "\n";
+        }
+      }
+    } else {
+      // TODO: If not interpolating, use the line name to get the data => pls rework later
+      // this is a workaround for the current data structure
+      auto lineName = line->getName();
+      std::replace(lineName.begin(), lineName.end(), ' ', '_');
+      auto data = sim.getTimedependentScalar(species, lineName);
+      const auto [min, max] = sim.getMinMax(species);
+      std::cout << "Min: " << min << ", Max: " << max << "\n";
+      if (!data) {
+        std::cerr << "No data found for line: " << lineName << "\n";
+        continue;
+      }
+      for (auto &[_, conn] : line->getConnections())
+        // conn->setDataInShader(*data, *data);
+        conn->setData1DInShader(*data, min, max);
+    }
   }
 }

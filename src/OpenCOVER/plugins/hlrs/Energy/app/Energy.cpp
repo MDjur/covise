@@ -34,7 +34,7 @@
 #include "ui/ennovatis/EnnovatisDeviceSensor.h"
 #include <build_options.h>
 #include <config/CoviseConfig.h>
-
+#include <util/string_util.h>
 // COVER
 #include <PluginUtil/colors/coColorMap.h>
 
@@ -192,11 +192,15 @@ EnergyPlugin::EnergyPlugin()
       m_Energy(new osg::MatrixTransform()),
       m_cityGML(new osg::Group()),
       m_energyGrids({
-          EnergySimulation{"PowerGrid", "vm_pu", "V", EnergyGridType::PowerGrid},
-          EnergySimulation{"HeatingGrid", "mass_flow", "kg/s",
-                           EnergyGridType::HeatingGrid},
-          EnergySimulation{"PowerGridSonder", "Leistung", "kWh",
-                           EnergyGridType::PowerGridSonder},
+          //   EnergySimulation{"PowerGrid", "vm_pu", "V",
+          //   EnergyGridType::PowerGrid},
+          //   EnergySimulation{"HeatingGrid", "mass_flow", "kg/s",
+          //                    EnergyGridType::HeatingGrid},
+          //   EnergySimulation{"PowerGridSonder", "Leistung", "kWh",
+          //                    EnergyGridType::PowerGridSonder},
+          EnergySimulation{"PowerGrid", EnergyGridType::PowerGrid},
+          EnergySimulation{"HeatingGrid", EnergyGridType::HeatingGrid},
+          EnergySimulation{"PowerGridSonder", EnergyGridType::PowerGridSonder},
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -373,6 +377,7 @@ bool EnergyPlugin::update() {
   for (auto &[name, sensor] : m_cityGMLObjs) sensor->update();
 
   for (auto &energyGrid : m_energyGrids) {
+    if (!energyGrid.grid) continue;
     energyGrid.grid->update();
   }
 
@@ -388,7 +393,13 @@ void EnergyPlugin::setTimestep(int t) {
   // order as they appear in the the constructor
 
   auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
-  if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
+  // needed for updating spheres
+//   if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
+  if (energyGrid.grid) energyGrid.grid->updateTime(t);
+//   if (energyGrid.type == EnergyGridType::HeatingGrid) energyGrid.grid->updateTime(t);
+  //   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  //   m_energyGrids[idx].simUI->updateTime(t);
+  //   m_energyGrids[idx].grid->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
@@ -1494,8 +1505,8 @@ void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
   auto gridTypeIndex = getEnergyGridTypeIndex(type);
   auto &grid = m_energyGrids[gridTypeIndex];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
-    // heating simulation
     grid.simUI->updateTimestepColors(map);
+    grid.grid->setColorMap(map);
   }
 }
 
@@ -1849,14 +1860,15 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
     return;
   }
 
-  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu"];
-  // auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
-  // auto arrowReader = apache::ArrowReader(loading_percent);
+  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu_NEW"];
+//   auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
+  auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent_NEW"];
+  auto arrowReader = apache::ArrowReader(loading_percent);
   auto vmPuReader = apache::ArrowReader(vm_pu_path);
 
-  // const auto &schema = arrowReader.getSchema();
+  const auto &schema = arrowReader.getSchema();
   const auto &schemaVmPu = vmPuReader.getSchema();
-  // const auto &columnNames = schema->fields();
+  const auto &columnNames = schema->fields();
   const auto &columnNamesVmPu = schemaVmPu->fields();
 
   std::cout << "Schema of the Arrow file:" << std::endl;
@@ -1866,29 +1878,27 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
   }
 
   auto sim = std::make_shared<power::PowerSimulation>();
-  // auto &cables = sim->Cables();
-
+  auto &cables = sim->Cables();
   auto &buses = sim->Buses();
   //   auto &transformators = sim->Transformators();
   //   auto &generators = sim->Generators();
   //
   //   auto chunk = arrowReader.readColumnFromTable("");
-  // int64_t chunk_offset(0);
+  int64_t chunk_offset(0);
   int64_t chunk_offset_vm_pu(0);
-  // auto table = arrowReader.getTable();
+  auto table = arrowReader.getTable();
   auto tableVmPu = vmPuReader.getTable();
-  //   for (const auto &column: table->columns()) {
   std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings",
                                   "pv-penetration"};
   for (int j = 0; j < tableVmPu->num_columns(); ++j) {
     auto columnName = columnNamesVmPu[j]->name();
-    // columnName = std::regex_replace(columnName, std::regex("\\."), "_");
     std::replace(columnName.begin(), columnName.end(), ' ', '_');
     if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
           return toSkip == columnName;
         }))
       continue;
     auto column = tableVmPu->column(j);
+    std::cout << "Processing column: " << columnName << std::endl;
     chunk_offset_vm_pu = 0;
     for (int i = 0; i < column->num_chunks(); ++i) {
       auto chunk = column->chunk(i);
@@ -1958,84 +1968,86 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
       }
     }
   }
-  // for (int j = 0; j < table->num_columns(); ++j) {
-  //   auto columnName = columnNames[j]->name();
-  //   columnName = std::regex_replace(columnName, std::regex("\\."), "_");
-  //   if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
-  //         return toSkip == columnName;
-  //       }))
-  //     continue;
-  //   auto column = table->column(j);
-  //   chunk_offset = 0;
-  //   for (int i = 0; i < column->num_chunks(); ++i) {
-  //     auto chunk = column->chunk(i);
-  //     switch (chunk->type_id()) {
-  //       case arrow::Type::DOUBLE: {
-  //         auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
-  //         auto rawValues = darr->raw_values();
-  //         auto containerIt = cables.find(columnName);
-  //         if (containerIt == cables.end()) {
-  //           cables.add(columnName);
-  //           auto &data = cables[columnName].getData();
-  //           data["loading_percent"] = {};
-  //           data["loading_percent"].resize(column->length());
-  //         }
-  //         auto &loadingPercentVec =
-  //         cables[columnName].getData()["loading_percent"]; std::copy(rawValues,
-  //         rawValues + darr->length(),
-  //                   loadingPercentVec.begin() + chunk_offset);
-  //         chunk_offset += darr->length();
-  //         break;
-  //       }
-  //       case arrow::Type::STRING:
-  //       case arrow::Type::NA:
-  //       case arrow::Type::BOOL:
-  //       case arrow::Type::UINT8:
-  //       case arrow::Type::INT8:
-  //       case arrow::Type::UINT16:
-  //       case arrow::Type::INT16:
-  //       case arrow::Type::UINT32:
-  //       case arrow::Type::INT32:
-  //       case arrow::Type::UINT64:
-  //       case arrow::Type::INT64:
-  //       case arrow::Type::HALF_FLOAT:
-  //       case arrow::Type::FLOAT:
-  //       case arrow::Type::BINARY:
-  //       case arrow::Type::FIXED_SIZE_BINARY:
-  //       case arrow::Type::DATE32:
-  //       case arrow::Type::DATE64:
-  //       case arrow::Type::TIMESTAMP:
-  //       case arrow::Type::TIME32:
-  //       case arrow::Type::TIME64:
-  //       case arrow::Type::INTERVAL_MONTHS:
-  //       case arrow::Type::INTERVAL_DAY_TIME:
-  //       case arrow::Type::DECIMAL128:
-  //       case arrow::Type::DECIMAL256:
-  //       case arrow::Type::LIST:
-  //       case arrow::Type::STRUCT:
-  //       case arrow::Type::SPARSE_UNION:
-  //       case arrow::Type::DENSE_UNION:
-  //       case arrow::Type::DICTIONARY:
-  //       case arrow::Type::MAP:
-  //       case arrow::Type::EXTENSION:
-  //       case arrow::Type::FIXED_SIZE_LIST:
-  //       case arrow::Type::DURATION:
-  //       case arrow::Type::LARGE_STRING:
-  //       case arrow::Type::LARGE_BINARY:
-  //       case arrow::Type::LARGE_LIST:
-  //       case arrow::Type::INTERVAL_MONTH_DAY_NANO:
-  //       case arrow::Type::RUN_END_ENCODED:
-  //       case arrow::Type::STRING_VIEW:
-  //       case arrow::Type::BINARY_VIEW:
-  //       case arrow::Type::LIST_VIEW:
-  //       case arrow::Type::LARGE_LIST_VIEW:
-  //       case arrow::Type::DECIMAL32:
-  //       case arrow::Type::DECIMAL64:
-  //       case arrow::Type::MAX_ID:
-  //         break;
-  //     }
-  //   }
-  // }
+
+  for (int j = 0; j < table->num_columns(); ++j) {
+    auto columnName = columnNames[j]->name();
+    std::replace(columnName.begin(), columnName.end(), ' ', '_');
+    // columnName = std::regex_replace(columnName, std::regex("\\."), "_");
+    if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
+          return toSkip == columnName;
+        }))
+      continue;
+    auto column = table->column(j);
+    chunk_offset = 0;
+    for (int i = 0; i < column->num_chunks(); ++i) {
+      auto chunk = column->chunk(i);
+      switch (chunk->type_id()) {
+        case arrow::Type::DOUBLE: {
+          auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
+          auto rawValues = darr->raw_values();
+          auto containerIt = cables.find(columnName);
+          if (containerIt == cables.end()) {
+            cables.add(columnName);
+            auto &data = cables[columnName].getData();
+            data["loading_percent"] = {};
+            data["loading_percent"].resize(column->length());
+          }
+          auto &loadingPercentVec =
+          cables[columnName].getData()["loading_percent"]; std::copy(rawValues,
+          rawValues + darr->length(),
+                    loadingPercentVec.begin() + chunk_offset);
+          chunk_offset += darr->length();
+          break;
+        }
+        case arrow::Type::STRING:
+        case arrow::Type::NA:
+        case arrow::Type::BOOL:
+        case arrow::Type::UINT8:
+        case arrow::Type::INT8:
+        case arrow::Type::UINT16:
+        case arrow::Type::INT16:
+        case arrow::Type::UINT32:
+        case arrow::Type::INT32:
+        case arrow::Type::UINT64:
+        case arrow::Type::INT64:
+        case arrow::Type::HALF_FLOAT:
+        case arrow::Type::FLOAT:
+        case arrow::Type::BINARY:
+        case arrow::Type::FIXED_SIZE_BINARY:
+        case arrow::Type::DATE32:
+        case arrow::Type::DATE64:
+        case arrow::Type::TIMESTAMP:
+        case arrow::Type::TIME32:
+        case arrow::Type::TIME64:
+        case arrow::Type::INTERVAL_MONTHS:
+        case arrow::Type::INTERVAL_DAY_TIME:
+        case arrow::Type::DECIMAL128:
+        case arrow::Type::DECIMAL256:
+        case arrow::Type::LIST:
+        case arrow::Type::STRUCT:
+        case arrow::Type::SPARSE_UNION:
+        case arrow::Type::DENSE_UNION:
+        case arrow::Type::DICTIONARY:
+        case arrow::Type::MAP:
+        case arrow::Type::EXTENSION:
+        case arrow::Type::FIXED_SIZE_LIST:
+        case arrow::Type::DURATION:
+        case arrow::Type::LARGE_STRING:
+        case arrow::Type::LARGE_BINARY:
+        case arrow::Type::LARGE_LIST:
+        case arrow::Type::INTERVAL_MONTH_DAY_NANO:
+        case arrow::Type::RUN_END_ENCODED:
+        case arrow::Type::STRING_VIEW:
+        case arrow::Type::BINARY_VIEW:
+        case arrow::Type::LIST_VIEW:
+        case arrow::Type::LARGE_LIST_VIEW:
+        case arrow::Type::DECIMAL32:
+        case arrow::Type::DECIMAL64:
+        case arrow::Type::MAX_ID:
+          break;
+      }
+    }
+  }
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
 
   if (m_energyGrids[idx].grid == nullptr) return;
@@ -2081,9 +2093,9 @@ void EnergyPlugin::initEnergyGridColorMaps() {
           scalarPropertyNames.end())
         scalarPropertyNames.push_back(name);
 
-      auto menu =
-          new ui::Menu(m_simulationMenu, energyGrid.name + "_" + energyGrid.species +
-                                             " " + std::to_string(idx++));
+      auto menu = new ui::Menu(m_simulationMenu, energyGrid.name + "_" +
+                                                     scalarProperty.species + "_" +
+                                                     std::to_string(idx++));
       menu->setVisible(false);
       auto cms = std::make_unique<opencover::CoverColorBar>(menu);
       cms->setSpecies(scalarProperty.species);
@@ -2127,10 +2139,38 @@ void EnergyPlugin::initEnergyGridColorMaps() {
         }
       }
       updateColorMap(colorMapMenu.selector->colorMap(), energyGrid.type);
+      updateGridData(energyGrid);
     });
     energyGrid.scalarSelector = scalarSelector;
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
     energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
+    updateColorMap(energyGrid.colorMapRegistry[scalarSelector->selectedItem()]
+                       .selector->colorMap(),
+                   energyGrid.type);
+    updateGridData(energyGrid);
+  }
+}
+
+void EnergyPlugin::updateGridData(EnergySimulation &energyGrid) {
+  switch (energyGrid.type) {
+    case EnergyGridType::PowerGrid:
+    case EnergyGridType::PowerGridSonder: {
+      if (energyGrid.simUI) {
+        energyGrid.grid->setData(*energyGrid.sim,
+                                 energyGrid.scalarSelector->selectedItem(), false);
+      }
+      break;
+    }
+    case EnergyGridType::HeatingGrid: {
+      if (energyGrid.simUI) {
+        energyGrid.grid->setData(*energyGrid.sim,
+                                 energyGrid.scalarSelector->selectedItem(), true);
+      }
+      break;
+    }
+    case EnergyGridType::NUM_ENERGY_TYPES:
+      // No action needed for NUM_ENERGY_TYPES, it's just a count marker.
+      break;
   }
 }
 
@@ -2358,9 +2398,9 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
     std::string name = fromPoint->getName() + " > " + toPoint->getName();
     float radius = 0.5f;
 
-    auto conData = std::make_unique<grid::ConnectionData>(name, fromPoint, toPoint,
-                                                          radius, nullptr, data);
-    connections.push_back(new grid::DirectedConnection(*conData));
+    grid::ConnectionData conData{name, fromPoint, toPoint, radius, false, nullptr, data};
+    connections.push_back(
+        new grid::DirectedConnection(conData, grid::ConnectionType::LineWithShader));
     from_last = to_new;
   }
   return new grid::Line(name, connections);
@@ -2403,10 +2443,6 @@ EnergyPlugin::getPowerGridLines(COVERUtils::read::CSVStream &stream,
       type = "Normalnetz";  // default type if not specified
 
     if (geoBuses.empty()) continue;
-    // auto gridPoints =
-    //     (type == "Sondernetz") ? points[1] : points[0];  // Sondernetz is at index
-    //     1
-    // auto line = createLine(name, from, geoBuses, data, gridPoints);
     auto line = createLine(name, from, geoBuses, data, points);
     if (type == "Sondernetz") {
       linesSonder.push_back(line);
@@ -2494,7 +2530,7 @@ void EnergyPlugin::buildPowerGrid() {
   }
 
   // create grid
-  if (lines.empty() || points.empty()) return;
+  if (lines[0].empty() || lines[1].empty() || points.empty()) return;
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
   auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
@@ -2520,15 +2556,15 @@ void EnergyPlugin::buildPowerGrid() {
 
   auto powerGrid = std::make_unique<EnergyGrid>(econfig, false);
   powerGrid->initDrawables();
-  powerGrid->updateColor(
-      osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
+//   powerGrid->updateColor(
+//       osg::Vec4(255.0f / 255.0f, 222.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   egrid.grid = std::move(powerGrid);
   addEnergyGridToGridSwitch(egrid.group);
 
   auto powerGridSonder = std::make_unique<EnergyGrid>(econfigSonder, false);
   powerGridSonder->initDrawables();
-  powerGridSonder->updateColor(
-      osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
+//   powerGridSonder->updateColor(
+//       osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
   egridSonder.grid = std::move(powerGridSonder);
   addEnergyGridToGridSwitch(egridSonder.group);
 
@@ -2587,16 +2623,37 @@ osg::ref_ptr<grid::Point> EnergyPlugin::searchHeatingGridPointById(
   return *pointIt;  // returns nullptr if not found
 }
 
+// int getId(const std::string &connectionsStrWithCommaDelimiter,
+//     grid::ConnectionDataList &additionalData)
+// {
+//   std::stringstream ss(connectionsStrWithCommaDelimiter);
+//   std::string connection("");
+//   grid::Connections connections;
+//   auto pointName = from->getName();
+//   std::string lineName{pointName};
+//   while (std::getline(ss, connection, ' ')) {
+//     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
+//     grid::Data connectionData{{"name", pointName + "_" + connection}};
+//     additionalData.emplace_back(std::vector{connectionData});
+//     int toID(-1);
+//     try {
+//       toID = std::stoi(connection);
+//     } catch (...) {
+//       continue;
+//     }
+//   }
+// }
+
 osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
     const grid::Points &points, osg::ref_ptr<grid::Point> from,
     const std::string &connectionsStrWithCommaDelimiter,
     grid::ConnectionDataList &additionalData) {
-  std::stringstream ss(connectionsStrWithCommaDelimiter);
   std::string connection("");
-  grid::Connections connections;
+  grid::Connections gridConnections;
   auto pointName = from->getName();
   std::string lineName{pointName};
-  while (std::getline(ss, connection, ' ')) {
+  auto connections = split(connectionsStrWithCommaDelimiter, ' ');
+  for (const auto &connection : connections) {
     if (connection.empty() || connection == INVALID_CELL_VALUE) continue;
     grid::Data connectionData{{"name", pointName + "_" + connection}};
     additionalData.emplace_back(std::vector{connectionData});
@@ -2617,13 +2674,14 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createHeatingGridLine(
       std::cerr << "Point with id " << toID << " not found in points." << std::endl;
       continue;
     }
-    grid::ConnectionData connData(pointName + "_" + connection, from, to, 0.5f,
-                                  nullptr, connectionData);
-    grid::DirectedConnection directed(
-        connData, grid::ConnectionType::LineWithColorInterpolation);
-    connections.push_back(new grid::DirectedConnection(directed));
+    grid::ConnectionData connData{
+        pointName + "_" + connection, from, to, 0.5f, true, nullptr, connectionData};
+    grid::DirectedConnection directed(connData,
+                                      grid::ConnectionType::LineWithShader);
+    gridConnections.push_back(new grid::DirectedConnection(directed));
   }
-  return new grid::Line(lineName, connections);
+
+  return new grid::Line(lineName, gridConnections);
 }
 
 void EnergyPlugin::readSimulationDataStream(
@@ -2803,7 +2861,7 @@ void EnergyPlugin::buildHeatingGrid() {
   if (m_heatingGridStreams.empty()) return;
 
   // find correct csv
-  auto heatingIt = m_heatingGridStreams.find("heating_network_2");
+  auto heatingIt = m_heatingGridStreams.find("heating_network_simple");
   if (heatingIt == m_heatingGridStreams.end()) return;
 
   auto &[_, heatingStream] = *heatingIt;

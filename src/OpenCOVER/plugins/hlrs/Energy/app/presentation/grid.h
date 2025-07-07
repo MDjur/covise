@@ -1,5 +1,8 @@
 #pragma once
 
+#include <PluginUtil/coShaderUtil.h>
+#include <lib/core/utils/color.h>
+
 #include <osg/BoundingBox>
 #include <osg/Geode>
 #include <osg/Group>
@@ -8,8 +11,6 @@
 #include <osg/Vec3>
 #include <osg/ref_ptr>
 #include <variant>
-
-#include <lib/core/utils/color.h>
 
 // #include "../utils/color.h"
 
@@ -24,9 +25,7 @@ class Point : public osg::MatrixTransform {
         const float &radius, const Data &additionalData = Data());
   Point(const Point &p);
 
-  void move(const osg::Vec3 &offset) {
-    setMatrix(osg::Matrix::translate(offset));
-  }
+  void move(const osg::Vec3 &offset) { setMatrix(osg::Matrix::translate(offset)); }
 
   const auto &getRadius() const { return m_radius; }
   const auto &getCenter() const { return m_point->getCenter(); }
@@ -50,29 +49,26 @@ class Point : public osg::MatrixTransform {
 };
 
 struct ConnectionData {
-  ConnectionData(const std::string &name, osg::ref_ptr<Point> start,
-                 osg::ref_ptr<Point> end, const float &radius,
-                 osg::ref_ptr<osg::TessellationHints> hints = nullptr,
-                 const Data &additionalData = Data())
-      : name(name),
-        start(start),
-        end(end),
-        radius(radius),
-        hints(hints),
-        additionalData(additionalData) {};
   std::string name;
   osg::ref_ptr<Point> start;
   osg::ref_ptr<Point> end;
   float radius;
+  bool colorInterpolation;
   osg::ref_ptr<osg::TessellationHints> hints;
   Data additionalData;
 };
 
-enum class ConnectionType { Line, LineWithColorInterpolation, Arc, Arrow };
+enum class ConnectionType {
+  Line,
+  LineWithColorInterpolation,
+  LineWithShader,
+  Arc,
+  Arrow
+};
 
 class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
-                     osg::ref_ptr<Point> end, const float &radius,
+                     osg::ref_ptr<Point> end, const float &radius, bool colorInterpolation,
                      osg::ref_ptr<osg::TessellationHints> hints,
                      const Data &additionalData = Data(),
                      ConnectionType type = ConnectionType::Line);
@@ -80,7 +76,7 @@ class DirectedConnection : public osg::MatrixTransform {
  public:
   DirectedConnection(const ConnectionData &data,
                      ConnectionType type = ConnectionType::Line)
-      : DirectedConnection(data.name, data.start, data.end, data.radius, data.hints,
+      : DirectedConnection(data.name, data.start, data.end, data.radius, data.colorInterpolation, data.hints,
                            data.additionalData, type) {};
 
   void move(const osg::Vec3 &offset) {
@@ -101,13 +97,24 @@ class DirectedConnection : public osg::MatrixTransform {
   void updateColor(const osg::Vec4 &color) {
     core::utils::color::overrideGeodeColor(m_geode, color);
   }
+  void setDataInShader(const std::vector<double> &fromData,
+               const std::vector<double> &toData);
+  void setData1DInShader(const std::vector<double> &data, float min, float max);
+  // shader needs to have same uniform buffer like share/covise/materials/EnergyGrid.xml
+  void updateColorMapInShader(const opencover::ColorMap &colorMap, const std::string &shaderName = "EnergyGrid");
+  void updateTimestepInShader(int timestep);
 
  private:
   osg::ref_ptr<osg::Geode> m_geode;
   osg::ref_ptr<Point> m_start;
   osg::ref_ptr<Point> m_end;
+
   Data m_additionalData;
   ConnectionType m_type;
+  // to idea who owns the shader
+  opencover::coVRShader *m_shader = nullptr;
+  bool m_colorInterpolation;
+  int m_numNodes = 2;
 };
 
 // list of directed connections between points
@@ -134,7 +141,6 @@ class Line : public osg::MatrixTransform {
  private:
   void init(const Connections &connections);
   void computeBoundingBox();
-
   std::string m_name;
   osg::BoundingBox m_boundingBox;
   std::map<std::string, osg::ref_ptr<DirectedConnection>> m_connections;
@@ -152,4 +158,4 @@ typedef std::map<int, Data> PointDataList;
 typedef std::vector<std::vector<Data>> ConnectionDataList;
 
 // }  // namespace core::simulation::grid
-}
+}  // namespace grid

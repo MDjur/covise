@@ -48,6 +48,8 @@ class PowerSimulation : public Simulation {
   const auto &Generators() const { return m_generators; }
   const auto &Transformators() const { return m_transformators; }
   const auto &Cables() const { return m_cables; }
+  const std::vector<double> *getTimedependentScalar(
+      const std::string &species, const std::string &node) const override;
 
  private:
   ObjectContainer<Bus> m_buses;

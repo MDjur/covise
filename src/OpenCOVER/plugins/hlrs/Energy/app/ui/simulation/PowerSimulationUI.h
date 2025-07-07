@@ -2,8 +2,8 @@
 
 #include <lib/core/simulation/power.h>
 
-#include "app/ui/simulation/BaseSimulationUI.h"
 #include "app/presentation/EnergyGrid.h"
+#include "app/ui/simulation/BaseSimulationUI.h"
 
 using namespace core::simulation::power;
 
@@ -13,8 +13,8 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
   PowerSimulationUI(std::shared_ptr<PowerSimulation> sim, std::shared_ptr<T> parent)
       : BaseSimulationUI<T>(sim, parent) {}
   ~PowerSimulationUI() = default;
-  PowerSimulationUI(const PowerSimulationUI &) = delete;
-  PowerSimulationUI &operator=(const PowerSimulationUI &) = delete;
+  PowerSimulationUI(const PowerSimulationUI&) = delete;
+  PowerSimulationUI& operator=(const PowerSimulationUI&) = delete;
 
   void updateTime(int timestep) override {
     auto parent = this->m_parent.lock();
@@ -44,11 +44,9 @@ class PowerSimulationUI : public BaseSimulationUI<T> {
   }
 
   void updateTimestepColors(const opencover::ColorMap& map) override {
-
     // compute colors
     auto powerSim = this->powerSimulationPtr();
-    if (!powerSim)
-      return;
+    if (!powerSim) return;
     auto computeColorsForContainer = [&](auto container) {
       this->computeColors(map, container);
     };

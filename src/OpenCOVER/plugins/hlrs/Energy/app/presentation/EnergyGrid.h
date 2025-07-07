@@ -120,8 +120,10 @@ class EnergyGrid : public interface::IEnergyGrid {
   }
   void updateColor(const osg::Vec4 &color) override;
   void updateDrawables() override;
-  void updateTime(int timestep) override {}
+  void updateTime(int timestep) override;
 
+  void setColorMap(const opencover::ColorMap &colorMap) override;
+  void setData(const core::simulation::Simulation& sim, const std::string & species, bool interpolate = false) override;
   osg::ref_ptr<grid::DirectedConnection> getConnectionByName(
       const std::string &name);
   osg::ref_ptr<grid::DirectedConnection> getConnectionByIdx(int idx) {
