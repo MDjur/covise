@@ -61,14 +61,15 @@ constexpr int NUM_CIRCLE_POINTS = 20;
 
 DirectedConnection::DirectedConnection(const std::string &name,
                                        osg::ref_ptr<Point> start,
-                                       osg::ref_ptr<Point> end, const float &radius,
+                                       osg::ref_ptr<Point> end, const float &radius, bool colorInterpolation,
                                        osg::ref_ptr<osg::TessellationHints> hints,
                                        const Data &additionalData,
                                        ConnectionType type)
     : osg::MatrixTransform(),
       m_start(start),
       m_end(end),
-      m_additionalData(additionalData) {
+      m_additionalData(additionalData),
+      m_colorInterpolation(colorInterpolation) {
   switch (type) {
     case ConnectionType::Line:
       m_geode = utils::osgUtils::createOsgCylinderBetweenPoints(
@@ -84,7 +85,7 @@ DirectedConnection::DirectedConnection(const std::string &name,
     case ConnectionType::LineWithShader: {
       auto geometry = utils::osgUtils::createCylinderBetweenPoints(
           start->getPosition(), end->getPosition(), radius, NUM_CIRCLE_POINTS, 1,
-          hints);
+          hints, m_colorInterpolation);
       m_geode = new osg::Geode();
       m_geode->addDrawable(geometry);
 
@@ -100,6 +101,33 @@ DirectedConnection::DirectedConnection(const std::string &name,
   addChild(m_geode);
   setName(name);
 }
+
+osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &data)  {
+    osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D();
+    texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
+    texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
+    texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+    texture->setBorderWidth(0);
+    texture->setResizeNonPowerOfTwoHint(false);
+    texture->setWrap(osg::Texture2D::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+
+    // Create the image
+    osg::ref_ptr<osg::Image> image = new osg::Image();
+    image->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
+    float* values = reinterpret_cast<float*>(image->data());
+    float min = 100.0f, max = 0.0f;
+    for (size_t i = 0; i < data.size(); ++i) {
+      values[i] = static_cast<float>(data[i]);
+      min = std::min(min, values[i]);
+      max = std::max(max, values[i]);
+    }
+    std::cout << "[Debug]: min: " << min << " max: " << max << std::endl;
+
+    image->dirty();
+    texture->setImage(image);
+    return texture;
+}
+
 
 osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromData,
                                                 const std::vector<double> &toData) {
@@ -137,8 +165,8 @@ constexpr int SHADER_SCALAR_TIMESTEP_MAPPING_INDEX =
     0;  // index of the texture that maps from energy grid node index to timestep
         // value
 
-void DirectedConnection::setData(const std::vector<double> &fromData,
-                                 const std::vector<double> &toData) {
+void DirectedConnection::setDataInShader(const std::vector<double> &fromData,
+                                         const std::vector<double> &toData) {
   if (!m_shader) {
     std::cerr << "DirectedConnection::setData: No shader set for connection "
               << getName() << "\n";
@@ -146,9 +174,9 @@ void DirectedConnection::setData(const std::vector<double> &fromData,
   }
   std::cerr << "Setting data shader for connection: " << getName() << "\n";
   m_shader->setIntUniform("numTimesteps", fromData.size());
-  if (getName() == "184_172") {
-    std::cerr << std::endl;
-  }
+//   if (getName() == "184_172") {
+//     std::cerr << std::endl;
+//   }
   // might be unnecessary, default should be 0 anyway
   auto uniform = m_shader->getcoVRUniform("timestepToData");
   assert(uniform);
@@ -164,9 +192,36 @@ void DirectedConnection::setData(const std::vector<double> &fromData,
   drawable->setStateSet(state);
 }
 
-void DirectedConnection::setColorMap(const opencover::ColorMap &colorMap) {
+void DirectedConnection::setData1DInShader(const std::vector<double> &data, float min, float max) {
+    if (!m_shader) {
+        std::cerr << "DirectedConnection::setData: No shader set for connection "
+                  << getName() << "\n";
+        return;
+    }
+    std::cerr << "Setting 1D data shader for connection: " << getName() << "\n";
+    m_shader->setIntUniform("numTimesteps", data.size());
+    m_shader->setIntUniform("numNodes", 1);
+    m_shader->setFloatUniform("rangeMin", min);
+    // m_shader->setFloatUniform("rangeMax", 83.2109);
+    m_shader->setFloatUniform("rangeMax", max);
+
+    auto uniform = m_shader->getcoVRUniform("timestepToData");
+    assert(uniform);
+    uniform->setValue(std::to_string(SHADER_SCALAR_TIMESTEP_MAPPING_INDEX).c_str());
+
+    auto texture = createValue1DTexture(data);
+    auto drawable = m_geode->getDrawable(0);
+    auto state = drawable->getOrCreateStateSet();
+    state->setTextureAttribute(SHADER_SCALAR_TIMESTEP_MAPPING_INDEX, texture,
+                               osg::StateAttribute::ON);
+
+    m_shader->apply(state);
+    drawable->setStateSet(state);
+}
+
+void DirectedConnection::updateColorMapInShader(const opencover::ColorMap &colorMap, const std::string &shaderName) {
   auto drawable = m_geode->getDrawable(0);
-  m_shader = opencover::applyShader(drawable, colorMap, "EnergyGrid");
+  m_shader = opencover::applyShader(drawable, colorMap, shaderName);
   m_shader->setIntUniform("numNodes", m_numNodes);
 
   auto state = drawable->getOrCreateStateSet();
@@ -174,7 +229,7 @@ void DirectedConnection::setColorMap(const opencover::ColorMap &colorMap) {
   drawable->setStateSet(state);
 }
 
-void DirectedConnection::updateTimestep(int timestep) {
+void DirectedConnection::updateTimestepInShader(int timestep) {
   if (!m_shader) {
     std::cerr << "DirectedConnection::updateTimestep: No shader set for connection "
               << getName() << "\n";

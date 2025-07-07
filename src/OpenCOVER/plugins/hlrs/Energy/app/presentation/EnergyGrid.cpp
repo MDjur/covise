@@ -128,7 +128,7 @@ void EnergyGrid::initConnectionsByIndex(
         if (additionalConnectionData.size() > i)
           if (additionalConnectionData[i].size() > j)
             additionalData = additionalConnectionData[i][j];
-      grid::ConnectionData data{name, from, to, radius, nullptr,
+      grid::ConnectionData data{name, from, to, radius, false, nullptr,
                                                     additionalData};
       m_connections.push_back(new grid::DirectedConnection(data));
     }
@@ -270,13 +270,13 @@ void EnergyGrid::updateDrawables() {
 void EnergyGrid::updateTime(int timestep)
 {
   for(auto &conn : m_connections)
-    conn->updateTimestep(timestep);
+    conn->updateTimestepInShader(timestep);
   for(auto &line : m_lines)
     for(auto &[_, conn] : line->getConnections())
-      conn->updateTimestep(timestep);
+      conn->updateTimestepInShader(timestep);
   for(auto &line : m_config.lines)
     for(auto &[_, conn] : line->getConnections())
-      conn->updateTimestep(timestep);
+      conn->updateTimestepInShader(timestep);
 }
 
 
@@ -284,22 +284,24 @@ void EnergyGrid::updateTime(int timestep)
 void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap)
 {
   for(auto &conn : m_connections)
-    conn->setColorMap(colorMap);
+    conn->updateColorMapInShader(colorMap);
   for(auto &line : m_lines)
     for(auto &[_, conn] : line->getConnections())
-      conn->setColorMap(colorMap);
+      conn->updateColorMapInShader(colorMap);
   for(auto &line : m_config.lines)
     for(auto &[_, conn] : line->getConnections())
-      conn->setColorMap(colorMap);
+      conn->updateColorMapInShader(colorMap);
 }
 
-void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::string & species) {
+void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::string & species, bool interpolate) {
   for(auto &conn : m_connections) {
 
     auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
-    auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+    auto toData = fromData;
+    if (interpolate)
+        toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
     if (fromData && toData) {
-      conn->setData(*fromData, *toData);
+      conn->setDataInShader(*fromData, *toData);
     } else {
       std::cerr << "No data found for connection: " << conn->getName() << "\n";
     }
@@ -308,26 +310,43 @@ void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::str
     for(auto &[_, conn] : line->getConnections()) {
 
       auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
-      auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+      auto toData = fromData;
+      if (interpolate)
+        toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
       if (fromData && toData) {
-        conn->setData(*fromData, *toData);
+        conn->setDataInShader(*fromData, *toData);
       } else {
         std::cerr << "No data found for connection: " << conn->getName() << "\n";
       }
     }
   }
-  for(auto &line : m_config.lines) {
-    for(auto &[_, conn] : line->getConnections()) {
-
-      auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
-      auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
-      if (fromData && toData) {
-        conn->setData(*fromData, *toData);
-      } else {
-        std::cerr << "No data found for connection: " << conn->getName() << "\n";
+  for (auto &line : m_config.lines) {
+    if (interpolate) {
+      for (auto &[_, conn] : line->getConnections()) {
+        auto fromData =
+            sim.getTimedependentScalar(species, conn->getStart()->getName());
+        auto toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+        if (fromData && toData) {
+          conn->setDataInShader(*fromData, *toData);
+        } else {
+          std::cerr << "No data found for connection: " << conn->getName() << "\n";
+        }
       }
+    } else {
+      // TODO: If not interpolating, use the line name to get the data => pls rework later
+      // this is a workaround for the current data structure
+      auto lineName = line->getName();
+      std::replace(lineName.begin(), lineName.end(), ' ', '_');
+      auto data = sim.getTimedependentScalar(species, lineName);
+      const auto [min, max] = sim.getMinMax(species);
+      std::cout << "Min: " << min << ", Max: " << max << "\n";
+      if (!data) {
+        std::cerr << "No data found for line: " << lineName << "\n";
+        continue;
+      }
+      for (auto &[_, conn] : line->getConnections())
+        // conn->setDataInShader(*data, *data);
+        conn->setData1DInShader(*data, min, max);
     }
   }
-
-
 }

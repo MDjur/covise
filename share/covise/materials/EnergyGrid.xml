@@ -27,9 +27,8 @@ varying float data;
 varying vec3 V;
 varying vec3 N;
 
-void main (void)
-{
-    float index = (float)indexAttrib / float(numNodes - 1);   
+void main (void) {
+    float index = (numNodes > 1) ? (float)indexAttrib / float(numNodes - 1) : 0.0;   
     float timestepIndex = float(timestep) / float(numTimesteps - 1); 
     data = texture2D(timestepToData, vec2(timestepIndex, index)).r;
 

@@ -112,7 +112,7 @@ class Simulation {
 
  protected:
   template <typename T>
-  void computeParameter(const ObjectContainer<T> &container) {
+  void computeParameter(const ObjectContainer<T> &container, float trim = 0.01) {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
     std::map<std::string, std::vector<double>> allValues{};
@@ -124,7 +124,7 @@ class Simulation {
 
     for (const auto &[key, values] : allValues) {
       setUnit(key);
-      computeMinMax(key, values, 0.01);  // 1% trimming
+      computeMinMax(key, values, trim);  // 1% trimming
       computeMaxTimestep(key, values);
       m_scalarProperties[key].species = key;
     }
@@ -136,7 +136,6 @@ class Simulation {
       const std::string &node) const {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
-    std::vector<double> result;
     for (const auto &[name, object] : container) {
       if (object.getName() == node) {
         const auto &data = object.getData();

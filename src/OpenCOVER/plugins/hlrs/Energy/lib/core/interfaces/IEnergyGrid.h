@@ -14,7 +14,7 @@ class IEnergyGrid : public IDrawables, public IColorable, public ITimedependable
   virtual void update() = 0;
   virtual void setColorMap(const opencover::ColorMap& colorMap) = 0;
   virtual void setData(const core::simulation::Simulation& sim,
-                       const std::string& species) = 0;
+                       const std::string& species, bool interpolate = false) = 0;
 };
 }  // namespace core::interface
 

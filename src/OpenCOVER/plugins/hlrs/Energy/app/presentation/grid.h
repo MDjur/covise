@@ -53,6 +53,7 @@ struct ConnectionData {
   osg::ref_ptr<Point> start;
   osg::ref_ptr<Point> end;
   float radius;
+  bool colorInterpolation;
   osg::ref_ptr<osg::TessellationHints> hints;
   Data additionalData;
 };
@@ -67,7 +68,7 @@ enum class ConnectionType {
 
 class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
-                     osg::ref_ptr<Point> end, const float &radius,
+                     osg::ref_ptr<Point> end, const float &radius, bool colorInterpolation,
                      osg::ref_ptr<osg::TessellationHints> hints,
                      const Data &additionalData = Data(),
                      ConnectionType type = ConnectionType::Line);
@@ -75,7 +76,7 @@ class DirectedConnection : public osg::MatrixTransform {
  public:
   DirectedConnection(const ConnectionData &data,
                      ConnectionType type = ConnectionType::Line)
-      : DirectedConnection(data.name, data.start, data.end, data.radius, data.hints,
+      : DirectedConnection(data.name, data.start, data.end, data.radius, data.colorInterpolation, data.hints,
                            data.additionalData, type) {};
 
   void move(const osg::Vec3 &offset) {
@@ -96,21 +97,24 @@ class DirectedConnection : public osg::MatrixTransform {
   void updateColor(const osg::Vec4 &color) {
     core::utils::color::overrideGeodeColor(m_geode, color);
   }
-  void setData(const std::vector<double> &fromData,
+  void setDataInShader(const std::vector<double> &fromData,
                const std::vector<double> &toData);
-  void setColorMap(const opencover::ColorMap &colorMap);
-  void updateTimestep(int timestep);
+  void setData1DInShader(const std::vector<double> &data, float min, float max);
+  // shader needs to have same uniform buffer like share/covise/materials/EnergyGrid.xml
+  void updateColorMapInShader(const opencover::ColorMap &colorMap, const std::string &shaderName = "EnergyGrid");
+  void updateTimestepInShader(int timestep);
 
  private:
   osg::ref_ptr<osg::Geode> m_geode;
   osg::ref_ptr<Point> m_start;
   osg::ref_ptr<Point> m_end;
-  int m_numNodes = 2;
 
   Data m_additionalData;
   ConnectionType m_type;
   // to idea who owns the shader
   opencover::coVRShader *m_shader = nullptr;
+  bool m_colorInterpolation;
+  int m_numNodes = 2;
 };
 
 // list of directed connections between points

@@ -409,7 +409,7 @@ constexpr int SHADER_INDEX_ATTRIB = 5;
 
 osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
     osg::Vec3 start, osg::Vec3 end, float radius, int circleSegments,
-    int lengthSegments, osg::ref_ptr<osg::TessellationHints> hints) {
+    int lengthSegments, osg::ref_ptr<osg::TessellationHints> hints, bool colorInterpolation) {
   osg::ref_ptr<osg::Geometry> geometry = new osg::Geometry;
   osg::Vec3 direction = start - end;
   direction.normalize();
@@ -431,7 +431,12 @@ osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
   osg::IntArray *intArray = new osg::IntArray;
   for (size_t i = 0; i < lengthSegments + 1; i++) {
     for (size_t j = 0; j < circleSegments; j++) {
-      intArray->push_back(i);
+    //   intArray->push_back(i);
+    //   intArray->push_back(colorInterpolation ? i : 0);
+      int val = (colorInterpolation ? i : 0);
+      std::cout << "[DEBUG] indexAttrib[" << (i * circleSegments + j)
+                << "] = " << val << std::endl;
+      intArray->push_back(val);
     }
   }
   intArray->setBinding(osg::Array::BIND_PER_VERTEX);

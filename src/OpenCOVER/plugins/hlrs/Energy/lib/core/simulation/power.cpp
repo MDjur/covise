@@ -7,7 +7,7 @@ void PowerSimulation::computeParameters() {
   computeParameter(m_buses);
   computeParameter(m_generators);
   computeParameter(m_transformators);
-  computeParameter(m_cables);
+  computeParameter(m_cables, 0.0f);  // no trimming for cables
 }
 
 const std::vector<double> *PowerSimulation::getTimedependentScalar(
@@ -18,6 +18,8 @@ const std::vector<double> *PowerSimulation::getTimedependentScalar(
     return result;
   if (auto result =
           Simulation::getTimedependentScalar(m_transformators, species, node))
+    return result;
+  if (auto result = Simulation::getTimedependentScalar(m_cables, species, node))
     return result;
   return nullptr;
 }
