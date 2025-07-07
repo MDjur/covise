@@ -1,4 +1,4 @@
-<EnergyGrid>
+<EnergyGrid_Line>
 <!--mapps vertex to node -->
 <attribute name="indexAttrib" type="int" value="5"/>
 
@@ -44,4 +44,4 @@ void main (void) {
 
 <fragmentProgram value="MapColorsFragment.glsl">
 </fragmentProgram>
-</EnergyGrid>
+</EnergyGrid_Line>
