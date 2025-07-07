@@ -1838,227 +1838,85 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
 }
 
 void EnergyPlugin::applySimulationDataToPowerGrid() {
-  auto simPath = configString("Simulation", "powerSimDir", "default")->value();
-
-  if (simPath.empty()) {
-    std::cerr << "No simulation data path configured." << std::endl;
-    return;
-  }
-
-  std::map<std::string, std::string> arrowFiles;
-  for (auto &entry : fs::directory_iterator(simPath)) {
-    if (fs::is_regular_file(entry)) {
-      if (entry.path().extension() == ".arrow") {
-        auto path = entry.path();
-        arrowFiles.emplace(path.stem().string(), path.string());
-      }
+    auto simPath = configString("Simulation", "powerSimDir", "default")->value();
+    if (simPath.empty()) {
+        std::cerr << "No simulation data path configured." << std::endl;
+        return;
     }
-  }
 
-  if (arrowFiles.empty()) {
-    std::cerr << "No .arrow files found in the simulation data path." << std::endl;
-    return;
-  }
-
-  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu_NEW"];
-//   auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
-  auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent_NEW"];
-  auto arrowReader = apache::ArrowReader(loading_percent);
-  auto vmPuReader = apache::ArrowReader(vm_pu_path);
-
-  const auto &schema = arrowReader.getSchema();
-  const auto &schemaVmPu = vmPuReader.getSchema();
-  const auto &columnNames = schema->fields();
-  const auto &columnNamesVmPu = schemaVmPu->fields();
-
-  std::cout << "Schema of the Arrow file:" << std::endl;
-  for (const auto &field : schemaVmPu->fields()) {
-    std::cout << "Field: " << field->name()
-              << ", Type: " << field->type()->ToString() << std::endl;
-  }
-
-  auto sim = std::make_shared<power::PowerSimulation>();
-  auto &cables = sim->Cables();
-  auto &buses = sim->Buses();
-  //   auto &transformators = sim->Transformators();
-  //   auto &generators = sim->Generators();
-  //
-  //   auto chunk = arrowReader.readColumnFromTable("");
-  int64_t chunk_offset(0);
-  int64_t chunk_offset_vm_pu(0);
-  auto table = arrowReader.getTable();
-  auto tableVmPu = vmPuReader.getTable();
-  std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings",
-                                  "pv-penetration"};
-  for (int j = 0; j < tableVmPu->num_columns(); ++j) {
-    auto columnName = columnNamesVmPu[j]->name();
-    std::replace(columnName.begin(), columnName.end(), ' ', '_');
-    if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
-          return toSkip == columnName;
-        }))
-      continue;
-    auto column = tableVmPu->column(j);
-    std::cout << "Processing column: " << columnName << std::endl;
-    chunk_offset_vm_pu = 0;
-    for (int i = 0; i < column->num_chunks(); ++i) {
-      auto chunk = column->chunk(i);
-      switch (chunk->type_id()) {
-        case arrow::Type::DOUBLE: {
-          auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
-          auto rawValues = darr->raw_values();
-          auto containerIt = buses.find(columnName);
-          if (containerIt == buses.end()) {
-            buses.add(columnName);
-            auto &data = buses[columnName].getData();
-            data["vm_pu"] = {};
-            data["vm_pu"].resize(column->length());
-          }
-          auto &vmPuVec = buses[columnName].getData()["vm_pu"];
-          std::copy(rawValues, rawValues + darr->length(),
-                    vmPuVec.begin() + chunk_offset_vm_pu);
-          chunk_offset_vm_pu += darr->length();
-          break;
+    std::map<std::string, std::string> arrowFiles;
+    for (auto &entry : fs::directory_iterator(simPath)) {
+        if (fs::is_regular_file(entry) && entry.path().extension() == ".arrow") {
+            arrowFiles.emplace(entry.path().stem().string(), entry.path().string());
         }
-        case arrow::Type::STRING:
-        case arrow::Type::NA:
-        case arrow::Type::BOOL:
-        case arrow::Type::UINT8:
-        case arrow::Type::INT8:
-        case arrow::Type::UINT16:
-        case arrow::Type::INT16:
-        case arrow::Type::UINT32:
-        case arrow::Type::INT32:
-        case arrow::Type::UINT64:
-        case arrow::Type::INT64:
-        case arrow::Type::HALF_FLOAT:
-        case arrow::Type::FLOAT:
-        case arrow::Type::BINARY:
-        case arrow::Type::FIXED_SIZE_BINARY:
-        case arrow::Type::DATE32:
-        case arrow::Type::DATE64:
-        case arrow::Type::TIMESTAMP:
-        case arrow::Type::TIME32:
-        case arrow::Type::TIME64:
-        case arrow::Type::INTERVAL_MONTHS:
-        case arrow::Type::INTERVAL_DAY_TIME:
-        case arrow::Type::DECIMAL128:
-        case arrow::Type::DECIMAL256:
-        case arrow::Type::LIST:
-        case arrow::Type::STRUCT:
-        case arrow::Type::SPARSE_UNION:
-        case arrow::Type::DENSE_UNION:
-        case arrow::Type::DICTIONARY:
-        case arrow::Type::MAP:
-        case arrow::Type::EXTENSION:
-        case arrow::Type::FIXED_SIZE_LIST:
-        case arrow::Type::DURATION:
-        case arrow::Type::LARGE_STRING:
-        case arrow::Type::LARGE_BINARY:
-        case arrow::Type::LARGE_LIST:
-        case arrow::Type::INTERVAL_MONTH_DAY_NANO:
-        case arrow::Type::RUN_END_ENCODED:
-        case arrow::Type::STRING_VIEW:
-        case arrow::Type::BINARY_VIEW:
-        case arrow::Type::LIST_VIEW:
-        case arrow::Type::LARGE_LIST_VIEW:
-        case arrow::Type::DECIMAL32:
-        case arrow::Type::DECIMAL64:
-        case arrow::Type::MAX_ID:
-          break;
-      }
     }
-  }
 
-  for (int j = 0; j < table->num_columns(); ++j) {
-    auto columnName = columnNames[j]->name();
-    std::replace(columnName.begin(), columnName.end(), ' ', '_');
-    // columnName = std::regex_replace(columnName, std::regex("\\."), "_");
-    if (std::any_of(skip.begin(), skip.end(), [&columnName](const auto &toSkip) {
-          return toSkip == columnName;
-        }))
-      continue;
-    auto column = table->column(j);
-    chunk_offset = 0;
-    for (int i = 0; i < column->num_chunks(); ++i) {
-      auto chunk = column->chunk(i);
-      switch (chunk->type_id()) {
-        case arrow::Type::DOUBLE: {
-          auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
-          auto rawValues = darr->raw_values();
-          auto containerIt = cables.find(columnName);
-          if (containerIt == cables.end()) {
-            cables.add(columnName);
-            auto &data = cables[columnName].getData();
-            data["loading_percent"] = {};
-            data["loading_percent"].resize(column->length());
-          }
-          auto &loadingPercentVec =
-          cables[columnName].getData()["loading_percent"]; std::copy(rawValues,
-          rawValues + darr->length(),
-                    loadingPercentVec.begin() + chunk_offset);
-          chunk_offset += darr->length();
-          break;
+    if (arrowFiles.empty()) {
+        std::cerr << "No .arrow files found in the simulation data path." << std::endl;
+        return;
+    }
+
+    auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu_NEW"];
+    auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent_NEW"];
+    apache::ArrowReader arrowReader(loading_percent);
+    apache::ArrowReader vmPuReader(vm_pu_path);
+
+    auto table = arrowReader.getTable();
+    auto tableVmPu = vmPuReader.getTable();
+    auto columnNames = table->schema()->fields();
+    auto columnNamesVmPu = tableVmPu->schema()->fields();
+
+    std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings", "pv-penetration"};
+
+    auto isSkipped = [&skip](const std::string &name) {
+        return std::any_of(skip.begin(), skip.end(), [&](const auto &s) { return s == name; });
+    };
+
+    auto sim = std::make_shared<power::PowerSimulation>();
+    auto &cables = sim->Cables();
+    auto &buses = sim->Buses();
+
+    // Helper to process columns
+    auto processColumns = [&](const std::shared_ptr<arrow::Table> &tbl, auto &container, const std::string &dataKey) {
+        for (int j = 0; j < tbl->num_columns(); ++j) {
+            auto columnName = columnNames[j]->name();
+            std::replace(columnName.begin(), columnName.end(), ' ', '_');
+            if (isSkipped(columnName)) continue;
+            auto column = tbl->column(j);
+            int64_t chunk_offset = 0;
+            for (int i = 0; i < column->num_chunks(); ++i) {
+                auto chunk = column->chunk(i);
+                if (chunk->type_id() == arrow::Type::DOUBLE) {
+                    auto darr = std::static_pointer_cast<arrow::DoubleArray>(chunk);
+                    auto rawValues = darr->raw_values();
+                    if (container.find(columnName) == container.end()) {
+                        container.add(columnName);
+                        auto &data = container[columnName].getData();
+                        data[dataKey] = {};
+                        data[dataKey].resize(column->length());
+                    }
+                    auto &vec = container[columnName].getData()[dataKey];
+                    std::copy(rawValues, rawValues + darr->length(), vec.begin() + chunk_offset);
+                    chunk_offset += darr->length();
+                }
+            }
         }
-        case arrow::Type::STRING:
-        case arrow::Type::NA:
-        case arrow::Type::BOOL:
-        case arrow::Type::UINT8:
-        case arrow::Type::INT8:
-        case arrow::Type::UINT16:
-        case arrow::Type::INT16:
-        case arrow::Type::UINT32:
-        case arrow::Type::INT32:
-        case arrow::Type::UINT64:
-        case arrow::Type::INT64:
-        case arrow::Type::HALF_FLOAT:
-        case arrow::Type::FLOAT:
-        case arrow::Type::BINARY:
-        case arrow::Type::FIXED_SIZE_BINARY:
-        case arrow::Type::DATE32:
-        case arrow::Type::DATE64:
-        case arrow::Type::TIMESTAMP:
-        case arrow::Type::TIME32:
-        case arrow::Type::TIME64:
-        case arrow::Type::INTERVAL_MONTHS:
-        case arrow::Type::INTERVAL_DAY_TIME:
-        case arrow::Type::DECIMAL128:
-        case arrow::Type::DECIMAL256:
-        case arrow::Type::LIST:
-        case arrow::Type::STRUCT:
-        case arrow::Type::SPARSE_UNION:
-        case arrow::Type::DENSE_UNION:
-        case arrow::Type::DICTIONARY:
-        case arrow::Type::MAP:
-        case arrow::Type::EXTENSION:
-        case arrow::Type::FIXED_SIZE_LIST:
-        case arrow::Type::DURATION:
-        case arrow::Type::LARGE_STRING:
-        case arrow::Type::LARGE_BINARY:
-        case arrow::Type::LARGE_LIST:
-        case arrow::Type::INTERVAL_MONTH_DAY_NANO:
-        case arrow::Type::RUN_END_ENCODED:
-        case arrow::Type::STRING_VIEW:
-        case arrow::Type::BINARY_VIEW:
-        case arrow::Type::LIST_VIEW:
-        case arrow::Type::LARGE_LIST_VIEW:
-        case arrow::Type::DECIMAL32:
-        case arrow::Type::DECIMAL64:
-        case arrow::Type::MAX_ID:
-          break;
-      }
-    }
-  }
-  auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+    };
 
-  if (m_energyGrids[idx].grid == nullptr) return;
-  auto &powerGrid = m_energyGrids[idx];
-  powerGrid.simUI = std::make_unique<PowerSimUI>(sim, powerGrid.grid);
-  powerGrid.sim = std::move(sim);
+    // Process bus voltages
+    processColumns(tableVmPu, buses, "vm_pu");
 
-  // std::cout << "Number of timesteps: " << table->num_rows() << std::endl;
-  // setAnimationTimesteps(table->num_rows(), powerGrid.group);
-  std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
-  setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
+    // Process cable loading
+    processColumns(table, cables, "loading_percent");
+
+    auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
+    if (m_energyGrids[idx].grid == nullptr) return;
+    auto &powerGrid = m_energyGrids[idx];
+    powerGrid.simUI = std::make_unique<PowerSimUI>(sim, powerGrid.grid);
+    powerGrid.sim = std::move(sim);
+
+    std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
+    setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
 }
 
 void EnergyPlugin::initPowerGrid() {
