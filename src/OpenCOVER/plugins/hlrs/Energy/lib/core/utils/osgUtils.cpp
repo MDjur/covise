@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <memory>
+#include <cassert>
 #include <osg/Array>
 #include <osg/BlendFunc>
 #include <osg/BoundingBox>
@@ -27,6 +28,7 @@
 #include <osg/Vec3>
 #include <osg/Vec4>
 #include <osg/ref_ptr>
+#include <osg/Texture1D>
 #include <osgDB/ReadFile>
 #include <osgFX/Outline>
 #include <osgText/Text>
@@ -458,6 +460,77 @@ createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
     for (int j = 0; j <= circleSegments; ++j) colors->push_back(color);
   }
   return colors;
+}
+
+osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &data)  {
+    osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D();
+    texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
+    texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
+    texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+    texture->setBorderWidth(0);
+    texture->setResizeNonPowerOfTwoHint(false);
+    texture->setWrap(osg::Texture2D::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+
+    // Create the image
+    osg::ref_ptr<osg::Image> image = new osg::Image();
+    image->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
+    float* values = reinterpret_cast<float*>(image->data());
+    float min = 100.0f, max = 0.0f;
+    for (size_t i = 0; i < data.size(); ++i) {
+      values[i] = static_cast<float>(data[i]);
+      min = std::min(min, values[i]);
+      max = std::max(max, values[i]);
+    }
+    std::cout << "[Debug]: min: " << min << " max: " << max << std::endl;
+
+    image->dirty();
+    texture->setImage(image);
+    return texture;
+}
+
+osg::ref_ptr<osg::Texture1D> createPointDataTexture(const std::vector<float>& data) {
+    osg::ref_ptr<osg::Texture1D> tex = new osg::Texture1D();
+    tex->setInternalFormat(GL_R32F);
+    tex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
+    tex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+    osg::ref_ptr<osg::Image> img = new osg::Image();
+    img->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
+    memcpy(img->data(), data.data(), data.size() * sizeof(float));
+    img->dirty();
+    tex->setImage(img);
+    return tex;
+}
+
+osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromData,
+                                                const std::vector<double> &toData) {
+  assert(fromData.size() == toData.size() &&
+         "fromData and toData must have the same size");
+  osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D();
+  texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
+  texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
+  texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
+  texture->setBorderWidth(0);
+  texture->setResizeNonPowerOfTwoHint(false);
+  texture->setWrap(osg::Texture2D::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
+  // Create the image
+  osg::ref_ptr<osg::Image> image = new osg::Image();
+  image->allocateImage(fromData.size(), 2, 1, GL_RED, GL_FLOAT);
+  unsigned char *v = image->data();
+
+  auto values = (float *)(v);
+  size_t index = 0;
+  for (auto val : fromData) {
+    values[index] = fromData[index];
+    ++index;
+  }
+  for (const auto &val : toData) {
+    values[index] = toData[index - fromData.size()];
+    ++index;
+  }
+
+  image->dirty();
+  texture->setImage(image);
+  return texture;
 }
 
 osg::ref_ptr<osg::Geode> createCylinderBetweenPointsColorInterpolation(

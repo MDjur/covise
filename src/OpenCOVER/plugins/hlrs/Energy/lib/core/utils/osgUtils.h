@@ -6,6 +6,8 @@
 #include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/StateSet>
+#include <osg/Texture1D>
+#include <osg/Texture2D>
 #include <osg/ref_ptr>
 #include <osgDB/Options>
 #include <osgText/Text>
@@ -62,7 +64,8 @@ osg::ref_ptr<osg::Geode> createOsgCylinderBetweenPoints(
 osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
     osg::Vec3 start, osg::Vec3 end, float radius, int circleSegments,
     int lengthSegments,
-    osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints(), bool colorInterpolation = false);
+    osg::ref_ptr<osg::TessellationHints> hints = new osg::TessellationHints(),
+    bool colorInterpolation = false);
 
 osg::ref_ptr<osg::Geode> createCylinderBetweenPointsColorInterpolation(
     const osg::Vec3 &start, const osg::Vec3 &end, float halfCylinderHalf,
@@ -77,6 +80,10 @@ osg::ref_ptr<osg::Geode> createBezierTube(
     int numSegments = 50,
     const osg::Vec4 &color = osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
 
+osg::ref_ptr<osg::Texture1D> createPointDataTexture(const std::vector<float> &data);
+osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &data);
+osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromData,
+                                                const std::vector<double> &toData);
 osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,
                                           const osg::Vec3 &position, int charSize,
                                           const char *fontFile,
