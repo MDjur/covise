@@ -144,9 +144,6 @@ void DirectedConnection::setData1DInShader(const std::vector<double> &data,
   std::cerr << "Setting 1D data shader for connection: " << getName() << "\n";
   m_shader->setIntUniform("numTimesteps", data.size());
   m_shader->setIntUniform("numNodes", 1);
-  m_shader->setFloatUniform("rangeMin", min);
-  // m_shader->setFloatUniform("rangeMax", 83.2109);
-  m_shader->setFloatUniform("rangeMax", max);
 
   auto uniform = m_shader->getcoVRUniform("timestepToData");
   assert(uniform);
