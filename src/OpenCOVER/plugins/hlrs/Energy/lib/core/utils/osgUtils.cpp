@@ -504,9 +504,6 @@ osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &dat
 
     // osg::ref_ptr<osg::TextureRectangle> texture = new osg::TextureRectangle;
     osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
-    // texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
-    // texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
-    texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
     texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
     texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
     texture->setBorderWidth(0);
@@ -516,8 +513,8 @@ osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &dat
 
     // Create the image
     osg::ref_ptr<osg::Image> image = new osg::Image();
-    image->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
     image->setInternalTextureFormat(GL_R32F);
+    image->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
     float* values = reinterpret_cast<float*>(image->data());
     // float* values = image->data();
     // float min = 100.0f, max = 0.0f;
@@ -538,10 +535,10 @@ osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &dat
 
 osg::ref_ptr<osg::Texture1D> createPointDataTexture(const std::vector<double>& data) {
     osg::ref_ptr<osg::Texture1D> tex = new osg::Texture1D();
-    tex->setInternalFormat(GL_R32F);
     tex->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
     tex->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
     osg::ref_ptr<osg::Image> img = new osg::Image();
+    img->setInternalTextureFormat(GL_R32F);
     img->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
     memcpy(img->data(), data.data(), data.size() * sizeof(float));
     img->dirty();
@@ -554,7 +551,6 @@ osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromD
   assert(fromData.size() == toData.size() &&
          "fromData and toData must have the same size");
   osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D();
-  texture->setInternalFormat(GL_R32F);  // 1 channel, 32-bit float
   texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
   texture->setFilter(osg::Texture::MAG_FILTER, osg::Texture::NEAREST);
   texture->setBorderWidth(0);
@@ -562,6 +558,7 @@ osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromD
   texture->setWrap(osg::Texture2D::WRAP_S, osg::Texture::CLAMP_TO_EDGE);
   // Create the image
   osg::ref_ptr<osg::Image> image = new osg::Image();
+  image->setInternalTextureFormat(GL_R32F);  // 1 channel, 32-bit float
   image->allocateImage(fromData.size(), 2, 1, GL_RED, GL_FLOAT);
   unsigned char *v = image->data();
 
