@@ -104,6 +104,15 @@ class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
   enum Components { Strom, Waerme, Kaelte };
+  enum Scenarios {
+    status_quo,
+    future_ev,
+    future_ev_pv,
+    rule_base_bigger_hp,
+    rule_based,
+    optimized_bigger_hp,
+    optimized
+  };
   enum class EnergyGridType {
     PowerGrid,
     HeatingGrid,
@@ -366,7 +375,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
                                 bool updateColorMap = true);
   void applyStaticDataCampusToCityGML(const std::string &filePath,
                                       bool updateColorMap = true);
-  void applySimulationDataToPowerGrid();
+  //   void applySimulationDataToPowerGrid();
+  void applySimulationDataToPowerGrid(const std::string &simPath);
   void updatePowerGridSelection(bool on);
   void updatePowerGridConfig(const std::string &tableName, const std::string &name,
                              bool on);
@@ -492,6 +502,15 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_liftGrids = nullptr;
   opencover::ui::Button *m_staticPower = nullptr;
   opencover::ui::Button *m_staticCampusPower = nullptr;
+  opencover::ui::ButtonGroup *m_scenarios = nullptr;
+  opencover::ui::Button *m_status_quo = nullptr;
+  opencover::ui::Button *m_future_ev = nullptr;
+  opencover::ui::Button *m_future_ev_pv = nullptr;
+  opencover::ui::Button *m_rule_base_bigger_hp = nullptr;
+  opencover::ui::Button *m_rule_based = nullptr;
+  opencover::ui::Button *m_optimized_bigger_hp = nullptr;
+  opencover::ui::Button *m_optimized = nullptr;
+
   // opencover::ui::Button *m_powerGridBtn = nullptr;
   // opencover::ui::Button *m_heatingGridBtn = nullptr;
   // opencover::ui::Button *m_coolingGridBtn = nullptr;

@@ -517,7 +517,7 @@ osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &dat
     // Create the image
     osg::ref_ptr<osg::Image> image = new osg::Image();
     image->allocateImage(data.size(), 1, 1, GL_RED, GL_FLOAT);
-    // image->allocateImage(data.size(), 1, 1, GL_LUMINANCE, GL_FLOAT);
+    image->setInternalTextureFormat(GL_R32F);
     float* values = reinterpret_cast<float*>(image->data());
     // float* values = image->data();
     // float min = 100.0f, max = 0.0f;

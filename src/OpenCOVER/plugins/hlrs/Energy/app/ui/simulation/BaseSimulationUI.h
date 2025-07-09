@@ -69,7 +69,7 @@ class BaseSimulationUI {
       const std::map<std::string, simulationObject> &objectContainer) {
     m_colorMap = &color_map;
     isDerivedFromObject<simulationObject>();
-    double minKeyVal = 0.0, maxKeyVal = 1.0;
+    double minKeyVal = 1000.0, maxKeyVal = 1.0;
 
     try {
       auto simulation = m_simulation.lock();
