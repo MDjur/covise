@@ -37,7 +37,7 @@ class BaseSimulationUI {
   BaseSimulationUI &operator=(const BaseSimulationUI &) = delete;
 
   virtual void updateTime(int timestep) = 0;
-  // toDo: make these const
+  // TODO: make these const
   virtual float min(const std::string &species) = 0;
   virtual float max(const std::string &species) = 0;
   virtual void updateTimestepColors(const opencover::ColorMap &map) = 0;

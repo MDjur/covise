@@ -4,7 +4,7 @@ namespace core::simulation::power {
 
 void PowerSimulation::computeParameters() {
   // TODO: rewrite to use factorypattern
-  computeParameter(m_buses);
+  computeParameter(m_buses, 0.0f);
   computeParameter(m_generators);
   computeParameter(m_transformators);
   computeParameter(m_cables, 0.0f);  // no trimming for cables

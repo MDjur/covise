@@ -106,7 +106,6 @@ void EnergyGrid::initConnectionsByIndex(
   for (auto i = 0; i < indices.size(); ++i) {
     auto from = points[i];
     for (auto j = 0; j < indices[i].size(); ++j) {
-
       if (i < 0 || i >= points.size()) {
         std::cerr << "Invalid Index for points: " << i << "\n";
         continue;
@@ -128,8 +127,8 @@ void EnergyGrid::initConnectionsByIndex(
         if (additionalConnectionData.size() > i)
           if (additionalConnectionData[i].size() > j)
             additionalData = additionalConnectionData[i][j];
-      grid::ConnectionData data{name, from, to, radius, false, nullptr,
-                                                    additionalData};
+      grid::ConnectionData data{name,    from,          to, radius, false,
+                                nullptr, additionalData};
       m_connections.push_back(new grid::DirectedConnection(data));
     }
   }
@@ -215,8 +214,7 @@ osg::ref_ptr<grid::DirectedConnection> EnergyGrid::getConnectionByName(
 
 const osg::ref_ptr<grid::Point> EnergyGrid::getPointByName(
     const std::string &name) const {
-
-    // TODO: need to rework this after workshop => for now it works
+  // TODO: need to rework this after workshop => for now it works
   for (auto &point : m_config.points)
     if (point->getName() == name) return point;
   for (auto &[_, point] : m_config.pointsMap)
@@ -256,9 +254,9 @@ void EnergyGrid::updateColor(const osg::Vec4 &color) {
     utils::color::overrideGeodeColor(point->getGeode(), color);
   for (auto &[_, point] : m_config.pointsMap)
     utils::color::overrideGeodeColor(point->getGeode(), color);
-  for (auto &line : m_config.lines)
-    for (auto &[name, connection] : line->getConnections())
-      utils::color::overrideGeodeColor(connection->getGeode(), color);
+  //   for (auto &line : m_config.lines)
+  //     for (auto &[name, connection] : line->getConnections())
+  //       utils::color::overrideGeodeColor(connection->getGeode(), color);
 }
 
 void EnergyGrid::updateDrawables() {
@@ -266,50 +264,72 @@ void EnergyGrid::updateDrawables() {
     infoboard->updateDrawable();
   }
 }
-//toDo: streamline update for m_connections, m_lines and m_config.lines
-void EnergyGrid::updateTime(int timestep)
-{
-  for(auto &conn : m_connections)
-    conn->updateTimestepInShader(timestep);
-  for(auto &line : m_lines)
-    for(auto &[_, conn] : line->getConnections())
+// toDo: streamline update for m_connections, m_lines and m_config.lines
+void EnergyGrid::updateTime(int timestep) {
+  for (auto point : m_config.points) point->updateTimestepInShader(timestep);
+
+  for (auto &[_, point] : m_config.pointsMap)
+    point->updateTimestepInShader(timestep);
+
+  for (auto &conn : m_connections) conn->updateTimestepInShader(timestep);
+  for (auto &line : m_lines)
+    for (auto &[_, conn] : line->getConnections())
       conn->updateTimestepInShader(timestep);
-  for(auto &line : m_config.lines)
-    for(auto &[_, conn] : line->getConnections())
+  for (auto &line : m_config.lines)
+    for (auto &[_, conn] : line->getConnections())
       conn->updateTimestepInShader(timestep);
 }
 
+void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap) {
+  for (auto &point : m_config.points) point->updateColorMapInShader(colorMap);
 
+  for (auto &[_, point] : m_config.pointsMap)
+    point->updateColorMapInShader(colorMap);
 
-void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap)
-{
-  for(auto &conn : m_connections)
-    conn->updateColorMapInShader(colorMap);
-  for(auto &line : m_lines)
-    for(auto &[_, conn] : line->getConnections())
+  for (auto &conn : m_connections) conn->updateColorMapInShader(colorMap);
+  for (auto &line : m_lines)
+    for (auto &[_, conn] : line->getConnections())
       conn->updateColorMapInShader(colorMap);
-  for(auto &line : m_config.lines)
-    for(auto &[_, conn] : line->getConnections())
+  for (auto &line : m_config.lines)
+    for (auto &[_, conn] : line->getConnections())
       conn->updateColorMapInShader(colorMap);
 }
 
-void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::string & species, bool interpolate) {
-  for(auto &conn : m_connections) {
-
+void EnergyGrid::setData(const core::simulation::Simulation &sim,
+                         const std::string &species, bool interpolate) {
+  for (auto &point : m_config.points) {
+    auto data = sim.getTimedependentScalar(species, point->getName());
+    auto [min, max] = sim.getMinMax(species);
+    if (data) {
+      point->updateDataInShader(*data, min, max);
+    } else {
+      std::cerr << "No data found for point: " << point->getName() << "\n";
+    }
+  }
+  for (auto &[_, point] : m_config.pointsMap) {
+    auto data = sim.getTimedependentScalar(species, point->getName());
+    auto [min, max] = sim.getMinMax(species);
+    if (data) {
+      point->updateDataInShader(*data, min, max);
+    } else {
+      std::cerr << "No data found for point: " << point->getName() << "\n";
+    }
+  }
+  for (auto &conn : m_connections) {
     auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
     auto toData = fromData;
     if (interpolate)
-        toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
+      toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
     if (fromData && toData) {
       conn->setDataInShader(*fromData, *toData);
     } else {
       std::cerr << "No data found for connection: " << conn->getName() << "\n";
     }
   }
-  for(auto &line : m_lines) {
-    for(auto &[_, conn] : line->getConnections()) {
-
-      auto fromData = sim.getTimedependentScalar(species, conn->getStart()->getName());
+  for (auto &line : m_lines) {
+    for (auto &[_, conn] : line->getConnections()) {
+      auto fromData =
+          sim.getTimedependentScalar(species, conn->getStart()->getName());
       auto toData = fromData;
       if (interpolate)
         toData = sim.getTimedependentScalar(species, conn->getEnd()->getName());
@@ -333,8 +353,8 @@ void EnergyGrid::setData(const core::simulation::Simulation& sim, const std::str
         }
       }
     } else {
-      // TODO: If not interpolating, use the line name to get the data => pls rework later
-      // this is a workaround for the current data structure
+      // TODO: If not interpolating, use the line name to get the data => pls rework
+      // later this is a workaround for the current data structure
       auto lineName = line->getName();
       std::replace(lineName.begin(), lineName.end(), ' ', '_');
       auto data = sim.getTimedependentScalar(species, lineName);

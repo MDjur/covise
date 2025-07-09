@@ -8,6 +8,7 @@
 #include <osg/StateSet>
 #include <osg/Texture1D>
 #include <osg/Texture2D>
+#include <osg/TextureRectangle>
 #include <osg/ref_ptr>
 #include <osgDB/Options>
 #include <osgText/Text>
@@ -80,8 +81,10 @@ osg::ref_ptr<osg::Geode> createBezierTube(
     int numSegments = 50,
     const osg::Vec4 &color = osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f));
 
-osg::ref_ptr<osg::Texture1D> createPointDataTexture(const std::vector<float> &data);
+osg::ref_ptr<osg::Texture1D> createPointDataTexture(const std::vector<double> &data);
 osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &data);
+// osg::ref_ptr<osg::TextureRectangle> createValue1DTexture(const std::vector<double> &data);
+// osg::ref_ptr<osg::Texture1D> createValue1DTexture(const std::vector<double> &data);
 osg::ref_ptr<osg::Texture2D> createValueTexture(const std::vector<double> &fromData,
                                                 const std::vector<double> &toData);
 osg::ref_ptr<osgText::Text> createTextBox(const std::string &text,

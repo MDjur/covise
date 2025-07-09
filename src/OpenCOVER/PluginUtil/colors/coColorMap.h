@@ -26,7 +26,7 @@ PLUGIN_UTILEXPORT ColorMaps &ConfigColorMaps();
 class PLUGIN_UTILEXPORT ColorMap {
 public:
   ColorMap(const std::string &species, const std::string &unit = "NoUnit",
-    float min = 0.0, float max = 1.0, int steps = 32);
+    float min = 0.0, float max = 1.0, int steps = 64);
   ColorMap(const BaseColorMap &map, float min = 0.0, float max = 1.0);
 
   ColorMap(const ColorMap &other) = delete;
@@ -75,7 +75,7 @@ PLUGIN_UTILEXPORT ColorMaps readColorMaps();
 //   void setCallback(const std::function<void(const ColorMap &)> &f);
 //   void showHud(bool show);
 //   bool hudVisible() const;
-//   void setHudPosition(const opencover::ColorBar::HudPosition &position); 
+//   void setHudPosition(const opencover::ColorBar::HudPosition &position);
 //   void setUnit(const std::string &unit);
 //   void setSpecies(const std::string &species);
 //   void setMin(float min);

@@ -136,13 +136,25 @@ class Simulation {
       const std::string &node) const {
     static_assert(std::is_base_of_v<Object, T>,
                   "T must be derived from core::simulation::Object");
-    for (const auto &[name, object] : container) {
-      if (object.getName() == node) {
-        const auto &data = object.getData();
-        if (data.find(species) != data.end()) {
-          return &data.at(species);
-        }
+    // for (const auto &[name, object] : container) {
+    //   if (object.getName() == node) {
+    //     const auto &data = object.getData();
+    //     if (data.find(species) != data.end()) {
+    //       return &data.at(species);
+    //     }
+    //   }
+    // }
+    auto it = container.find(node);
+    if (it != container.end()) {
+      const auto &data = it->second.getData();
+      auto dataIt = data.find(species);
+      if (dataIt != data.end()) {
+        return &dataIt->second;
+      } else {
+        std::cerr << "Species not found: " << species << std::endl;
       }
+    } else {
+      std::cerr << "Node not found: " << node << std::endl;
     }
     return nullptr;
   }

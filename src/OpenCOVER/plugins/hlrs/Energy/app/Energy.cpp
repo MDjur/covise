@@ -134,6 +134,39 @@ const std::regex dateRgx(
     R"(((0[1-9])|([12][0-9])|(3[01]))\.((0[0-9])|(1[012]))\.((20[012]\d|19\d\d)|(1\d|2[0123])))");
 ennovatis::rest_request_handler m_debug_worker;
 
+void printLoadingPercentDistribution(const ObjectContainer<power::Cable> &cables, float min, float max, int numBins = 20)
+{
+    std::vector<int> histogram(numBins, 0);
+    int total = 0;
+
+    for (const auto &cable : cables)
+    {
+        auto it = cable.second.getData().find("loading_percent");
+        if (it == cable.second.getData().end())
+            continue;
+        const auto &data = it->second;
+        for (double value : data)
+        {
+            int bin = static_cast<int>(numBins * (value - min) / (max - min + 1e-8));
+            if (bin < 0) bin = 0;
+            if (bin >= numBins) bin = numBins - 1;
+            histogram[bin]++;
+            total++;
+        }
+    }
+
+    std::cout << "Distribution of loading_percent (" << total << " values):\n";
+    for (int i = 0; i < numBins; ++i)
+    {
+        float binMin = min + i * (max - min) / numBins;
+        float binMax = min + (i + 1) * (max - min) / numBins;
+        std::cout << "[" << binMin << ", " << binMax << "): ";
+        int stars = histogram[i] * 50 / (total > 0 ? *std::max_element(histogram.begin(), histogram.end()) : 1);
+        for (int s = 0; s < stars; ++s) std::cout << "*";
+        std::cout << " (" << histogram[i] << ")\n";
+    }
+}
+
 // Compare two string numbers as integer using std::stoi
 bool helper_cmpStrNo_as_int(const std::string &strtNo, const std::string &strtNo2) {
   try {
@@ -199,8 +232,8 @@ EnergyPlugin::EnergyPlugin()
           //   EnergySimulation{"PowerGridSonder", "Leistung", "kWh",
           //                    EnergyGridType::PowerGridSonder},
           EnergySimulation{"PowerGrid", EnergyGridType::PowerGrid},
-          EnergySimulation{"HeatingGrid", EnergyGridType::HeatingGrid},
-          EnergySimulation{"PowerGridSonder", EnergyGridType::PowerGridSonder},
+          EnergySimulation{"HeatingGrid", EnergyGridType::HeatingGrid}
+        //   EnergySimulation{"PowerGridSonder", EnergyGridType::PowerGridSonder},
           // EnergyGrid{"CoolingGrid", "mass_flow", "kg/s", EnergyGrids::CoolingGrid,
           // Components::Kaelte},
       }) {
@@ -394,7 +427,7 @@ void EnergyPlugin::setTimestep(int t) {
 
   auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
   // needed for updating spheres
-  //   if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
+    // if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
   if (energyGrid.grid) energyGrid.grid->updateTime(t);
   //   if (energyGrid.type == EnergyGridType::HeatingGrid)
   //   energyGrid.grid->updateTime(t); auto idx =
@@ -1506,7 +1539,7 @@ void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
   auto gridTypeIndex = getEnergyGridTypeIndex(type);
   auto &grid = m_energyGrids[gridTypeIndex];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
-    grid.simUI->updateTimestepColors(map);
+    // grid.simUI->updateTimestepColors(map);
     grid.grid->setColorMap(map);
   }
 }
@@ -1748,9 +1781,9 @@ bool EnergyPlugin::checkBoxSelection_powergrid(const std::string &tableName,
 
 void EnergyPlugin::rebuildPowerGrid() {
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
-  auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
+//   auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
   m_grid->removeChild(m_energyGrids[idx].group);
-  m_grid->removeChild(m_energyGrids[idxSonder].group);
+//   m_grid->removeChild(m_energyGrids[idxSonder].group);
   initPowerGridStreams();
   buildPowerGrid();
 }
@@ -1857,8 +1890,8 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
     return;
   }
 
-  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu_NEW"];
-  auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent_NEW"];
+  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu"];
+  auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
   apache::ArrowReader arrowReader(loading_percent);
   apache::ArrowReader vmPuReader(vm_pu_path);
 
@@ -1867,8 +1900,18 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
   auto columnNames = table->schema()->fields();
   auto columnNamesVmPu = tableVmPu->schema()->fields();
 
-  std::array<std::string, 5> skip{"timestamp", "district", "hkw", "new-buildings",
-                                  "pv-penetration"};
+//   for (const auto &col : columnNamesVmPu) {
+//     if (col->name() == "timestamp" || col->name() == "district" ||
+//         col->name() == "hkw" || col->name() == "new-buildings" ||
+//         col->name() == "pv-penetration") {
+//       continue;
+//     }
+//     std::cout << "Processing column: " << col->name() << std::endl;
+//     // columnNames.push_back(col);
+//   }
+
+  std::array<std::string, 7> skip{"timestamp", "district", "hkw", "new-buildings",
+                                  "pv-penetration", "loc_emob", "n_emob"};
 
   auto isSkipped = [&skip](const std::string &name) {
     return std::any_of(skip.begin(), skip.end(),
@@ -1882,6 +1925,7 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
   // Helper to process columns
   auto processColumns = [&](const std::shared_ptr<arrow::Table> &tbl,
                             auto &container, const std::string &dataKey) {
+    auto columnNames = tbl->schema()->fields();
     for (int j = 0; j < tbl->num_columns(); ++j) {
       auto columnName = columnNames[j]->name();
       std::replace(columnName.begin(), columnName.end(), ' ', '_');
@@ -1913,6 +1957,37 @@ void EnergyPlugin::applySimulationDataToPowerGrid() {
 
   // Process cable loading
   processColumns(table, cables, "loading_percent");
+
+  float min = 100.0f, max = 0.0f;
+  int time(0), maxTime(0);
+  for (auto &cable : cables) {
+    if (cable.second.getData().find("loading_percent") ==
+        cable.second.getData().end()) {
+      std::cerr << "No loading_percent data found for cable: " << cable.first
+                << std::endl;
+      continue;
+    }
+    auto &data = cable.second.getData()["loading_percent"];
+    if (data.empty()) {
+      std::cerr << "Empty loading_percent data for cable: " << cable.first
+                << std::endl;
+    }
+    time = 0;
+    for (const auto &value : data) {
+      if (value < min) min = value;
+    //   if (value > max) max = value;
+      if (value > max) {
+        max = value;
+        maxTime = time;
+      }
+      ++time;
+    }
+  }
+
+  std::cout << "Cable loading percent min: " << min
+            << ", max: " << max << " max time " << maxTime <<  std::endl;
+
+  printLoadingPercentDistribution(cables, min, max);
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
   if (m_energyGrids[idx].grid == nullptr) return;
@@ -2005,6 +2080,9 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       updateGridData(energyGrid);
     });
     energyGrid.scalarSelector = scalarSelector;
+    // auto it = std::find(scalarPropertyNames.begin(), scalarPropertyNames.end(),"loading_percent");
+    // int defaultIdx = (it != scalarPropertyNames.end()) ? std::distance(scalarPropertyNames.begin(), it) : 0;
+    // energyGrid.scalarSelector->select(defaultIdx, true);
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
     energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
     updateColorMap(energyGrid.colorMapRegistry[scalarSelector->selectedItem()]
@@ -2016,16 +2094,16 @@ void EnergyPlugin::initEnergyGridColorMaps() {
 
 void EnergyPlugin::updateGridData(EnergySimulation &energyGrid) {
   switch (energyGrid.type) {
-    case EnergyGridType::PowerGrid:
-    case EnergyGridType::PowerGridSonder: {
-      if (energyGrid.simUI) {
+    case EnergyGridType::PowerGrid: {
+    // case EnergyGridType::PowerGridSonder: {
+      if (energyGrid.grid && energyGrid.scalarSelector) {
         energyGrid.grid->setData(*energyGrid.sim,
                                  energyGrid.scalarSelector->selectedItem(), false);
       }
       break;
     }
     case EnergyGridType::HeatingGrid: {
-      if (energyGrid.simUI) {
+      if (energyGrid.grid && energyGrid.scalarSelector) {
         energyGrid.grid->setData(*energyGrid.sim,
                                  energyGrid.scalarSelector->selectedItem(), true);
       }
@@ -2272,7 +2350,6 @@ osg::ref_ptr<grid::Line> EnergyPlugin::createLine(
 
 std::pair<std::vector<grid::Lines>, std::vector<grid::ConnectionDataList>>
 EnergyPlugin::getPowerGridLines(COVERUtils::read::CSVStream &stream,
-                                // const std::vector<grid::Points> &points) {
                                 const std::vector<grid::PointsMap> &points) {
   using Lines = grid::Lines;
   using CDL = grid::ConnectionDataList;
@@ -2396,27 +2473,40 @@ void EnergyPlugin::buildPowerGrid() {
   // create grid
   if (lines[0].empty() || lines[1].empty() || points.empty()) return;
 
+  grid::PointsMap mergedPoints = points[0];
+  mergedPoints.insert(points[1].begin(), points[1].end());
+  // TODO: workaround for merging => PLS REFACTOR LATER
+  grid::Lines mergedLines = lines[0];
+  mergedLines.insert(
+      mergedLines.end(), lines[1].begin(), lines[1].end());
+
+  grid::ConnectionDataList mergedOptData = optData[0];
+  mergedOptData.insert(mergedOptData.end(), optData[1].begin(), optData[1].end());
+
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
-  auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
+//   auto idxSonder = getEnergyGridTypeIndex(EnergyGridType::PowerGridSonder);
   auto &egrid = m_energyGrids[idx];
-  auto &egridSonder = m_energyGrids[idxSonder];
+//   auto &egridSonder = m_energyGrids[idxSonder];
   auto &powerGroup = egrid.group;
-  auto &powerGroupSonder = egridSonder.group;
+//   auto &powerGroupSonder = egridSonder.group;
   powerGroup = new osg::MatrixTransform;
-  powerGroupSonder = new osg::MatrixTransform;
+//   powerGroupSonder = new osg::MatrixTransform;
   auto font = configString("Billboard", "font", "default")->value();
   TxtBoxAttributes infoboardAttributes = TxtBoxAttributes(
       osg::Vec3(0, 0, 0), "EnergyGridText", font, 50, 50, 2.0f, 0.1, 2);
   powerGroup->setName("PowerGrid");
-  powerGroupSonder->setName("PowerGridSonder");
+//   powerGroupSonder->setName("PowerGridSonder");
 
-  EnergyGridConfig econfig("POWER", {}, grid::Indices(), points[0], powerGroup,
-                           connectionsRadius, optData[0], infoboardAttributes,
-                           EnergyGridConnectionType::Line, lines[0]);
-  EnergyGridConfig econfigSonder("POWERSonder", {}, grid::Indices(), points[1],
-                                 powerGroupSonder, connectionsRadius, optData[1],
-                                 infoboardAttributes, EnergyGridConnectionType::Line,
-                                 lines[1]);
+  EnergyGridConfig econfig("POWER", {}, grid::Indices(), mergedPoints, powerGroup,
+                           connectionsRadius, mergedOptData, infoboardAttributes,
+                           EnergyGridConnectionType::Line, mergedLines);
+//   EnergyGridConfig econfig("POWER", {}, grid::Indices(), points[0], powerGroup,
+//                            connectionsRadius, optData[0], infoboardAttributes,
+//                            EnergyGridConnectionType::Line, lines[0]);
+//   EnergyGridConfig econfigSonder("POWERSonder", {}, grid::Indices(), points[1],
+//                                  powerGroupSonder, connectionsRadius, optData[1],
+//                                  infoboardAttributes, EnergyGridConnectionType::Line,
+//                                  lines[1]);
 
   auto powerGrid = std::make_unique<EnergyGrid>(econfig, false);
   powerGrid->initDrawables();
@@ -2425,12 +2515,12 @@ void EnergyPlugin::buildPowerGrid() {
   egrid.grid = std::move(powerGrid);
   addEnergyGridToGridSwitch(egrid.group);
 
-  auto powerGridSonder = std::make_unique<EnergyGrid>(econfigSonder, false);
-  powerGridSonder->initDrawables();
-  //   powerGridSonder->updateColor(
-  //       osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
-  egridSonder.grid = std::move(powerGridSonder);
-  addEnergyGridToGridSwitch(egridSonder.group);
+//   auto powerGridSonder = std::make_unique<EnergyGrid>(econfigSonder, false);
+//   powerGridSonder->initDrawables();
+//   //   powerGridSonder->updateColor(
+//   //       osg::Vec4(0.0f / 255.0f, 200.0f / 255.0f, 33.0f / 255.0f, 1.0f));
+//   egridSonder.grid = std::move(powerGridSonder);
+//   addEnergyGridToGridSwitch(egridSonder.group);
 
   // TODO:
   //  [ ] set trafo as 3d model or block

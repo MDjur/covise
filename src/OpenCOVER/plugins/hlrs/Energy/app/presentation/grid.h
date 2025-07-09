@@ -39,6 +39,11 @@ class Point : public osg::MatrixTransform {
     core::utils::color::overrideGeodeColor(getGeode(), color);
   }
 
+  void updateColorMapInShader(const opencover::ColorMap &colormap,
+                              const std::string &shaderName = "EnergyGrid_Point");
+  void updateTimestepInShader(int timestep);
+  void updateDataInShader(const std::vector<double> &data, float min, float max);
+
  private:
   void init(const std::string &name);
 
@@ -46,6 +51,7 @@ class Point : public osg::MatrixTransform {
   osg::ref_ptr<osg::ShapeDrawable> m_shape;
   osg::ref_ptr<osg::Sphere> m_point;
   Data m_additionalData;
+  opencover::coVRShader *m_shader;
 };
 
 struct ConnectionData {
@@ -68,7 +74,8 @@ enum class ConnectionType {
 
 class DirectedConnection : public osg::MatrixTransform {
   DirectedConnection(const std::string &name, osg::ref_ptr<Point> start,
-                     osg::ref_ptr<Point> end, const float &radius, bool colorInterpolation,
+                     osg::ref_ptr<Point> end, const float &radius,
+                     bool colorInterpolation,
                      osg::ref_ptr<osg::TessellationHints> hints,
                      const Data &additionalData = Data(),
                      ConnectionType type = ConnectionType::Line);
@@ -76,8 +83,9 @@ class DirectedConnection : public osg::MatrixTransform {
  public:
   DirectedConnection(const ConnectionData &data,
                      ConnectionType type = ConnectionType::Line)
-      : DirectedConnection(data.name, data.start, data.end, data.radius, data.colorInterpolation, data.hints,
-                           data.additionalData, type) {};
+      : DirectedConnection(data.name, data.start, data.end, data.radius,
+                           data.colorInterpolation, data.hints, data.additionalData,
+                           type) {};
 
   void move(const osg::Vec3 &offset) {
     setMatrix(osg::Matrix::translate(offset));
@@ -98,10 +106,12 @@ class DirectedConnection : public osg::MatrixTransform {
     core::utils::color::overrideGeodeColor(m_geode, color);
   }
   void setDataInShader(const std::vector<double> &fromData,
-               const std::vector<double> &toData);
+                       const std::vector<double> &toData);
   void setData1DInShader(const std::vector<double> &data, float min, float max);
-  // shader needs to have same uniform buffer like share/covise/materials/EnergyGrid_Line.xml
-  void updateColorMapInShader(const opencover::ColorMap &colorMap, const std::string &shaderName = "EnergyGrid_Line");
+  // shader needs to have same uniform buffer like
+  // share/covise/materials/EnergyGrid_Line.xml
+  void updateColorMapInShader(const opencover::ColorMap &colorMap,
+                              const std::string &shaderName = "EnergyGrid_Line");
   void updateTimestepInShader(int timestep);
 
  private:

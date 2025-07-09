@@ -10,6 +10,7 @@
 #include <osg/BoundingBox>
 #include <osg/MatrixTransform>
 #include <osg/Shape>
+#include <osg/StateAttribute>
 #include <osg/Texture1D>
 #include <osg/Texture2D>
 #include <osg/Vec4>
@@ -25,6 +26,10 @@ void updateMinMax(osg::Vec3 &minExtends, osg::Vec3 &maxExtends,
   maxExtends.y() = std::max(maxExtends.y(), point.y());
   maxExtends.z() = std::max(maxExtends.z(), point.z());
 }
+
+constexpr int SHADER_SCALAR_TIMESTEP_MAPPING_INDEX =
+    0;  // index of the texture that maps from energy grid node index to timestep
+        // value
 }  // namespace
    //
 using namespace core;
@@ -37,7 +42,8 @@ Point::Point(const std::string &name, const float &x, const float &y, const floa
     : osg::MatrixTransform(),
       m_point(new osg::Sphere(osg::Vec3(x, y, z), radius)),
       m_additionalData(additionalData),
-      m_radius(radius) {
+      m_radius(radius),
+      m_shader(nullptr) {
   init(name);
 }
 
@@ -55,6 +61,58 @@ void Point::init(const std::string &name) {
   geode->addChild(m_shape);
   addChild(geode);
   setName(name);
+}
+
+void Point::updateColorMapInShader(const opencover::ColorMap &colorMap,
+                                   const std::string &shaderName) {
+  m_shader = opencover::applyShader(m_shape, colorMap, shaderName);
+
+  auto geode = getChild(0)->asGeode();
+  auto state = geode->getOrCreateStateSet();
+  m_shader->apply(state);
+  geode->setStateSet(state);
+}
+
+void Point::updateDataInShader(const std::vector<double> &data, float min,
+                               float max) {
+  if (!m_shader) {
+    std::cerr << "Point::updateDataInShader: No shader set for point " << getName()
+              << "\n";
+    return;
+  }
+
+  m_shader->setIntUniform("numTimesteps", data.size());
+//   m_shader->setFloatUniform("rangeMin", min);
+//   m_shader->setFloatUniform("rangeMax", max);
+
+  auto uniform = m_shader->getcoVRUniform("pointData");
+  assert(uniform);
+  uniform->setValue(std::to_string(SHADER_SCALAR_TIMESTEP_MAPPING_INDEX).c_str());
+
+  auto texture = core::utils::osgUtils::createPointDataTexture(data);
+//   auto state = m_shape->getOrCreateStateSet();
+  auto geode = getChild(0);
+  auto state = geode->getOrCreateStateSet();
+  state->setTextureAttribute(SHADER_SCALAR_TIMESTEP_MAPPING_INDEX, texture,
+                             osg::StateAttribute::ON);
+
+  m_shader->apply(state);
+//   m_shape->setStateSet(state);
+  geode->setStateSet(state);
+}
+
+void Point::updateTimestepInShader(int timestep) {
+  if (!m_shader) {
+    std::cerr << "DirectedConnection::updateTimestep: No shader set for connection "
+              << getName() << "\n";
+    return;
+  }
+
+  m_shader->setIntUniform("timestep", timestep);
+  auto geode = getChild(0);
+  auto state = geode->getOrCreateStateSet();
+  m_shader->apply(state);
+  geode->setStateSet(state);
 }
 
 constexpr int NUM_CIRCLE_POINTS = 20;
@@ -103,10 +161,6 @@ DirectedConnection::DirectedConnection(const std::string &name,
   setName(name);
 }
 
-constexpr int SHADER_SCALAR_TIMESTEP_MAPPING_INDEX =
-    0;  // index of the texture that maps from energy grid node index to timestep
-        // value
-
 void DirectedConnection::setDataInShader(const std::vector<double> &fromData,
                                          const std::vector<double> &toData) {
   if (!m_shader) {
@@ -144,6 +198,9 @@ void DirectedConnection::setData1DInShader(const std::vector<double> &data,
   std::cerr << "Setting 1D data shader for connection: " << getName() << "\n";
   m_shader->setIntUniform("numTimesteps", data.size());
   m_shader->setIntUniform("numNodes", 1);
+  // will be set in apply shader
+//   m_shader->setIntUniform("rangeMin", min);
+//   m_shader->setIntUniform("rangeMax", max);
 
   auto uniform = m_shader->getcoVRUniform("timestepToData");
   assert(uniform);

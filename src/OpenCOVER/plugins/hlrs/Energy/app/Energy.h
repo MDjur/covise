@@ -107,7 +107,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   enum class EnergyGridType {
     PowerGrid,
     HeatingGrid,
-    PowerGridSonder,
+    // PowerGridSonder,
     NUM_ENERGY_TYPES
   };
   // enum EnergyGrids { PowerGrid, HeatingGrid, CoolingGrid, NUM_ENERGY_GRIDS };
@@ -281,7 +281,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
     const std::string name;
     const EnergyGridType type;
     opencover::ui::Button *simulationUIBtn = nullptr;
-    opencover::ui::Menu *menu = nullptr;
+    // opencover::ui::Menu *menu = nullptr;
     opencover::ui::SelectionList *scalarSelector = nullptr;
     osg::ref_ptr<osg::MatrixTransform> group = nullptr;
     std::shared_ptr<core::interface::IEnergyGrid> grid;
