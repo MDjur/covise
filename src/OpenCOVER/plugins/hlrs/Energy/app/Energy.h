@@ -108,9 +108,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
     status_quo,
     future_ev,
     future_ev_pv,
-    rule_base_bigger_hp,
-    rule_based,
-    optimized_bigger_hp,
+    optimized_bigger_awz,
     optimized
   };
   enum class EnergyGridType {
@@ -508,7 +506,7 @@ class EnergyPlugin : public opencover::coVRPlugin,
   opencover::ui::Button *m_future_ev_pv = nullptr;
   opencover::ui::Button *m_rule_base_bigger_hp = nullptr;
   opencover::ui::Button *m_rule_based = nullptr;
-  opencover::ui::Button *m_optimized_bigger_hp = nullptr;
+  opencover::ui::Button *m_optimized_bigger_awz = nullptr;
   opencover::ui::Button *m_optimized = nullptr;
 
   // opencover::ui::Button *m_powerGridBtn = nullptr;

@@ -1571,15 +1571,11 @@ void EnergyPlugin::initSimMenu() {
                                Scenarios::future_ev);
   m_future_ev_pv = new ui::Button(m_simulationMenu, "future_ev_pv", m_scenarios,
                                   Scenarios::future_ev_pv);
-  m_rule_based = new ui::Button(m_simulationMenu, "rule_based", m_scenarios,
-                                Scenarios::rule_based);
-  m_rule_base_bigger_hp =
-      new ui::Button(m_simulationMenu, "rule_base_bigger_hp", m_scenarios,
-                     Scenarios::rule_base_bigger_hp);
   m_optimized = new ui::Button(m_simulationMenu, "optimized", m_scenarios,
                                Scenarios::optimized);
-  m_optimized_bigger_hp = new ui::Button(m_simulationMenu, "optimized_bigger_hp",
-                                         m_scenarios, Scenarios::optimized);
+  m_optimized_bigger_awz =
+      new ui::Button(m_simulationMenu, "optimized_bigger_awz", m_scenarios,
+                     Scenarios::optimized_bigger_awz);
 
   m_scenarios->setCallback([this](int value) {
     switchTo(m_energyGrids[getEnergyGridTypeIndex(EnergyGridType::PowerGrid)].group,
@@ -1595,17 +1591,11 @@ void EnergyPlugin::initSimMenu() {
       case Scenarios::future_ev_pv:
         scenarioName = "future_ev_pv";
         break;
-      case Scenarios::rule_based:
-        scenarioName = "rule_based";
-        break;
-      case Scenarios::rule_base_bigger_hp:
-        scenarioName = "rule_base_bigger_hp";
-        break;
       case Scenarios::optimized:
         scenarioName = "optimized";
         break;
-      case Scenarios::optimized_bigger_hp:
-        scenarioName = "optimized_bigger_hp";
+      case Scenarios::optimized_bigger_awz:
+        scenarioName = "optimized_bigger_awz";
         break;
     }
     auto simPath = configString("Simulation", "powerSimDir", "default")->value();
@@ -1616,9 +1606,10 @@ void EnergyPlugin::initSimMenu() {
     auto scalarSelector = energyGrid.scalarSelector;
     auto selectedScalar = scalarSelector->selectedItem();
     auto &colorMapMenu = energyGrid.colorMapRegistry[selectedScalar];
-    auto min = energyGrid.simUI->min(selectedScalar);
-    auto max = energyGrid.simUI->max(selectedScalar);
-    colorMapMenu.selector->setMinMax(min, max);
+    // auto min = energyGrid.simUI->min(selectedScalar);
+    // auto max = energyGrid.simUI->max(selectedScalar);
+    // colorMapMenu.selector->setMinMax(min, max);
+    colorMapMenu.selector->setMinMax(0.0f, 100.0f);
 
     updateColorMap(colorMapMenu.selector->colorMap(), energyGrid.type);
     updateGridData(energyGrid);
