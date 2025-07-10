@@ -1954,15 +1954,13 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
     return;
   }
 
-  auto vm_pu_path = arrowFiles["electrical_grid.res_bus.vm_pu"];
+  auto vm_pu = arrowFiles["electrical_grid.res_bus.vm_pu"];
   auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
-  apache::ArrowReader arrowReader(loading_percent);
-  apache::ArrowReader vmPuReader(vm_pu_path);
+  apache::ArrowReader loadingPercentReader(loading_percent);
+  apache::ArrowReader vmPuReader(vm_pu);
 
-  auto table = arrowReader.getTable();
+  auto tableLoadingPercent = loadingPercentReader.getTable();
   auto tableVmPu = vmPuReader.getTable();
-  auto columnNames = table->schema()->fields();
-  auto columnNamesVmPu = tableVmPu->schema()->fields();
 
   std::array<std::string, 7> skip{"timestamp",     "district",       "hkw",
                                   "new-buildings", "pv-penetration", "loc_emob",
@@ -1984,6 +1982,7 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
     for (int j = 0; j < tbl->num_columns(); ++j) {
       auto columnName = columnNames[j]->name();
       std::replace(columnName.begin(), columnName.end(), ' ', '_');
+      std::replace(columnName.begin(), columnName.end(), '/', '-');
       if (isSkipped(columnName)) continue;
       auto column = tbl->column(j);
       int64_t chunk_offset = 0;
@@ -2011,8 +2010,9 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
   processColumns(tableVmPu, buses, "vm_pu");
 
   // Process cable loading
-  processColumns(table, cables, "loading_percent");
+  processColumns(tableLoadingPercent, cables, "loading_percent");
 
+  // SOME DEBUG OUTPUT
   //   float min = 100.0f, max = 0.0f;
   //   int time(0), maxTime(0);
   //   for (auto &cable : cables) {
@@ -2038,10 +2038,8 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
   //       ++time;
   //     }
   //   }
-
   //   std::cout << "Cable loading percent min: " << min
   //             << ", max: " << max << " max time " << maxTime <<  std::endl;
-
   //   printLoadingPercentDistribution(cables, min, max);
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
