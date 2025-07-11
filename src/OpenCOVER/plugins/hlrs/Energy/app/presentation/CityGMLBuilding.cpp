@@ -66,7 +66,7 @@ void CityGMLBuilding::setColorMapInShader(const opencover::ColorMap &colorMap) {
                 << "No geode found for drawable.\n";
       continue;
     }
-    auto shader = opencover::applyShader(geo, colorMap, "EnergyGrid_Line");
+    auto shader = opencover::applyShader(geo, colorMap, "EnergyGrid");
     if (shader) {
       auto state = geo->getOrCreateStateSet();
       shader->apply(state);
