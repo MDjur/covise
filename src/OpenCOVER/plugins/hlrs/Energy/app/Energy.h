@@ -372,7 +372,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
       std::string &name, std::map<std::string, uint> &duplicateMap);
   std::unique_ptr<grid::PointDataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
-  void applyInfluxToCityGML(const std::string &filePath, bool updateColorMap = true);
+  void applyInfluxCSVToCityGML(const std::string &filePath, bool updateColorMap = true);
+  void applyInfluxArrowToCityGML();
   void applyStaticDataToCityGML(const std::string &filePath,
                                 bool updateColorMap = true);
   void applyStaticDataCampusToCityGML(const std::string &filePath,
@@ -490,7 +491,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
 
   // citygml UI
   opencover::ui::Menu *m_cityGMLMenu = nullptr;
-  opencover::ui::Button *m_cityGMLEnableInflux = nullptr;
+  opencover::ui::Button *m_cityGMLEnableInfluxCSV = nullptr;
+  opencover::ui::Button *m_cityGMLEnableInfluxArrow = nullptr;
   opencover::ui::Button *m_PVEnable = nullptr;
   //   opencover::ui::Button *m_cityGMLDisableBuildings = nullptr;
   opencover::ui::EditField *m_cityGMLX = nullptr, *m_cityGMLY = nullptr,

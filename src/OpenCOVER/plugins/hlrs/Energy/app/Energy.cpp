@@ -542,11 +542,22 @@ void EnergyPlugin::setAnimationTimesteps(size_t maxTimesteps, const void *who) {
 void EnergyPlugin::initCityGMLUI() {
   checkEnergyTab();
   m_cityGMLMenu = new ui::Menu(m_EnergyTab, "CityGML");
-  m_cityGMLEnableInflux = new ui::Button(m_cityGMLMenu, "Influx");
-  m_cityGMLEnableInflux->setCallback([this](bool on) {
+  m_cityGMLEnableInfluxCSV = new ui::Button(m_cityGMLMenu, "InfluxCSV");
+  m_cityGMLEnableInfluxCSV->setCallback([this](bool on) {
     if (on) {
       m_staticPower->setState(false);
       m_staticCampusPower->setState(false);
+      m_cityGMLEnableInfluxArrow->setState(false);
+    }
+    enableCityGML(on);
+  });
+
+  m_cityGMLEnableInfluxArrow = new ui::Button(m_cityGMLMenu, "InfluxArrow");
+  m_cityGMLEnableInfluxArrow->setCallback([this](bool on) {
+    if (on) {
+      m_staticPower->setState(false);
+      m_staticCampusPower->setState(false);
+      m_cityGMLEnableInfluxCSV->setState(false);
     }
     enableCityGML(on);
   });
@@ -574,7 +585,8 @@ void EnergyPlugin::initCityGMLUI() {
   m_staticPower->setState(false);
   m_staticPower->setCallback([&](bool on) {
     if (on) {
-      m_cityGMLEnableInflux->setState(false);
+      m_cityGMLEnableInfluxCSV->setState(false);
+      m_cityGMLEnableInfluxArrow->setState(false);
       m_staticCampusPower->setState(false);
     }
     enableCityGML(on);
@@ -585,7 +597,8 @@ void EnergyPlugin::initCityGMLUI() {
   m_staticCampusPower->setState(false);
   m_staticCampusPower->setCallback([&](bool on) {
     if (on) {
-      m_cityGMLEnableInflux->setState(false);
+      m_cityGMLEnableInfluxCSV->setState(false);
+      m_cityGMLEnableInfluxArrow->setState(false);
       m_staticPower->setState(false);
     }
     enableCityGML(on);
@@ -1004,15 +1017,20 @@ void EnergyPlugin::enableCityGML(bool on, bool updateColorMap) {
     switchTo(m_cityGML, m_switch);
 
     // TODO: add a check if the group is already added and make sure its safe to
-    if (m_cityGMLEnableInflux->state()) {
+    if (m_cityGMLEnableInfluxCSV->state()) {
       auto influxCSVPath =
           configString("Simulation", "staticInfluxCSV", "default")->value();
-      applyInfluxToCityGML(influxCSVPath, updateColorMap);
+      applyInfluxCSVToCityGML(influxCSVPath, updateColorMap);
     }
+
+    if (m_cityGMLEnableInfluxArrow->state()) {
+    }
+
     if (m_staticCampusPower->state()) {
       auto campusPath = configString("Simulation", "campusPath", "default")->value();
       applyStaticDataCampusToCityGML(campusPath, updateColorMap);
     }
+
     if (m_staticPower->state()) {
       auto staticPower =
           configString("Simulation", "staticPower", "default")->value();
@@ -1567,7 +1585,7 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 /* #region SIMULATION_DATA */
 
 void EnergyPlugin::updateEnergyGridColorMapInShader(const opencover::ColorMap &map,
-                                  EnergyGridType type) {
+                                                    EnergyGridType type) {
   auto gridTypeIndex = getEnergyGridTypeIndex(type);
   auto &grid = m_energyGrids[gridTypeIndex];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
@@ -1615,6 +1633,7 @@ void EnergyPlugin::initSimMenu() {
     std::string scenarioName = getScenarioName(Scenario(value));
     auto simPath = configString("Simulation", "powerSimDir", "default")->value();
     simPath += "/" + scenarioName;
+
     applySimulationDataToPowerGrid(simPath);
     auto &energyGrid =
         m_energyGrids[getEnergyGridTypeIndex(EnergyGridType::PowerGrid)];
@@ -1626,7 +1645,8 @@ void EnergyPlugin::initSimMenu() {
     // colorMapMenu.selector->setMinMax(min, max);
     colorMapMenu.selector->setMinMax(0.0f, 100.0f);
 
-    updateEnergyGridColorMapInShader(colorMapMenu.selector->colorMap(), energyGrid.type);
+    updateEnergyGridColorMapInShader(colorMapMenu.selector->colorMap(),
+                                     energyGrid.type);
     updateEnergyGridShaderData(energyGrid);
   });
 }
@@ -1765,8 +1785,8 @@ auto EnergyPlugin::readStaticPowerData(CSVStream &stream, float &max, float &min
   return powerData;
 }
 
-void EnergyPlugin::applyInfluxToCityGML(const std::string &filePathToInfluxCSV,
-                                        bool updateColorMap) {
+void EnergyPlugin::applyInfluxCSVToCityGML(const std::string &filePathToInfluxCSV,
+                                           bool updateColorMap) {
   if (m_cityGMLObjs.empty()) return;
   if (!fs::exists(filePathToInfluxCSV)) return;
   auto csvStream = CSVStream(filePathToInfluxCSV);
@@ -1790,6 +1810,10 @@ void EnergyPlugin::applyInfluxToCityGML(const std::string &filePathToInfluxCSV,
     }
   }
   setAnimationTimesteps(timesteps, m_cityGML);
+}
+
+void EnergyPlugin::applyInfluxArrowToCityGML() {
+  if (m_cityGMLObjs.empty()) return;
 }
 
 void EnergyPlugin::applyStaticDataToCityGML(const std::string &filePathToInfluxCSV,
@@ -1961,6 +1985,7 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
   auto vm_pu = arrowFiles["electrical_grid.res_bus.vm_pu"];
   auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
   auto res_mw = arrowFiles["electrical_prosumer.res_mw"];
+
   apache::ArrowReader loadingPercentReader(loading_percent);
   apache::ArrowReader vmPuReader(vm_pu);
   apache::ArrowReader resMWReader(res_mw);
@@ -2051,6 +2076,34 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
   powerGrid.simUI = std::make_unique<PowerSimUI>(sim, powerGrid.grid);
   powerGrid.sim = std::move(sim);
 
+  if (m_cityGMLEnableInfluxArrow->state()) {
+    const auto &[min, max] = powerGrid.sim->getMinMax("res_mw");
+    m_cityGmlColorMap->setMinMax(min, max);
+    m_cityGmlColorMap->setSpecies("Residuallast");
+    m_cityGmlColorMap->setUnit("MW");
+    auto halfSpan = (max - min) / 2;
+    m_cityGmlColorMap->setMinBounds(min - halfSpan, min + halfSpan);
+    m_cityGmlColorMap->setMaxBounds(max - halfSpan, max + halfSpan);
+    printLoadingPercentDistribution(buildings, min, max);
+
+    for (auto &[name, sensor] : m_cityGMLObjs) {
+      std::string sensorName = name;
+      auto values = powerGrid.sim->getTimedependentScalar("res_mw", sensorName);
+      if (!values) {
+        std::cerr << "No res_mw data found for sensor: " << sensorName << std::endl;
+        continue;
+      }
+
+      sensor->setColorMapInShader(m_cityGmlColorMap->colorMap());
+      sensor->setDataInShader(*values, min, max);
+
+      std::vector<std::string> texts;
+      std::transform(values->begin(), values->end(), std::back_inserter(texts),
+                     [](const auto &v) { return std::to_string(v) + " MW"; });
+      sensor->updateTxtBoxTexts(texts);
+    }
+  }
+
   std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
   setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
 }
@@ -2098,8 +2151,9 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       cms->setSpecies(scalarProperty.species);
       cms->setUnit(scalarProperty.unit);
       auto type = energyGrid.type;
-      cms->setCallback(
-          [this, type](const opencover::ColorMap &cm) { updateEnergyGridColorMapInShader(cm, type); });
+      cms->setCallback([this, type](const opencover::ColorMap &cm) {
+        updateEnergyGridColorMapInShader(cm, type);
+      });
       cms->setName(energyGrid.name);
       auto min = energyGrid.simUI->min(scalarProperty.species);
       auto max = energyGrid.simUI->max(scalarProperty.species);
@@ -2135,7 +2189,8 @@ void EnergyPlugin::initEnergyGridColorMaps() {
           menu.menu->setVisible(false);
         }
       }
-      updateEnergyGridColorMapInShader(colorMapMenu.selector->colorMap(), energyGrid.type);
+      updateEnergyGridColorMapInShader(colorMapMenu.selector->colorMap(),
+                                       energyGrid.type);
       updateEnergyGridShaderData(energyGrid);
     });
     energyGrid.scalarSelector = scalarSelector;
@@ -2145,9 +2200,10 @@ void EnergyPlugin::initEnergyGridColorMaps() {
     // 0; energyGrid.scalarSelector->select(defaultIdx, true);
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
     energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
-    updateEnergyGridColorMapInShader(energyGrid.colorMapRegistry[scalarSelector->selectedItem()]
-                       .selector->colorMap(),
-                   energyGrid.type);
+    updateEnergyGridColorMapInShader(
+        energyGrid.colorMapRegistry[scalarSelector->selectedItem()]
+            .selector->colorMap(),
+        energyGrid.type);
     updateEnergyGridShaderData(energyGrid);
   }
 }
