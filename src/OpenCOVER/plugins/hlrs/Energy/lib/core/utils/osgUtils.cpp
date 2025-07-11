@@ -467,7 +467,6 @@ createColorArrayForTubeColorInterpolationBetweenStartAndEnd(
   return colors;
 }
 
-// osg::ref_ptr<osg::Texture1D> createValue1DTexture(const std::vector<double> &data)  {
 osg::ref_ptr<osg::Texture2D> createValue1DTexture(const std::vector<double> &data)  {
     osg::ref_ptr<osg::Texture2D> texture = new osg::Texture2D;
     texture->setFilter(osg::Texture::MIN_FILTER, osg::Texture::NEAREST);
