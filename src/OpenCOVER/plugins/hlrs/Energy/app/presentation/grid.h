@@ -40,7 +40,7 @@ class Point : public osg::MatrixTransform {
   }
 
   void updateColorMapInShader(const opencover::ColorMap &colormap,
-                              const std::string &shaderName = "EnergyGrid_Point");
+                              const std::string &shaderName = "EnergyGrid");
   void updateTimestepInShader(int timestep);
   void updateDataInShader(const std::vector<double> &data, float min, float max);
 
@@ -111,7 +111,7 @@ class DirectedConnection : public osg::MatrixTransform {
   // shader needs to have same uniform buffer like
   // share/covise/materials/EnergyGrid_Line.xml
   void updateColorMapInShader(const opencover::ColorMap &colorMap,
-                              const std::string &shaderName = "EnergyGrid_Line");
+                              const std::string &shaderName = "EnergyGrid");
   void updateTimestepInShader(int timestep);
 
  private:

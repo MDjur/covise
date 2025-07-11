@@ -8,6 +8,7 @@
 #include <cassert>
 #include <iostream>
 #include <osg/BoundingBox>
+#include <osg/Geode>
 #include <osg/MatrixTransform>
 #include <osg/Shape>
 #include <osg/StateAttribute>
@@ -65,9 +66,10 @@ void Point::init(const std::string &name) {
 
 void Point::updateColorMapInShader(const opencover::ColorMap &colorMap,
                                    const std::string &shaderName) {
-  m_shader = opencover::applyShader(m_shape, colorMap, shaderName);
+  osg::ref_ptr<osg::Geode> geode = getChild(0)->asGeode();
+  m_shader = opencover::applyShader(geode, colorMap, shaderName);
+  m_shader->setIntUniform("numNodes", 1);
 
-  auto geode = getChild(0)->asGeode();
   auto state = geode->getOrCreateStateSet();
   m_shader->apply(state);
   geode->setStateSet(state);
@@ -82,28 +84,25 @@ void Point::updateDataInShader(const std::vector<double> &data, float min,
   }
 
   m_shader->setIntUniform("numTimesteps", data.size());
-//   m_shader->setFloatUniform("rangeMin", min);
-//   m_shader->setFloatUniform("rangeMax", max);
+  m_shader->setIntUniform("numNodes", 1);
 
-  auto uniform = m_shader->getcoVRUniform("pointData");
+  auto uniform = m_shader->getcoVRUniform("timestepToData");
   assert(uniform);
   uniform->setValue(std::to_string(SHADER_SCALAR_TIMESTEP_MAPPING_INDEX).c_str());
 
-  auto texture = core::utils::osgUtils::createPointDataTexture(data);
-//   auto state = m_shape->getOrCreateStateSet();
+  auto texture = core::utils::osgUtils::createValue1DTexture(data);
   auto geode = getChild(0);
   auto state = geode->getOrCreateStateSet();
   state->setTextureAttribute(SHADER_SCALAR_TIMESTEP_MAPPING_INDEX, texture,
                              osg::StateAttribute::ON);
 
   m_shader->apply(state);
-//   m_shape->setStateSet(state);
   geode->setStateSet(state);
 }
 
 void Point::updateTimestepInShader(int timestep) {
   if (!m_shader) {
-    std::cerr << "DirectedConnection::updateTimestep: No shader set for connection "
+    std::cerr << "Point::updateTimestep: No shader set for connection "
               << getName() << "\n";
     return;
   }
@@ -170,9 +169,6 @@ void DirectedConnection::setDataInShader(const std::vector<double> &fromData,
   }
   std::cerr << "Setting data shader for connection: " << getName() << "\n";
   m_shader->setIntUniform("numTimesteps", fromData.size());
-  //   if (getName() == "184_172") {
-  //     std::cerr << std::endl;
-  //   }
   // might be unnecessary, default should be 0 anyway
   auto uniform = m_shader->getcoVRUniform("timestepToData");
   assert(uniform);
@@ -198,9 +194,6 @@ void DirectedConnection::setData1DInShader(const std::vector<double> &data,
   std::cerr << "Setting 1D data shader for connection: " << getName() << "\n";
   m_shader->setIntUniform("numTimesteps", data.size());
   m_shader->setIntUniform("numNodes", 1);
-  // will be set in apply shader
-//   m_shader->setIntUniform("rangeMin", min);
-//   m_shader->setIntUniform("rangeMax", max);
 
   auto uniform = m_shader->getcoVRUniform("timestepToData");
   assert(uniform);
