@@ -35,6 +35,11 @@ class Cable : public Object {
   Cable(const std::string &name, const Data &data = {}) : Object(name, data) {}
 };
 
+class Building : public Object {
+ public:
+  Building(const std::string &name, const Data &data = {}) : Object(name, data) {}
+};
+
 class PowerSimulation : public Simulation {
  public:
   PowerSimulation() = default;
@@ -44,10 +49,12 @@ class PowerSimulation : public Simulation {
   auto &Generators() { return m_generators; }
   auto &Transformators() { return m_transformators; }
   auto &Cables() { return m_cables; }
+  auto &Buildings() { return m_buildings; }
   const auto &Buses() const { return m_buses; }
   const auto &Generators() const { return m_generators; }
   const auto &Transformators() const { return m_transformators; }
   const auto &Cables() const { return m_cables; }
+  const auto &Buildings() const { return m_buildings; }
   const std::vector<double> *getTimedependentScalar(
       const std::string &species, const std::string &node) const override;
 
@@ -56,6 +63,7 @@ class PowerSimulation : public Simulation {
   ObjectContainer<Generator> m_generators;
   ObjectContainer<Transformator> m_transformators;
   ObjectContainer<Cable> m_cables;
+  ObjectContainer<Building> m_buildings;
 };
 
 }  // namespace core::simulation::power
