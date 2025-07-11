@@ -148,16 +148,16 @@ const std::regex dateRgx(
 ennovatis::rest_request_handler m_debug_worker;
 
 template <typename T>
-void printLoadingPercentDistribution(const ObjectContainer<T> &cables, float min,
-                                     float max, int numBins = 20) {
+void printLoadingPercentDistribution(const ObjectContainer<T> &container, float min,
+                                     float max, int numBins = 20, const std::string &species = "loading_percent") {
   static_assert(std::is_base_of_v<Object, T>,
                 "T must be derived from core::simulation::Object");
   std::vector<int> histogram(numBins, 0);
   int total = 0;
 
-  for (const auto &cable : cables) {
-    auto it = cable.second.getData().find("loading_percent");
-    if (it == cable.second.getData().end()) continue;
+  for (const auto &object : container) {
+    auto it = object.second.getData().find(species);
+    if (it == object.second.getData().end()) continue;
     const auto &data = it->second;
     for (double value : data) {
       int bin = static_cast<int>(numBins * (value - min) / (max - min + 1e-8));
@@ -168,7 +168,7 @@ void printLoadingPercentDistribution(const ObjectContainer<T> &cables, float min
     }
   }
 
-  std::cout << "Distribution of loading_percent (" << total << " values):\n";
+  std::cout << "Distribution of "<< species << " (" << total << " values):\n";
   for (int i = 0; i < numBins; ++i) {
     float binMin = min + i * (max - min) / numBins;
     float binMax = min + (i + 1) * (max - min) / numBins;
