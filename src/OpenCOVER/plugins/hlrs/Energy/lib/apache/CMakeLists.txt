@@ -16,3 +16,4 @@ set(HEADERS
 set(Name "Apache_Arrow")
 add_library(${Name} OBJECT ${SOURCES} ${HEADERS})
 target_link_libraries(${Name} PRIVATE Arrow::arrow_shared)
+set_target_properties(${Name} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
