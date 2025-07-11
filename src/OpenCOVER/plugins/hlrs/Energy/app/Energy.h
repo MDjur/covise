@@ -104,12 +104,13 @@ class EnergyPlugin : public opencover::coVRPlugin,
                      public opencover::ui::Owner,
                      public opencover::coTUIListener {
   enum Components { Strom, Waerme, Kaelte };
-  enum Scenarios {
+  enum class Scenario {
     status_quo,
     future_ev,
     future_ev_pv,
     optimized_bigger_awz,
-    optimized
+    optimized,
+    NUM_SCENARIOS
   };
   enum class EnergyGridType {
     PowerGrid,
@@ -179,7 +180,10 @@ class EnergyPlugin : public opencover::coVRPlugin,
   };
 
   auto getEnergyGridTypeIndex(EnergyGridType type) { return static_cast<int>(type); }
+  auto getScenarioIndex(Scenario scenario) { return static_cast<int>(scenario); }
 
+//   std::string getScenarioName(int value);
+  std::string getScenarioName(Scenario scenario);
   void preFrame() override;  // update colormaps
 
   /* #region GENERAL */

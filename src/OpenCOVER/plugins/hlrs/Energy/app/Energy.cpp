@@ -274,6 +274,23 @@ EnergyPlugin::EnergyPlugin()
       configFloatArray("General", "offset", std::vector<double>{0, 0, 0})->value();
 }
 
+std::string EnergyPlugin::getScenarioName(Scenario scenario) {
+  switch (scenario) {
+    case Scenario::status_quo:
+      return "status_quo";
+    case Scenario::future_ev:
+      return "future_ev";
+    case Scenario::future_ev_pv:
+      return "future_ev_pv";
+    case Scenario::optimized_bigger_awz:
+      return "optimized_bigger_awz";
+    case Scenario::optimized:
+      return "optimized";
+    default:
+      return "unknown_scenario";
+  }
+}
+
 EnergyPlugin::~EnergyPlugin() {
   auto root = cover->getObjectsRoot();
 
@@ -1563,41 +1580,25 @@ void EnergyPlugin::initSimMenu() {
   });
 
   m_scenarios = new opencover::ui::ButtonGroup(m_simulationMenu, "Scenarios");
-  m_scenarios->setDefaultValue(Scenarios::status_quo);
+  m_scenarios->setDefaultValue(getScenarioIndex(Scenario::status_quo));
 
   m_status_quo = new ui::Button(m_simulationMenu, "status_quo", m_scenarios,
-                                Scenarios::status_quo);
+                                getScenarioIndex(Scenario::status_quo));
   m_future_ev = new ui::Button(m_simulationMenu, "future_ev", m_scenarios,
-                               Scenarios::future_ev);
+                               getScenarioIndex(Scenario::future_ev));
   m_future_ev_pv = new ui::Button(m_simulationMenu, "future_ev_pv", m_scenarios,
-                                  Scenarios::future_ev_pv);
+                                  getScenarioIndex(Scenario::future_ev_pv));
   m_optimized = new ui::Button(m_simulationMenu, "optimized", m_scenarios,
-                               Scenarios::optimized);
+                               getScenarioIndex(Scenario::optimized));
   m_optimized_bigger_awz =
       new ui::Button(m_simulationMenu, "optimized_bigger_awz", m_scenarios,
-                     Scenarios::optimized_bigger_awz);
+                     getScenarioIndex(Scenario::optimized_bigger_awz));
 
   m_scenarios->setCallback([this](int value) {
     switchTo(m_energyGrids[getEnergyGridTypeIndex(EnergyGridType::PowerGrid)].group,
              m_grid);
-    std::string scenarioName;
-    switch (Scenarios(value)) {
-      case Scenarios::status_quo:
-        scenarioName = "status_quo";
-        break;
-      case Scenarios::future_ev:
-        scenarioName = "future_ev";
-        break;
-      case Scenarios::future_ev_pv:
-        scenarioName = "future_ev_pv";
-        break;
-      case Scenarios::optimized:
-        scenarioName = "optimized";
-        break;
-      case Scenarios::optimized_bigger_awz:
-        scenarioName = "optimized_bigger_awz";
-        break;
-    }
+    // auto scenarioIndex = getScenarioIndex(Scenario(value));
+    std::string scenarioName = getScenarioName(Scenario(value));
     auto simPath = configString("Simulation", "powerSimDir", "default")->value();
     simPath += "/" + scenarioName;
     applySimulationDataToPowerGrid(simPath);
