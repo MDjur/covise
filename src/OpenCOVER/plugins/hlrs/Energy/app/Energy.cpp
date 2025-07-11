@@ -129,6 +129,17 @@ namespace {
 
 constexpr bool debug = build_options.debug_ennovatis;
 constexpr bool skipRedundance = false;
+const std::array<std::string, 13> skipInfluxTables{
+    "timestamp",      "district", "hkw",           "new-buildings",
+    "pv-penetration", "loc_emob", "n_emob",        "awz_scaling",
+    "loc_ev",         "n_ev",     "new_buildings", "operation_mode",
+    "pv_scaling"};
+
+auto isSkippedInfluxTable(const std::string &name) {
+  return std::any_of(skipInfluxTables.begin(), skipInfluxTables.end(),
+                     [&](const auto &s) { return s == name; });
+}
+
 // regex for dd.mm.yyyy
 const std::regex dateRgx(
     R"(((0[1-9])|([12][0-9])|(3[01]))\.((0[0-9])|(1[012]))\.((20[012]\d|19\d\d)|(1\d|2[0123])))");
@@ -1927,8 +1938,6 @@ void EnergyPlugin::initPowerGridUI(const std::vector<std::string> &tablesToSkip)
 }
 
 void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
-  // void EnergyPlugin::applySimulationDataToPowerGrid() {
-  //   auto simPath = configString("Simulation", "powerSimDir", "default")->value();
   if (simPath.empty()) {
     std::cerr << "No simulation data path configured." << std::endl;
     return;
@@ -1948,24 +1957,19 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
 
   auto vm_pu = arrowFiles["electrical_grid.res_bus.vm_pu"];
   auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
+  auto res_mw = arrowFiles["electrical_prosumer.res_mw"];
   apache::ArrowReader loadingPercentReader(loading_percent);
   apache::ArrowReader vmPuReader(vm_pu);
+  apache::ArrowReader resMWReader(res_mw);
 
   auto tableLoadingPercent = loadingPercentReader.getTable();
   auto tableVmPu = vmPuReader.getTable();
-
-  std::array<std::string, 7> skip{"timestamp",     "district",       "hkw",
-                                  "new-buildings", "pv-penetration", "loc_emob",
-                                  "n_emob"};
-
-  auto isSkipped = [&skip](const std::string &name) {
-    return std::any_of(skip.begin(), skip.end(),
-                       [&](const auto &s) { return s == name; });
-  };
+  auto tableResMW = resMWReader.getTable();
 
   auto sim = std::make_shared<power::PowerSimulation>();
   auto &cables = sim->Cables();
   auto &buses = sim->Buses();
+  auto &buildings = sim->Buildings();
 
   // Helper to process columns
   auto processColumns = [&](const std::shared_ptr<arrow::Table> &tbl,
@@ -1975,7 +1979,7 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
       auto columnName = columnNames[j]->name();
       std::replace(columnName.begin(), columnName.end(), ' ', '_');
       std::replace(columnName.begin(), columnName.end(), '/', '-');
-      if (isSkipped(columnName)) continue;
+      if (isSkippedInfluxTable(columnName)) continue;
       auto column = tbl->column(j);
       int64_t chunk_offset = 0;
       for (int i = 0; i < column->num_chunks(); ++i) {
