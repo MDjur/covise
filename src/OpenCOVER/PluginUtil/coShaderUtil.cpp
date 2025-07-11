@@ -1,5 +1,6 @@
 #include "coShaderUtil.h"
 #include <osg/Texture1D>
+#include "osg/Geode"
 
 using namespace opencover;
 
@@ -41,7 +42,6 @@ coVRShader *opencover::applyShader(osg::Drawable *drawable, const ColorMap &colo
     parammap["texUnit1"] = std::to_string(TfTexUnit);
 
     auto shader = opencover::coVRShaderList::instance()->getUnique(shaderFile, &parammap);
-    
 
     osg::ref_ptr<osg::Texture1D> texture = colorMapTexture(colorMap);
 
@@ -51,5 +51,24 @@ coVRShader *opencover::applyShader(osg::Drawable *drawable, const ColorMap &colo
     shader->setFloatUniform("rangeMax", colorMap.max());
     shader->apply(state);
     drawable->setStateSet(state);
+    return shader;
+}
+
+coVRShader *opencover::applyShader(osg::Geode *geo, const ColorMap &colorMap, const std::string& shaderFile)
+{
+    std::map<std::string, std::string> parammap;
+    parammap["dataAttrib"] = std::to_string(DataAttrib);
+    parammap["texUnit1"] = std::to_string(TfTexUnit);
+
+    auto shader = opencover::coVRShaderList::instance()->getUnique(shaderFile, &parammap);
+
+    osg::ref_ptr<osg::Texture1D> texture = colorMapTexture(colorMap);
+
+    auto state = geo->getOrCreateStateSet();
+    state->setTextureAttribute(TfTexUnit, texture, osg::StateAttribute::ON);
+    shader->setFloatUniform("rangeMin", colorMap.min());
+    shader->setFloatUniform("rangeMax", colorMap.max());
+    shader->apply(state);
+    geo->setStateSet(state);
     return shader;
 }
