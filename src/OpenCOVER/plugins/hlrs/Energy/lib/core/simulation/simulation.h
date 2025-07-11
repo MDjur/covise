@@ -60,6 +60,7 @@ const UnitMap UNIT_MAP = UnitMap({
     {{"vm_pu"}, "pu (voltage per unit)"},
     {{"q_mvar"}, "Mvar"},
     {{"loading_percent", "percent"}, "%"},
+    {{"res_mw"}, "MW"}
 });
 
 struct ScalarProperty {
