@@ -1563,7 +1563,7 @@ bool EnergyPlugin::loadDBFile(const std::string &fileName,
 
 /* #region SIMULATION_DATA */
 
-void EnergyPlugin::updateColorMap(const opencover::ColorMap &map,
+void EnergyPlugin::updateEnergyGridColorMapInShader(const opencover::ColorMap &map,
                                   EnergyGridType type) {
   auto gridTypeIndex = getEnergyGridTypeIndex(type);
   auto &grid = m_energyGrids[gridTypeIndex];
@@ -1623,8 +1623,8 @@ void EnergyPlugin::initSimMenu() {
     // colorMapMenu.selector->setMinMax(min, max);
     colorMapMenu.selector->setMinMax(0.0f, 100.0f);
 
-    updateColorMap(colorMapMenu.selector->colorMap(), energyGrid.type);
-    updateGridData(energyGrid);
+    updateEnergyGridColorMapInShader(colorMapMenu.selector->colorMap(), energyGrid.type);
+    updateEnergyGridShaderData(energyGrid);
   });
 }
 
@@ -2096,7 +2096,7 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       cms->setUnit(scalarProperty.unit);
       auto type = energyGrid.type;
       cms->setCallback(
-          [this, type](const opencover::ColorMap &cm) { updateColorMap(cm, type); });
+          [this, type](const opencover::ColorMap &cm) { updateEnergyGridColorMapInShader(cm, type); });
       cms->setName(energyGrid.name);
       auto min = energyGrid.simUI->min(scalarProperty.species);
       auto max = energyGrid.simUI->max(scalarProperty.species);
@@ -2132,8 +2132,8 @@ void EnergyPlugin::initEnergyGridColorMaps() {
           menu.menu->setVisible(false);
         }
       }
-      updateColorMap(colorMapMenu.selector->colorMap(), energyGrid.type);
-      updateGridData(energyGrid);
+      updateEnergyGridColorMapInShader(colorMapMenu.selector->colorMap(), energyGrid.type);
+      updateEnergyGridShaderData(energyGrid);
     });
     energyGrid.scalarSelector = scalarSelector;
     // auto it = std::find(scalarPropertyNames.begin(),
@@ -2142,14 +2142,14 @@ void EnergyPlugin::initEnergyGridColorMaps() {
     // 0; energyGrid.scalarSelector->select(defaultIdx, true);
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
     energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
-    updateColorMap(energyGrid.colorMapRegistry[scalarSelector->selectedItem()]
+    updateEnergyGridColorMapInShader(energyGrid.colorMapRegistry[scalarSelector->selectedItem()]
                        .selector->colorMap(),
                    energyGrid.type);
-    updateGridData(energyGrid);
+    updateEnergyGridShaderData(energyGrid);
   }
 }
 
-void EnergyPlugin::updateGridData(EnergySimulation &energyGrid) {
+void EnergyPlugin::updateEnergyGridShaderData(EnergySimulation &energyGrid) {
   switch (energyGrid.type) {
     case EnergyGridType::PowerGrid: {
       // case EnergyGridType::PowerGridSonder: {

@@ -317,9 +317,9 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initEnergyGridColorMaps();
   void switchEnergyGrid(EnergyGridType grid);
   void initSimMenu();
-  void updateColorMap(const opencover::ColorMap &map, EnergyGridType grid);
+  void updateEnergyGridColorMapInShader(const opencover::ColorMap &map, EnergyGridType grid);
   void initColorMap();
-  void updateGridData(EnergySimulation &energyGrid);
+  void updateEnergyGridShaderData(EnergySimulation &energyGrid);
   void initGrid();
   void addEnergyGridToGridSwitch(osg::ref_ptr<osg::Group> energyGridGroup);
 
