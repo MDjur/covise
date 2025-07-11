@@ -148,8 +148,9 @@ const std::regex dateRgx(
 ennovatis::rest_request_handler m_debug_worker;
 
 template <typename T>
-void printLoadingPercentDistribution(const ObjectContainer<T> &container, float min,
-                                     float max, int numBins = 20, const std::string &species = "loading_percent") {
+void printLoadingPercentDistribution(
+    const ObjectContainer<T> &container, float min, float max, int numBins = 20,
+    const std::string &species = "loading_percent") {
   static_assert(std::is_base_of_v<Object, T>,
                 "T must be derived from core::simulation::Object");
   std::vector<int> histogram(numBins, 0);
@@ -168,7 +169,7 @@ void printLoadingPercentDistribution(const ObjectContainer<T> &container, float 
     }
   }
 
-  std::cout << "Distribution of "<< species << " (" << total << " values):\n";
+  std::cout << "Distribution of " << species << " (" << total << " values):\n";
   for (int i = 0; i < numBins; ++i) {
     float binMin = min + i * (max - min) / numBins;
     float binMax = min + (i + 1) * (max - min) / numBins;
@@ -460,14 +461,7 @@ void EnergyPlugin::setTimestep(int t) {
   // order as they appear in the the constructor
 
   auto &energyGrid = m_energyGrids[m_energygridBtnGroup->value()];
-  // needed for updating spheres
-  // if (energyGrid.simUI) energyGrid.simUI->updateTime(t);
   if (energyGrid.grid) energyGrid.grid->updateTime(t);
-  //   if (energyGrid.type == EnergyGridType::HeatingGrid)
-  //   energyGrid.grid->updateTime(t); auto idx =
-  //   getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  //   m_energyGrids[idx].simUI->updateTime(t);
-  //   m_energyGrids[idx].grid->updateTime(t);
 }
 
 void EnergyPlugin::switchTo(const osg::ref_ptr<osg::Node> child,
@@ -1592,7 +1586,10 @@ void EnergyPlugin::updateEnergyGridColorMapInShader(const opencover::ColorMap &m
   auto &grid = m_energyGrids[gridTypeIndex];
   if (grid.group && isActiv(m_grid, grid.group) && grid.simUI) {
     // grid.simUI->updateTimestepColors(map);
-    grid.grid->setColorMap(map);
+    // grid.grid->setColorMap(map);
+    // TODO: remove this later
+    // HACK: this is a workaround
+    grid.grid->setColorMap(map, m_vmPuColorMap->colorMap());
   }
 }
 
@@ -2041,35 +2038,6 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
   // Process residual load in MW
   processColumns(tableResMW, buildings, "res_mw");
 
-  //
-  // SOME DEBUG OUTPUT
-  //   float min = 100.0f, max = 0.0f;
-  //   int time(0), maxTime(0);
-  //   for (auto &cable : cables) {
-  //     if (cable.second.getData().find("loading_percent") ==
-  //         cable.second.getData().end()) {
-  //       std::cerr << "No loading_percent data found for cable: " << cable.first
-  //                 << std::endl;
-  //       continue;
-  //     }
-  //     auto &data = cable.second.getData()["loading_percent"];
-  //     if (data.empty()) {
-  //       std::cerr << "Empty loading_percent data for cable: " << cable.first
-  //                 << std::endl;
-  //     }
-  //     time = 0;
-  //     for (const auto &value : data) {
-  //       if (value < min) min = value;
-  //     //   if (value > max) max = value;
-  //       if (value > max) {
-  //         max = value;
-  //         maxTime = time;
-  //       }
-  //       ++time;
-  //     }
-  //   }
-  //   std::cout << "Cable loading percent min: " << min
-  //             << ", max: " << max << " max time " << maxTime <<  std::endl;
   //   printLoadingPercentDistribution(cables, min, max);
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
@@ -2111,6 +2079,26 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
                      [](const auto &v) { return std::to_string(v) + " MW"; });
       sensor->updateTxtBoxTexts(texts);
     }
+  }
+
+  // TODO: remove this later
+  // HACK: this is a workaround
+  if (!m_vmPuColorMap && m_simulationMenu) {
+    auto menu = new opencover::ui::Menu(m_simulationMenu, "VmPuColorMap");
+    m_vmPuColorMap = std::make_unique<opencover::CoverColorBar>(menu);
+    auto tmp_steps = m_vmPuColorMap->colorMap().steps();
+    m_vmPuColorMap->setColorMap("Voltage");
+    m_vmPuColorMap->setSpecies("Voltage (VmPu)");
+    m_vmPuColorMap->setUnit("");
+    m_vmPuColorMap->setSteps(tmp_steps);
+    m_vmPuColorMap->setCallback([this](const opencover::ColorMap &cm) {
+
+    });
+    m_vmPuColorMap->setName("VmPu");
+  }
+  if (m_vmPuColorMap) {
+    const auto &[min, max] = powerGrid.sim->getMinMax("vm_pu");
+    m_vmPuColorMap->setMinMax(min, max);
   }
 
   std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
@@ -2173,7 +2161,7 @@ void EnergyPlugin::initEnergyGridColorMaps() {
 
       auto colormapName = scalarProperty.preferredColorMap;
       if (colormapName == core::simulation::INVALID_UNIT)
-          colormapName = cms->colorMap().name();
+        colormapName = cms->colorMap().name();
 
       cms->setColorMap(colormapName);
       cms->setSteps(steps);
@@ -2210,10 +2198,6 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       updateEnergyGridShaderData(energyGrid);
     });
     energyGrid.scalarSelector = scalarSelector;
-    // auto it = std::find(scalarPropertyNames.begin(),
-    // scalarPropertyNames.end(),"loading_percent"); int defaultIdx = (it !=
-    // scalarPropertyNames.end()) ? std::distance(scalarPropertyNames.begin(), it) :
-    // 0; energyGrid.scalarSelector->select(defaultIdx, true);
     energyGrid.scalarSelector->select(scalarPropertyNames.size() - 1, true);
     energyGrid.colorMapRegistry[scalarPropertyNames.back()].menu->setVisible(true);
     updateEnergyGridColorMapInShader(

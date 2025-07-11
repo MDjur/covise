@@ -473,6 +473,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
              static_cast<std::size_t>(EnergyGridType::NUM_ENERGY_TYPES)>
       m_energyGrids;
   std::unique_ptr<opencover::CoverColorBar> m_cityGmlColorMap;
+  // TODO: remove this later
+  std::unique_ptr<opencover::CoverColorBar> m_vmPuColorMap;
 
   // historical
   opencover::ui::Button *ShowGraph = nullptr;

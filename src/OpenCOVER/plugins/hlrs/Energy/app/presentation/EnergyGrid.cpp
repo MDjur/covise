@@ -1,5 +1,7 @@
 #include "EnergyGrid.h"
 
+#include <PluginUtil/colors/ColorBar.h>
+#include <PluginUtil/colors/coColorMap.h>
 #include <cover/coVRSelectionManager.h>
 #include <lib/core/constants.h>
 // #include <lib/core/simulation/grid.h>
@@ -20,6 +22,7 @@
 #include <variant>
 
 #include "cover/VRViewer.h"
+#include "lib/core/simulation/power.h"
 
 namespace {
 
@@ -280,11 +283,11 @@ void EnergyGrid::updateTime(int timestep) {
       conn->updateTimestepInShader(timestep);
 }
 
-void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap) {
+void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap, const opencover::ColorMap &vm_pu_colormap) {
   for (auto &point : m_config.points) point->updateColorMapInShader(colorMap);
 
   for (auto &[_, point] : m_config.pointsMap)
-    point->updateColorMapInShader(colorMap);
+    point->updateColorMapInShader(vm_pu_colormap);
 
   for (auto &conn : m_connections) conn->updateColorMapInShader(colorMap);
   for (auto &line : m_lines)
@@ -307,8 +310,12 @@ void EnergyGrid::setData(const core::simulation::Simulation &sim,
     }
   }
   for (auto &[_, point] : m_config.pointsMap) {
-    auto data = sim.getTimedependentScalar(species, point->getName());
-    auto [min, max] = sim.getMinMax(species);
+    // TODO: remove this later => workaround for workshop
+    // Make selector a buttongroupd which allows to select multiple species
+    auto data = sim.getTimedependentScalar("vm_pu", point->getName());
+    auto [min, max] = sim.getMinMax("vm_pu");
+    // auto data = sim.getTimedependentScalar(species, point->getName());
+    // auto [min, max] = sim.getMinMax(species);
     if (data) {
       point->updateDataInShader(*data, min, max);
     } else {
