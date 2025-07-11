@@ -9,6 +9,8 @@
 #include "object.h"
 
 namespace core::simulation {
+
+constexpr auto INVALID_UNIT = "unknown";
 struct UnitPair {
   std::vector<std::string> names;
   std::string unit;
@@ -29,7 +31,7 @@ class UnitMap {
     if (it != unit_map.end()) {
       return it->second;
     }
-    return "unknown";
+    return INVALID_UNIT;
   }
 
   auto begin() { return unit_map.begin(); }
@@ -39,36 +41,13 @@ class UnitMap {
   std::unordered_map<std::string, std::string> unit_map;
 };
 
-const UnitMap UNIT_MAP = UnitMap({
-    {{"kWh", "leistung", "power"}, "kWh"},
-    {{"kW"}, "kW"},
-    {{"q_dem_w", "waermestromdichte"}, "W/m2"},
-    {{"delta_q", "aenderung_stromdichte"}, "W/m2"},
-    {{"mass_flow", "massenstrom"}, "kg/s"},
-    {{"celcius", "temp", "inlet_temp", "outlet_temp"}, "°C"},
-    {{"electricity_selling_price"}, "Cent/kWh"},
-    {{"heating_cost"}, "€"},
-    {{"voltage", "volt"}, "V"},
-    {{"current", "ampere"}, "A"},
-    {{"i_ka"}, "kA"},
-    {{"resistance", "ohm"}, "Ω"},
-    {{"power_factor", "cos_phi"}, ""},
-    {{"efficiency", "eta"}, ""},
-    {{"reactive_power", "q"}, "var"},
-    {{"active_power", "p"}, "W"},
-    {{"apparent_power", "s"}, "VA"},
-    {{"vm_pu"}, "pu (voltage per unit)"},
-    {{"q_mvar"}, "Mvar"},
-    {{"loading_percent", "percent"}, "%"},
-    {{"res_mw"}, "MW"}
-});
-
 struct ScalarProperty {
-  std::string unit;
-  std::string species;
   double min;
   double max;
   size_t timesteps;
+  std::string unit;
+  std::string species;
+  std::string preferredColorMap;
 };
 
 typedef std::map<std::string, ScalarProperty> ScalarProperties;
@@ -104,6 +83,9 @@ class Simulation {
   }
   auto getSpecies(const std::string &key) const { return ScalarProp(key).species; }
   auto getUnit(const std::string &key) const { return ScalarProp(key).unit; }
+  auto getPreferredColorMap(const std::string &key) const {
+    return ScalarProp(key).preferredColorMap;
+  }
   const auto &getScalarProperties() const { return m_scalarProperties; }
   auto &getScalarProperties() { return m_scalarProperties; }
 
@@ -125,6 +107,7 @@ class Simulation {
 
     for (const auto &[key, values] : allValues) {
       setUnit(key);
+      setPreferredColorMap(key);
       computeMinMax(key, values, trim);  // 1% trimming
       computeMaxTimestep(key, values);
       m_scalarProperties[key].species = key;
@@ -158,6 +141,7 @@ class Simulation {
   virtual void computeMaxTimestep(const std::string &key,
                                   const std::vector<double> &values);
   virtual void setUnit(const std::string &key);
+  virtual void setPreferredColorMap(const std::string &key);
 
   ScalarProperties m_scalarProperties;
   // general meta data for the simulation
