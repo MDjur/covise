@@ -29,6 +29,7 @@
 // includes. In our case before everything we can resolve the issue.
 #include <lib/apache/arrow.h>
 #include "Energy.h"
+#include "lib/core/simulation/simulation.h"
 #include "ui/historic/Device.h"
 #include "ui/ennovatis/EnnovatisDevice.h"
 #include "ui/ennovatis/EnnovatisDeviceSensor.h"
@@ -129,6 +130,7 @@ namespace {
 
 constexpr bool debug = build_options.debug_ennovatis;
 constexpr bool skipRedundance = false;
+
 const std::array<std::string, 13> skipInfluxTables{
     "timestamp",      "district", "hkw",           "new-buildings",
     "pv-penetration", "loc_emob", "n_emob",        "awz_scaling",
@@ -2094,6 +2096,13 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
         continue;
       }
 
+      auto steps = m_cityGmlColorMap->colorMap().steps();
+      auto colorMapName = powerGrid.sim->getPreferredColorMap("res_mw");
+      if (colorMapName == core::simulation::INVALID_UNIT) {
+        colorMapName = m_cityGmlColorMap->colorMap().name();
+      }
+      m_cityGmlColorMap->setColorMap(colorMapName);
+      m_cityGmlColorMap->setSteps(steps);
       sensor->setColorMapInShader(m_cityGmlColorMap->colorMap());
       sensor->setDataInShader(*values, min, max);
 
@@ -2117,7 +2126,6 @@ void EnergyPlugin::initPowerGrid() {
   auto simPath = configString("Simulation", "powerSimDir", "default")->value();
   simPath += "/status_quo";
   applySimulationDataToPowerGrid(simPath);
-  //   m_scenarios->setActiveButton(m_status_quo);
 }
 
 void EnergyPlugin::initEnergyGridColorMaps() {
@@ -2161,6 +2169,14 @@ void EnergyPlugin::initEnergyGridColorMaps() {
       auto halfSpan = (max - min) / 2;
       cms->setMinBounds(min - halfSpan, min + halfSpan);
       cms->setMaxBounds(max - halfSpan, max + halfSpan);
+      auto steps = cms->colorMap().steps();
+
+      auto colormapName = scalarProperty.preferredColorMap;
+      if (colormapName == core::simulation::INVALID_UNIT)
+          colormapName = cms->colorMap().name();
+
+      cms->setColorMap(colormapName);
+      cms->setSteps(steps);
 
       energyGrid.simUI->updateTimestepColors(cms->colorMap());
       energyGrid.colorMapRegistry.emplace(scalarProperty.species,
