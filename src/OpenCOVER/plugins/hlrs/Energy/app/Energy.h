@@ -317,7 +317,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
   void initEnergyGridColorMaps();
   void switchEnergyGrid(EnergyGridType grid);
   void initSimMenu();
-  void updateEnergyGridColorMapInShader(const opencover::ColorMap &map, EnergyGridType grid);
+  void updateEnergyGridColorMapInShader(const opencover::ColorMap &map,
+                                        EnergyGridType grid);
   void initColorMap();
   void updateEnergyGridShaderData(EnergySimulation &energyGrid);
   void initGrid();
@@ -372,7 +373,8 @@ class EnergyPlugin : public opencover::coVRPlugin,
       std::string &name, std::map<std::string, uint> &duplicateMap);
   std::unique_ptr<grid::PointDataList> getAdditionalPowerGridPointData(
       const std::size_t &numOfBus);
-  void applyInfluxCSVToCityGML(const std::string &filePath, bool updateColorMap = true);
+  void applyInfluxCSVToCityGML(const std::string &filePath,
+                               bool updateColorMap = true);
   void applyInfluxArrowToCityGML();
   void applyStaticDataToCityGML(const std::string &filePath,
                                 bool updateColorMap = true);
