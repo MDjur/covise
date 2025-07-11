@@ -145,8 +145,11 @@ const std::regex dateRgx(
     R"(((0[1-9])|([12][0-9])|(3[01]))\.((0[0-9])|(1[012]))\.((20[012]\d|19\d\d)|(1\d|2[0123])))");
 ennovatis::rest_request_handler m_debug_worker;
 
-void printLoadingPercentDistribution(const ObjectContainer<power::Cable> &cables,
-                                     float min, float max, int numBins = 20) {
+template <typename T>
+void printLoadingPercentDistribution(const ObjectContainer<T> &cables, float min,
+                                     float max, int numBins = 20) {
+  static_assert(std::is_base_of_v<Object, T>,
+                "T must be derived from core::simulation::Object");
   std::vector<int> histogram(numBins, 0);
   int total = 0;
 
