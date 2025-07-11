@@ -2008,6 +2008,10 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
   // Process cable loading
   processColumns(tableLoadingPercent, cables, "loading_percent");
 
+  // Process residual load in MW
+  processColumns(tableResMW, buildings, "res_mw");
+
+  //
   // SOME DEBUG OUTPUT
   //   float min = 100.0f, max = 0.0f;
   //   int time(0), maxTime(0);

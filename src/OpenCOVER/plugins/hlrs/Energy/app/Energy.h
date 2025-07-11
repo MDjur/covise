@@ -377,7 +377,6 @@ class EnergyPlugin : public opencover::coVRPlugin,
                                 bool updateColorMap = true);
   void applyStaticDataCampusToCityGML(const std::string &filePath,
                                       bool updateColorMap = true);
-  //   void applySimulationDataToPowerGrid();
   void applySimulationDataToPowerGrid(const std::string &simPath);
   void updatePowerGridSelection(bool on);
   void updatePowerGridConfig(const std::string &tableName, const std::string &name,
