@@ -5,6 +5,7 @@
 #include <PluginUtil/colors/coColorMap.h>
 #include <app/presentation/CityGMLBuilding.h>
 
+#include <algorithm>
 #include <memory>
 #include <osg/Geometry>
 
@@ -16,7 +17,8 @@ CityGMLDeviceSensor::CityGMLDeviceSensor(
     : coPickSensor(parent),
       m_cityGMLBuilding(std::move(drawableBuilding)),
       m_infoBoard(std::move(infoBoard)),
-      m_textBoxTxt(textBoxTxt) {
+      m_textBoxTxt(textBoxTxt),
+      m_colors({}) {
   m_cityGMLBuilding->initDrawables();
 
   // infoboard
@@ -53,7 +55,10 @@ void CityGMLDeviceSensor::updateTimestepColors(const std::vector<float> &values,
                                                const opencover::ColorMap &map) {
   m_colors.clear();
   m_colors.resize(values.size());
-  for (auto i = 0; i < m_colors.size(); ++i) m_colors[i] = map.getColor(values[i]);
+  std::transform(values.begin(), values.end(), m_colors.begin(),
+                 [&map](const auto &v) {
+                   return map.getColor(v);  // Initialize with the first value
+                 });
 }
 
 void CityGMLDeviceSensor::updateTxtBoxTexts(const std::vector<std::string> &texts) {
