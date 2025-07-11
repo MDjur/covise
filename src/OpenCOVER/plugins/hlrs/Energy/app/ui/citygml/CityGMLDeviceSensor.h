@@ -41,6 +41,8 @@ class CityGMLDeviceSensor : public coPickSensor {
                             const opencover::ColorMap &map);
   void updateTxtBoxTexts(const std::vector<std::string> &texts);
   void updateTitleOfInfoboard(const std::string &title);
+  void setColorMapInShader(const opencover::ColorMap &colorMap);
+  void setDataInShader(const std::vector<double> &data, float min, float max);
 
  private:
   std::unique_ptr<core::interface::IBuilding> m_cityGMLBuilding;

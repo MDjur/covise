@@ -73,12 +73,31 @@ void CityGMLDeviceSensor::updateTitleOfInfoboard(const std::string &title) {
 }
 
 void CityGMLDeviceSensor::updateTime(int timestep) {
-  if (timestep < m_colors.size()) {
-    m_cityGMLBuilding->updateColor(m_colors[timestep]);
-    m_cityGMLBuilding->updateTime(timestep);
+//   if (timestep < m_colors.size()) {
+    // m_cityGMLBuilding->updateColor(m_colors[timestep]);
+    auto gmlBuilding = dynamic_cast<CityGMLBuilding *>(m_cityGMLBuilding.get());
+    if (gmlBuilding)
+      if (gmlBuilding->hasShader()) gmlBuilding->updateTime(timestep);
+    // m_cityGMLBuilding->updateTime(timestep);
+//   }
+  //   if (timestep < m_textBoxTxt.size()) {
+  //     m_infoBoard->updateInfo(m_textBoxTxt[timestep]);
+  //     m_infoBoard->updateTime(timestep);
+  //   }
+}
+
+void CityGMLDeviceSensor::setColorMapInShader(const opencover::ColorMap &colorMap) {
+  auto gmlBuilding = dynamic_cast<CityGMLBuilding *>(m_cityGMLBuilding.get());
+  if (gmlBuilding) {
+    gmlBuilding->setColorMapInShader(colorMap);
+    return;
   }
-  if (timestep < m_textBoxTxt.size()) {
-    m_infoBoard->updateInfo(m_textBoxTxt[timestep]);
-    m_infoBoard->updateTime(timestep);
+}
+void CityGMLDeviceSensor::setDataInShader(const std::vector<double> &data, float min,
+                                          float max) {
+  auto gmlBuilding = dynamic_cast<CityGMLBuilding *>(m_cityGMLBuilding.get());
+  if (gmlBuilding) {
+    gmlBuilding->setDataInShader(data, min, max);
+    return;
   }
 }
