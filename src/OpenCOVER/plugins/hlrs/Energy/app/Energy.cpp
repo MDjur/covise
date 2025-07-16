@@ -1981,24 +1981,21 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
     return;
   }
 
-  auto vm_pu = arrowFiles["electrical_grid.res_bus.vm_pu"];
-  auto loading_percent = arrowFiles["electrical_grid.res_line.loading_percent"];
-  auto res_mw = arrowFiles["electrical_prosumer.res_mw"];
-
-  apache::ArrowReader loadingPercentReader(loading_percent);
-  apache::ArrowReader vmPuReader(vm_pu);
-  apache::ArrowReader resMWReader(res_mw);
-
-  auto tableLoadingPercent = loadingPercentReader.getTable();
-  auto tableVmPu = vmPuReader.getTable();
-  auto tableResMW = resMWReader.getTable();
+  struct InfluxData {
+    std::string name;
+    ObjectContainer<Object> *container;
+  };
 
   auto sim = std::make_shared<power::PowerSimulation>();
   auto &cables = sim->Cables();
   auto &buses = sim->Buses();
   auto &buildings = sim->Buildings();
 
-  // Helper to process columns
+  const std::array<InfluxData, 3> requiredFiles = {
+      {{"electrical_grid.res_bus.vm_pu", &buses},
+       {"electrical_grid.res_line.loading_percent", &cables},
+       {"electrical_prosumer.res_mw", &buildings}}};
+
   auto processColumns = [&](const std::shared_ptr<arrow::Table> &tbl,
                             auto &container, const std::string &dataKey) {
     auto columnNames = tbl->schema()->fields();
@@ -2029,16 +2026,24 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
     }
   };
 
-  // Process bus voltages
-  processColumns(tableVmPu, buses, "vm_pu");
+  for (const auto &data : requiredFiles) {
+    auto &file = data.name;
+    auto &container = *data.container;
+    auto it = arrowFiles.find(file);
+    if (it == arrowFiles.end()) {
+      std::cerr << "Required file " << file
+                << " not found in the simulation data path." << std::endl;
+      continue;
+    }
 
-  // Process cable loading
-  processColumns(tableLoadingPercent, cables, "loading_percent");
-
-  // Process residual load in MW
-  processColumns(tableResMW, buildings, "res_mw");
-
-  //   printLoadingPercentDistribution(cables, min, max);
+    auto filePath = it->second;
+    apache::ArrowReader reader(filePath);
+    auto table = reader.getTable();
+    // auto columnNames = table->schema()->fields();
+    auto dataKey =
+        file.substr(file.rfind('.') + 1);  // Extract data key from file name
+    processColumns(table, container, dataKey);
+  }
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::PowerGrid);
   if (m_energyGrids[idx].grid == nullptr) return;
@@ -2101,8 +2106,10 @@ void EnergyPlugin::applySimulationDataToPowerGrid(const std::string &simPath) {
     m_vmPuColorMap->setMinMax(min, max);
   }
 
-  std::cout << "Number of timesteps: " << tableVmPu->num_rows() << std::endl;
-  setAnimationTimesteps(tableVmPu->num_rows(), powerGrid.group);
+  auto numTimesteps = cables.size();
+
+  std::cout << "Number of timesteps: " << numTimesteps << std::endl;
+  setAnimationTimesteps(numTimesteps, powerGrid.group);
 }
 
 void EnergyPlugin::initPowerGrid() {
