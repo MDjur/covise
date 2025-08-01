@@ -5,7 +5,7 @@ _pkgBuildDir=build.covise
 _installDir=/usr
 _gitRep=https://github.com/hlrs-vis/covise.git
 pkgname=$_pkgname-git
-pkgver=1.0.r8802.06139086e
+pkgver=1.0.r9106.25bf8b5ad
 pkgrel=1
 pkgdesc="COVISE - COllaborative Visualization and Simulation Environment for VR/AR - HLRS"
 arch=(x86_64)
@@ -23,7 +23,6 @@ depends=(
     qt6-multimedia
     qt6-networkauth
     qt6-quick3d
-    qt6-quickcontrols2
     qt6-sensors
     qt6-serialbus
     qt6-serialport
@@ -45,7 +44,7 @@ depends=(
     libpng
     giflib
     assimp
-    swig
+    python-swig
     ffmpeg
     hdf5-openmpi
     netcdf-openmpi
@@ -92,13 +91,12 @@ build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DCOVISE_BUILD_DRIVINGSIM=off \
         -DCOVISE_USE_QT5=off \
+        -DCOVISE_USE_CUDA=off \
+        -DCOVISE_USE_DESKVOX=off \
         -DCMAKE_INSTALL_PREFIX="$_installDir" \
-        -DCMAKE_CXX_COMPILER=g++ \
-        -DCMAKE_C_COMPILER=gcc \
         -G Ninja \
         -Wno-dev
     ninja -C "$_pkgBuildDir" ${MAKEFLAGS} 
-    # make -C "$_pkgBuildDir" ${MAKEFLAGS} 
 }
 
 package() {
