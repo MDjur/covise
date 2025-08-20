@@ -22,9 +22,9 @@ jobs:
         run: >
           pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja sudo
 
-      #- name: Init environment
-        #run: >
-          #useradd --create-home build && usermod -aG wheel build && echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers && su - build && cd
+      - name: Init environment
+        run: >
+          useradd --create-home builder && usermod -aG wheel builder && echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers
       
       - name: Checkout repository
         uses: actions/checkout@v4
