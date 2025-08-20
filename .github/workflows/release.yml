@@ -16,7 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: archlinux/archlinx-latest
+      image: archlinux
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
