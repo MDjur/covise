@@ -18,12 +18,16 @@ jobs:
     container:
       image: archlinux
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Install build environment
         run: >
-          pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja
+          pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja sudo
+
+      - name: Init environment
+        run: >
+          useradd --create-home build && usermod -aG wheel username && echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers && su - build && cd
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Build Package
         run: |
