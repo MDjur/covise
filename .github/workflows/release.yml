@@ -33,7 +33,7 @@ jobs:
 
       - name: Change permission for covise
         run: |
-          chmod -R 777 covise
+          chmod -R 777 $GITHUB_WORKSPACE/covise
 
       - name: Build Package
         run: |
