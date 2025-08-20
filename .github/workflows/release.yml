@@ -38,7 +38,7 @@ jobs:
 
       - name: Build Package
         run: |
-          sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && sudo makepkg -s"
+          sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && makepkg -s"
 
       - name: Upload package as artifact
         uses: actions/upload-artifact@v4
