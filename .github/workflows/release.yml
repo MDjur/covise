@@ -12,58 +12,38 @@ on:
   # release:
   #   types: [created]
 jobs:
-  arch-build:
+  build:
     name: Arch Package Build
     runs-on: ubuntu-latest
     container:
       image: archlinux
-      options: --privileged
     steps:
       - name: Install build environment
         run: >
-          pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja sudo && pacman-key --init
-          
+          pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja sudo
+
+      - name: Init environment
+        run: >
+          useradd --create-home builder && usermod -aG wheel builder && echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
+      
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: "CI/CD"
-          
-      - name: Build Arch Linux package
-        uses: FFY00/build-arch-package@v1
-        with:
-          PKGBUILD: $GITHUB_WORKSPACE/deploy/arch/PKGBUILD
-  #build:
-  #  name: Arch Package Build
-  #  runs-on: ubuntu-latest
-  #  container:
-  #    image: archlinux
-  #  steps:
-  #    - name: Install build environment
-  #      run: >
-  #        pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja sudo
 
-  #    - name: Init environment
-  #      run: >
-  #        useradd --create-home builder && usermod -aG wheel builder && echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers
-      
-  #    - name: Checkout repository
-  #      uses: actions/checkout@v4
-  #      with:
-  #        ref: "CI/CD"
+      - name: Change permission for covise
+        run: |
+          chmod -R 777 $GITHUB_WORKSPACE
 
-  #    - name: Change permission for covise
-  #      run: |
-  #        chmod -R 777 $GITHUB_WORKSPACE
+      - name: Build Package
+        run: |
+          sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && makepkg --noconfirm -s"
 
-  #    - name: Build Package
-  #      run: |
-  #        sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && makepkg --noconfirm -s"
-
-  #    - name: Upload package as artifact
-  #      uses: actions/upload-artifact@v4
-  #      with: 
-  #        name: covise-arch-package
-  #        path: "*.pkg.tar.zst"
+      - name: Upload package as artifact
+        uses: actions/upload-artifact@v4
+        with: 
+          name: covise-arch-package
+          path: "*.pkg.tar.zst"
 
   generate:
     name: Create release-artifacts
