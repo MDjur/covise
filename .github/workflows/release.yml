@@ -31,6 +31,10 @@ jobs:
         with:
           ref: "CI/CD"
 
+      - name: Change permission for covise
+        run: |
+          chmod -R 777 covise
+
       - name: Build Package
         run: |
           sudo -u builder bash -c "cd '$GITHUB_WORKSPACE' && makepkg -s"
