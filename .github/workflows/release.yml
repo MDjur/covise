@@ -1,11 +1,41 @@
 name: Make Release
 
 on:
-  workflow_dispatch:
-  release:
-    types: [created]
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+  # workflow_dispatch:
+  # release:
+  #   types: [created]
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux/archlinx-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build environment
+        run:
+          pacman -Sy --noconfirm
+          pacman -S --noconfirm base-devel git cmake ninja
+
+      - name: Build Package
+        run: |
+          make pkg --noconfirm
+
+      - name: Upload package as artifact
+        uses: actions/upload-artifact@v4
+        with: 
+          name: covise-arch-package
+          path: "*.pkg.tar.zst"
+
   generate:
     name: Create release-artifacts
     runs-on: ubuntu-latest
