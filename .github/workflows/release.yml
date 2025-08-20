@@ -33,7 +33,7 @@ jobs:
 
       - name: Build Package
         run: |
-          sudo -u builder bash -c 'cd $GITHUB_WORKSPACE && makepkg -s'
+          sudo -u builder bash -c "cd '$GITHUB_WORKSPACE' && makepkg -s"
 
       - name: Upload package as artifact
         uses: actions/upload-artifact@v4
