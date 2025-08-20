@@ -24,7 +24,7 @@ jobs:
 
       - name: Init environment
         run: >
-          useradd --create-home build && usermod -aG wheel username && echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers && su - build && cd
+          useradd --create-home build && usermod -aG wheel build && echo "%wheel ALL=(ALL) ALL" >> /etc/sudoers && su - build && cd
       
       - name: Checkout repository
         uses: actions/checkout@v4
