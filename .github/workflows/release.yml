@@ -31,7 +31,7 @@ jobs:
       - name: Build Arch Linux package
         uses: FFY00/build-arch-package@v1
         with:
-          PKGBUILD: deploy/arch/PKGBUILD
+          PKGBUILD: $GITHUB_WORKSPACE/deploy/arch/PKGBUILD
   #build:
   #  name: Arch Package Build
   #  runs-on: ubuntu-latest
