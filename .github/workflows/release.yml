@@ -27,7 +27,7 @@ jobs:
 
       - name: Build Package
         run: |
-          makepkg --noconfirm -s
+          makepkg -s
 
       - name: Upload package as artifact
         uses: actions/upload-artifact@v4
