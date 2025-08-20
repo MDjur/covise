@@ -43,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with: 
           name: covise-arch-package
-          path: "*.pkg.tar.zst"
+          path: "$GITHUB_WORKSPACE/deploy/arch/*.pkg.tar.zst"
 
   generate:
     name: Create release-artifacts
