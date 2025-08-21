@@ -1,81 +1,26 @@
 name: Make Release
-#on:
-  #push:
-    #tags:
-      #- 'v*' # This will trigger the workflow on any tag that starts with 'v', e.g., v1.0, v2.0.1
+
 on:
+  workflow_dispatch:
   release:
     types: [created]
-#on:
-  #push:
-    #branches:
-      #- master
-  #pull_request:
-    #branches:
-      #- master
 
-permissions:
-  contents: write
-
-  # workflow_dispatch:
-  # release:
-  #   types: [created]
 jobs:
-  build:
-    name: Arch Package Build
+  generate:
+    name: Create release-artifacts
     runs-on: ubuntu-latest
-    container:
-      image: archlinux
     steps:
-      - name: Install build environment
-        run: >
-          pacman -Sy --noconfirm && pacman -S --noconfirm base-devel git cmake ninja sudo
-
-      - name: Init environment
-        run: >
-          useradd --create-home builder && usermod -aG wheel builder && echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
-      
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@master
+
+      - name: Package source code including submodules
+        uses: qmonnet/git-archive-all-action@v1
         with:
-          ref: "CI/CD"
+          output-files: covise-${{ github.ref_name }}.tar.gz covise-${{ github.ref_name }}.zip
+          force-submodules: true
 
-      - name: Change permission for covise
-        run: |
-          chmod -R 777 $GITHUB_WORKSPACE
-
-      - name: Build Package
-        run: |
-          sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && makepkg --noconfirm -s"
-      
-      - name: Release Package
+      - name: Create draft release and add artifacts
         uses: softprops/action-gh-release@v1
         with:
-          files: 'deploy/arch/*.pkg.tar.zst'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      #- name: Upload package as artifact
-        #uses: actions/upload-artifact@v4
-        #with: 
-          #name: covise-arch-package
-          #path: "$GITHUB_WORKSPACE/deploy/arch/*.pkg.tar.zst"
-
-  #generate:
-    #name: Create release-artifacts
-    #runs-on: ubuntu-latest
-    #steps:
-      #- name: Checkout repository
-        #uses: actions/checkout@master
-
-      #- name: Package source code including submodules
-        #uses: qmonnet/git-archive-all-action@v1
-        #with:
-          #output-files: covise-${{ github.ref_name }}.tar.gz covise-${{ github.ref_name }}.zip
-          #force-submodules: true
-
-      #- name: Create draft release and add artifacts
-        #uses: softprops/action-gh-release@v1
-        #with:
-          #draft: true
-          #files: covise-*
+          draft: true
+          files: covise-*
