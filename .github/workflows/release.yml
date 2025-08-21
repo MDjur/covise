@@ -1,12 +1,15 @@
 name: Make Release
 
 on:
-  push:
-    branches:
-      - master
+  #push:
+    #branches:
+      #- master
   pull_request:
     branches:
       - master
+
+permissions:
+  contents: write
 
   # workflow_dispatch:
   # release:
@@ -39,27 +42,31 @@ jobs:
         run: |
           sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && makepkg --noconfirm -s"
 
+      - name: Debug directory contents
+        run: |
+          ls -R $GITHUB_WORKSPACE/deploy/arch/
+
       - name: Upload package as artifact
         uses: actions/upload-artifact@v4
         with: 
           name: covise-arch-package
           path: "$GITHUB_WORKSPACE/deploy/arch/*.pkg.tar.zst"
 
-  generate:
-    name: Create release-artifacts
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@master
+  #generate:
+    #name: Create release-artifacts
+    #runs-on: ubuntu-latest
+    #steps:
+      #- name: Checkout repository
+        #uses: actions/checkout@master
 
-      - name: Package source code including submodules
-        uses: qmonnet/git-archive-all-action@v1
-        with:
-          output-files: covise-${{ github.ref_name }}.tar.gz covise-${{ github.ref_name }}.zip
-          force-submodules: true
+      #- name: Package source code including submodules
+        #uses: qmonnet/git-archive-all-action@v1
+        #with:
+          #output-files: covise-${{ github.ref_name }}.tar.gz covise-${{ github.ref_name }}.zip
+          #force-submodules: true
 
-      - name: Create draft release and add artifacts
-        uses: softprops/action-gh-release@v1
-        with:
-          draft: true
-          files: covise-*
+      #- name: Create draft release and add artifacts
+        #uses: softprops/action-gh-release@v1
+        #with:
+          #draft: true
+          #files: covise-*
