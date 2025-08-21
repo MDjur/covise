@@ -41,16 +41,19 @@ jobs:
       - name: Build Package
         run: |
           sudo -u builder bash -c "cd '$GITHUB_WORKSPACE/deploy/arch' && makepkg --noconfirm -s"
-
-      - name: Debug directory contents
-        run: |
-          ls -R $GITHUB_WORKSPACE/deploy/arch/
-
-      - name: Upload package as artifact
-        uses: actions/upload-artifact@v4
-        with: 
-          name: covise-arch-package
-          path: "$GITHUB_WORKSPACE/deploy/arch/*.pkg.tar.zst"
+      
+      - name: Release Package
+        uses: softprops/action-gh-release@v1
+        with:
+          files: 'deploy/arch/*.pkg.tar.zst'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      #- name: Upload package as artifact
+        #uses: actions/upload-artifact@v4
+        #with: 
+          #name: covise-arch-package
+          #path: "$GITHUB_WORKSPACE/deploy/arch/*.pkg.tar.zst"
 
   #generate:
     #name: Create release-artifacts
