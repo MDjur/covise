@@ -1105,11 +1105,28 @@ void SimulationSystem::initHeatingGridStreams() {
   }
 }
 
+void SimulationSystem::interpolateMissingDataInHeatingGrid() {
+  // 1. identify nodes without data
+  // loop through all nodes and check if they obtain simulation data and at least one connection to
+  // another node
+  // return a list of the nodes id,
+
+  // 2. interpolate data for those nodes
+  // for each node without data and with connections to other nodes, interpolate the data obtained
+  // from the connected nodes
+  // return the interpolated data
+
+  // 3. apply interpolated data to the grid
+  // apply interpolated data to the grid
+}
+
 void SimulationSystem::initHeatingGrid() {
   initHeatingGridStreams();
   buildHeatingGrid();
   applySimulationDataToHeatingGrid();
   m_heatingGridStreams.clear();
+
+  interpolateMissingDataInHeatingGrid();
 }
 
 std::vector<int> SimulationSystem::createHeatingGridIndices(
