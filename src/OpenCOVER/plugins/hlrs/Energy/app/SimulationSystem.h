@@ -101,6 +101,12 @@ class SimulationSystem final : public core::interface::ISystem {
     std::map<std::string, ColorMapMenu> colorMapRegistry;
   };
 
+  struct NodeData{
+    int id;
+    std::vector<int> neighboringNodesIds;
+    std::map<std::string, std::vector<double>> neighboringNodesDataMap;
+  };
+
   static constexpr int const getEnergyGridTypeIndex(EnergyGridType type) {
     return static_cast<int>(type);
   }
@@ -172,6 +178,24 @@ class SimulationSystem final : public core::interface::ISystem {
   void readSimulationDataStream(CSVStream &heatingSimStream);
   void applySimulationDataToHeatingGrid();
   void readHeatingGridStream(CSVStream &heatingStream);
+  std::vector<osg::ref_ptr<grid::Point>> getHeatingGridNodesToInterpolateDataFor();
+  void interpolateDataForHeatingGridNodes(std::vector<osg::ref_ptr<grid::Point>> &nodes);
+  void interpolateDataForNode(int nodeId,
+                              std::vector<std::reference_wrapper<SimulationSystem::NodeData>> nodeDataRefs);
+  void interpolateDataHeatingGrid();
+  std::vector<SimulationSystem::NodeData> getDataOfNeighboringNodes(int &id,
+                                                                    std::vector<osg::ref_ptr<grid::Point>> &nodes);
+  std::pair<int, int> getFromAndToIdsFromConnectionName(const std::string &connectionName,
+                                                        const std::string &delimiter);
+  std::vector<SimulationSystem::NodeData> getDataOfFromNode(int fromId,
+                                                            std::vector<int> tempNodeList,
+                                                            grid::Points &nodesToInterpolateDataFor,
+                                                            grid::Lines &connections);
+  std::vector<SimulationSystem::NodeData> getDataOfToNode(int toId,
+                                                          std::vector<int> tempNodeList,
+                                                          grid::Points &nodesToInterpolateDataFor,
+                                                          grid::Lines &connections);
+  core::simulation::Data getNodeDataFromSimulation(int nodeId);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
