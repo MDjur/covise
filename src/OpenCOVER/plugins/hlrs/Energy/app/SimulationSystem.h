@@ -172,6 +172,7 @@ class SimulationSystem final : public core::interface::ISystem {
   void readSimulationDataStream(CSVStream &heatingSimStream);
   void applySimulationDataToHeatingGrid();
   void readHeatingGridStream(CSVStream &heatingStream);
+  std::vector<osg::ref_ptr<grid::Point>> getNodesWithoutData();
   void interpolateMissingDataInHeatingGrid();
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,

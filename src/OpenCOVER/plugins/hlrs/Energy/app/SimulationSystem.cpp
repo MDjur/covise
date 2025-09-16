@@ -1105,11 +1105,28 @@ void SimulationSystem::initHeatingGridStreams() {
   }
 }
 
+std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
+  // loop through all nodes in heating grid and check whether or not they obtain data and at least
+  // one connection to another node
+  std::vector<osg::ref_ptr<grid::Point>> nodesWithoutData;
+  
+  // get the data by using getData() funtion of simulation class
+
+  // loop through the ids of the nodes
+    // check if the node contains data
+    // check if the node has at least one connection to another node
+    // add id to list of nodes without data if both conditions are met
+
+  // return a list of pointers to the nodes without data
+  return nodesWithoutData;
+}
+
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
   // 1. identify nodes without data
   // loop through all nodes and check if they obtain simulation data and at least one connection to
   // another node
-  // return a list of the nodes id,
+  // return a list of pointers to the nodes without data
+  std::vector<osg::ref_ptr<grid::Point>> nodesWithoutData = getNodesWithoutData();
 
   // 2. interpolate data for those nodes
   // for each node without data and with connections to other nodes, interpolate the data obtained
