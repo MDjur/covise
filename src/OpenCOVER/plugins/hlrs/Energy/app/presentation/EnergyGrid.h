@@ -148,6 +148,9 @@ class EnergyGrid : public interface::IEnergyGrid {
     if (idx < 0 || idx >= m_config.points.size()) return nullptr;
     return m_config.points[idx];
   }
+  const auto &getPoints() const { return m_config.points; }
+  const auto &getLines() const { return m_config.lines; }
+  const auto &getName() const { return m_config.name; }
 
  private:
   template <typename T>

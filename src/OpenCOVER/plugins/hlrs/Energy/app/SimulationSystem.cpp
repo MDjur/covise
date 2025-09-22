@@ -1126,7 +1126,18 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
     // check if the node contains data
     // check if the node has at least one connection to another node
     // add id to list of nodes without data if both conditions are met
+  const auto& points = heatingGrid->getPoints();
+  const auto& connections = heatingGrid->getLines();
+  const auto& consumers = heatingSim->Consumers();
+  const auto& producers = heatingSim->Producers();
 
+  cout << "Total number of nodes in heating grid: " << points.size() << endl;
+  cout << "Total number of connections in heating grid: " << connections.size() << endl;
+  cout << "Total number of consumers in heating simulation: " << consumers.size() << endl;
+  cout << "Total number of producers in heating simulation: " << producers.size() << endl;
+
+  // Interrupt execution for 5 seconds
+  std::this_thread::sleep_for(std::chrono::seconds(5));
   // return a list of pointers to the nodes without data
   return nodesWithoutData;
 }
