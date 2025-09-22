@@ -1146,6 +1146,16 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
   return nodesToInterpolateDataFor;
 }
 
+void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes) {
+  // loop through all nodes without data and with connections to other nodes
+  // for each node, get the connected nodes and their data
+  // check if connected nodes have data
+  // if connected nodes have data, interpolate the data from the connected nodes
+  // else follow the connection upwards or downwards until a node with data is found
+  // interpolate data regarding the distance of the node with data
+  // apply the interpolated data to the node
+}
+
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
   // 1. identify nodes without data
   // loop through all nodes and check if they obtain simulation data and at least one connection to
@@ -1157,6 +1167,7 @@ void SimulationSystem::interpolateMissingDataInHeatingGrid() {
   // for each node without data and with connections to other nodes, interpolate the data obtained
   // from the connected nodes
   // return the interpolated data
+  interpolateData(nodesToInterpolateDataFor);
 
   // 3. apply interpolated data to the grid
   // apply interpolated data to the grid
