@@ -1154,6 +1154,10 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   // else follow the connection upwards or downwards until a node with data is found
   // interpolate data regarding the distance of the node with data
   // apply the interpolated data to the node
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
+
+  const auto& connections = heatingGrid->getLines();
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
