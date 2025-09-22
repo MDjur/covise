@@ -1136,6 +1136,14 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
 
     bool hasData = consumers.find(id) != consumers.end() ||
                    producers.find(id) != producers.end();
+
+    bool hasConnections = false;
+    for (const auto& connection: connections) {
+      if (connection->getName().find(id) != std::string::npos) {
+        hasConnections = true;
+        break;
+      }
+    }
   }
   
   // return a list of pointers to the nodes without data
