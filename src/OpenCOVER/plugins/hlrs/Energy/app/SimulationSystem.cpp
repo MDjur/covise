@@ -1109,15 +1109,15 @@ void SimulationSystem::initHeatingGridStreams() {
   }
 }
 
-std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
-  std::vector<osg::ref_ptr<grid::Point>> nodesWithoutData;
+std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateData() {
+  std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor;
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  if (m_energyGrids[idx].grid == nullptr) return nodesWithoutData;
+  if (m_energyGrids[idx].grid == nullptr) return nodesToInterpolateDataFor;
 
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
   auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
-  if (!heatingGrid || !heatingSim) return nodesWithoutData;
+  if (!heatingGrid || !heatingSim) return nodesToInterpolateDataFor;
 
   const auto& points = heatingGrid->getPoints();
   const auto& connections = heatingGrid->getLines();
@@ -1139,11 +1139,11 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
     }
 
     if (!hasData && hasConnections) {
-      nodesWithoutData.push_back(point);
+      nodesToInterpolateDataFor.push_back(point);
     }
   }
 
-  return nodesWithoutData;
+  return nodesToInterpolateDataFor;
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
@@ -1151,7 +1151,7 @@ void SimulationSystem::interpolateMissingDataInHeatingGrid() {
   // loop through all nodes and check if they obtain simulation data and at least one connection to
   // another node
   // return a list of pointers to the nodes without data
-  std::vector<osg::ref_ptr<grid::Point>> nodesWithoutData = getNodesWithoutData();
+  std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor = getNodesToInterpolateData();
 
   // 2. interpolate data for those nodes
   // for each node without data and with connections to other nodes, interpolate the data obtained
