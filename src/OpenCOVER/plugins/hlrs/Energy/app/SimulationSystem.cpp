@@ -1131,13 +1131,13 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
   const auto& consumers = heatingSim->Consumers();
   const auto& producers = heatingSim->Producers();
 
-  cout << "Total number of nodes in heating grid: " << points.size() << endl;
-  cout << "Total number of connections in heating grid: " << connections.size() << endl;
-  cout << "Total number of consumers in heating simulation: " << consumers.size() << endl;
-  cout << "Total number of producers in heating simulation: " << producers.size() << endl;
+  for (const auto& point: points) {
+    auto id = point->getName();
 
-  // Interrupt execution for 5 seconds
-  std::this_thread::sleep_for(std::chrono::seconds(5));
+    bool hasData = consumers.find(id) != consumers.end() ||
+                   producers.find(id) != producers.end();
+  }
+  
   // return a list of pointers to the nodes without data
   return nodesWithoutData;
 }
