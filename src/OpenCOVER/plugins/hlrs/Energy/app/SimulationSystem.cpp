@@ -1110,22 +1110,15 @@ void SimulationSystem::initHeatingGridStreams() {
 }
 
 std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
-  // loop through all nodes in heating grid and check whether or not they obtain data and at least
-  // one connection to another node
   std::vector<osg::ref_ptr<grid::Point>> nodesWithoutData;
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   if (m_energyGrids[idx].grid == nullptr) return nodesWithoutData;
 
-  // get data by using getData() function of simulation class
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
   auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
   if (!heatingGrid || !heatingSim) return nodesWithoutData;
 
-  // loop through the ids of the nodes
-    // check if the node contains data
-    // check if the node has at least one connection to another node
-    // add id to list of nodes without data if both conditions are met
   const auto& points = heatingGrid->getPoints();
   const auto& connections = heatingGrid->getLines();
   const auto& consumers = heatingSim->Consumers();
@@ -1150,7 +1143,6 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
     }
   }
 
-  // return a list of pointers to the nodes without data
   return nodesWithoutData;
 }
 
