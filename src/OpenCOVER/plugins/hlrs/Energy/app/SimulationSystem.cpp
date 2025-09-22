@@ -1118,6 +1118,9 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
   if (m_energyGrids[idx].grid == nullptr) return nodesWithoutData;
 
   // get data by using getData() function of simulation class
+  auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
+  auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
+  if (!heatingGrid || !heatingSim) return nodesWithoutData;
 
   // loop through the ids of the nodes
     // check if the node contains data
