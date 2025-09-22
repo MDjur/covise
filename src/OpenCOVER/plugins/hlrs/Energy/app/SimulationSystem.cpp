@@ -40,6 +40,10 @@
 #include <lib/core/utils/color.h>
 #include <lib/core/utils/osgUtils.h>
 
+// threads
+#include <thread>
+#include <chrono>
+
 // other
 #include <proj.h>
 
@@ -1109,8 +1113,11 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
   // loop through all nodes in heating grid and check whether or not they obtain data and at least
   // one connection to another node
   std::vector<osg::ref_ptr<grid::Point>> nodesWithoutData;
-  
-  // get the data by using getData() funtion of simulation class
+
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  if (m_energyGrids[idx].grid == nullptr) return nodesWithoutData;
+
+  // get data by using getData() function of simulation class
 
   // loop through the ids of the nodes
     // check if the node contains data
