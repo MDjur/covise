@@ -1144,8 +1144,12 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesWithoutData() {
         break;
       }
     }
+
+    if (!hasData && hasConnections) {
+      nodesWithoutData.push_back(point);
+    }
   }
-  
+
   // return a list of pointers to the nodes without data
   return nodesWithoutData;
 }
