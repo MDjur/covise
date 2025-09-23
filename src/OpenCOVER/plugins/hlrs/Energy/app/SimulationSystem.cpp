@@ -1243,6 +1243,48 @@ void SimulationSystem::getDataOfToNode(int toId,
                                        grid::Lines &connections,
                                        std::map<std::string, std::vector<double> *> &toNodeData)
 {
+  auto toNode = searchHeatingGridPointById(nodes, toId);
+  if (toNode == nullptr)
+  {
+    auto consumerIt = consumers.find(std::to_string(toId));
+    auto producerIt = producers.find(std::to_string(toId));
+    if (consumerIt != consumers.end())
+    {
+      for (const auto &key : dataKeys)
+      {
+        auto dataIt = consumerIt->second->getData().find(key);
+        if (dataIt != consumerIt->second->getData().end())
+        {
+          toNodeData[key] = &(dataIt->second);
+        }
+      }
+    }
+    else if (producerIt != producers.end())
+    {
+      for (const auto &key : dataKeys)
+      {
+        auto dataIt = producerIt->second->getData().find(key);
+        if (dataIt != producerIt->second->getData().end())
+        {
+          toNodeData[key] = &(dataIt->second);
+        }
+      }
+    }
+  } else {
+    int id = toId;
+    string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
+
+    for (const auto &connection : connections)
+    {
+      string connectionString = connection->getName();
+      int fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
+      toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
+
+      if (id == fromId) {
+        getDataOfToNode(toId, nodes, consumers, producers, dataKeys, connections, toNodeData);
+      }
+    }
+  }
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
