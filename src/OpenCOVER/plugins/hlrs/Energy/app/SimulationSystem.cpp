@@ -1156,8 +1156,12 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   // apply the interpolated data to the node
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
+  auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
 
   const auto& connections = heatingGrid->getLines();
+
+  const auto& consumers = heatingSim->Consumers();
+  const auto& producers = heatingSim->Producers();
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
