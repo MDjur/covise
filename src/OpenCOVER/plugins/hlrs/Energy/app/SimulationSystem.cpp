@@ -1233,6 +1233,39 @@ void SimulationSystem::getDataOfFromNode(int fromId,
                                          grid::Lines &connections,
                                          std::map<std::string, std::vector<double> *> &fromNodeData)
 {
+  auto fromNode = searchHeatingGridPointById(nodes, fromId);
+  if (fromNode == nullptr) {
+    auto consumerIt = consumers.find(std::to_string(fromId));
+    auto producerIt = producers.find(std::to_string(fromId));
+    if (consumerIt != consumers.end()) {
+      for (const auto &key : dataKeys) {
+        auto dataIt = consumerIt->second->getData().find(key);
+        if (dataIt != consumerIt->second->getData().end()) {
+          fromNodeData[key] = &(dataIt->second);
+        }
+      }
+    } else if (producerIt != producers.end()) {
+      for (const auto &key : dataKeys) {
+        auto dataIt = producerIt->second->getData().find(key);
+        if (dataIt != producerIt->second->getData().end()) {
+          fromNodeData[key] = &(dataIt->second);
+        }
+      }
+    }
+  } else {
+    int id = fromId;
+    string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
+
+    for (const auto &connection : connections) {
+      string connectionString = connection->getName();
+      fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
+      int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
+
+      if (id == toId) {
+        getDataOfFromNode(fromId, nodes, consumers, producers, dataKeys, connections, fromNodeData);
+      }
+    }
+  }
 }
 
 void SimulationSystem::getDataOfToNode(int toId,
