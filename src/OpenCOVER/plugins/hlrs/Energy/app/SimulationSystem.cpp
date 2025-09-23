@@ -1165,6 +1165,27 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
 
   std::map<std::string, std::vector<double> *> toNodeData;
   std::map<std::string, std::vector<double> *> fromNodeData;
+
+  auto getDataKeys = [&]() -> vector<string> {
+    int testId;
+    for (int id = 0; id < connections.size(); ++id) {
+      auto node = searchHeatingGridPointById(nodes, id);
+      if (node == nullptr){
+        testId = id;
+        break;
+      }
+    }
+
+    auto consumerIt = consumers.find(std::to_string(testId));
+    auto consumerData = consumerIt->second->getData();
+    vector<string> dataKeys;
+    for (const auto& dataEntry : consumerData) {
+      dataKeys.push_back(dataEntry.first);
+    }
+    return dataKeys;
+  };
+
+  vector<string> dataKeys = getDataKeys();
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
