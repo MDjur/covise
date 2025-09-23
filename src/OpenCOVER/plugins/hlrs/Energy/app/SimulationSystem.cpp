@@ -1216,11 +1216,22 @@ void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
 
     if (id == fromId)
     {
+      getDataOfToNode(toId, nodes, consumers, producers, dataKeys, connections, toNodeData);
     }
     else if (id == toId)
     {
     }
   }
+}
+
+void SimulationSystem::getDataOfToNode(int toId,
+                                       std::vector<osg::ref_ptr<grid::Point>> &nodes,
+                                       const core::simulation::ObjectMap &consumers,
+                                       const core::simulation::ObjectMap &producers,
+                                       std::vector<std::string> &dataKeys,
+                                       grid::Lines &connections,
+                                       std::map<std::string, std::vector<double> *> &toNodeData)
+{
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {

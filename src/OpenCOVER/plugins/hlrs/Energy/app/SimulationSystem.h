@@ -183,6 +183,13 @@ class SimulationSystem final : public core::interface::ISystem {
                                  std::vector<std::string> &dataKeys,
                                  std::map<std::string, std::vector<double> *> &toNodeData,
                                  std::map<std::string, std::vector<double> *> &fromNodeData);
+  void getDataOfToNode(int toId,
+                       grid::Points &nodes,
+                       const core::simulation::ObjectMap &consumers,
+                       const core::simulation::ObjectMap &producers,
+                       osg::Node::DescriptionList &dataKeys,
+                       grid::Lines &connections,
+                       std::map<std::string, std::vector<double> *> &toNodeData);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
