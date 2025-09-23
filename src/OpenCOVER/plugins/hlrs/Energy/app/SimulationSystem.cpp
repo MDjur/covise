@@ -1158,7 +1158,7 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
   auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
 
-  const auto& connections = heatingGrid->getLines();
+  auto connections = heatingGrid->getLines();
 
   const auto& consumers = heatingSim->Consumers();
   const auto& producers = heatingSim->Producers();
@@ -1186,6 +1186,24 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   };
 
   vector<string> dataKeys = getDataKeys();
+
+  string connectionString;
+
+   for (const auto& node: nodes) {
+    auto id = std::stoi(node->getName());
+    getDataOfNeighboringNodes(connections, id, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
+  }
+}
+
+void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
+                                                 int &id,
+                                                 std::vector<osg::ref_ptr<grid::Point>> &nodes,
+                                                 const core::simulation::ObjectMap &consumers,
+                                                 const core::simulation::ObjectMap &producers,
+                                                 std::vector<std::string> &dataKeys,
+                                                 std::map<std::string, std::vector<double> *> &toNodeData,
+                                                 std::map<std::string, std::vector<double> *> &fromNodeData)
+{
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
