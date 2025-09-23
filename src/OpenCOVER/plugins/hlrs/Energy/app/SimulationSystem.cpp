@@ -1220,8 +1220,19 @@ void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
     }
     else if (id == toId)
     {
+      getDataOfFromNode(fromId, nodes, consumers, producers, dataKeys, connections, fromNodeData);
     }
   }
+}
+
+void SimulationSystem::getDataOfFromNode(int fromId,
+                                         std::vector<osg::ref_ptr<grid::Point>> &nodes,
+                                         const core::simulation::ObjectMap &consumers,
+                                         const core::simulation::ObjectMap &producers,
+                                         std::vector<std::string> &dataKeys,
+                                         grid::Lines &connections,
+                                         std::map<std::string, std::vector<double> *> &fromNodeData)
+{
 }
 
 void SimulationSystem::getDataOfToNode(int toId,
