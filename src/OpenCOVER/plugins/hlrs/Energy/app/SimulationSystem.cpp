@@ -1162,6 +1162,9 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
 
   const auto& consumers = heatingSim->Consumers();
   const auto& producers = heatingSim->Producers();
+
+  std::map<std::string, std::vector<double> *> toNodeData;
+  std::map<std::string, std::vector<double> *> fromNodeData;
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
