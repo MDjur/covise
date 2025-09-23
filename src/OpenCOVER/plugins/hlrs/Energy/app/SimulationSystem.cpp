@@ -1370,6 +1370,7 @@ osg::ref_ptr<grid::Point> SimulationSystem::searchHeatingGridPointById(
   });
   if (pointIt == points.end()) {
     std::cerr << "Point with id " << id << " not found in points." << std::endl;
+    return nullptr;
   }
   return *pointIt;  // returns nullptr if not found
 }
