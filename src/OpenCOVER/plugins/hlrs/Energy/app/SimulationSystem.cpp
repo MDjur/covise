@@ -1204,6 +1204,23 @@ void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
                                                  std::map<std::string, std::vector<double> *> &toNodeData,
                                                  std::map<std::string, std::vector<double> *> &fromNodeData)
 {
+  string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
+
+  for (const auto &connection : connections)
+  {
+    string connectionString = connection->getName();
+    int fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
+    int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
+
+    cout << "FromId: " << fromId << ", ToId: " << toId << endl;
+
+    if (id == fromId)
+    {
+    }
+    else if (id == toId)
+    {
+    }
+  }
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
