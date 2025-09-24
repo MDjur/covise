@@ -1195,12 +1195,11 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
     auto id = std::stoi(node->getName());
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
 
-    interpolateDataForNode(node, nodeLists, dataKeys, toNodeData, fromNodeData);
+    interpolateDataForNode(nodeLists, dataKeys, toNodeData, fromNodeData);
   }
 }
 
-void SimulationSystem::interpolateDataForNode(const osg::ref_ptr<grid::Point> &node,
-                                              std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+void SimulationSystem::interpolateDataForNode(std::pair<std::vector<int>, std::vector<int>> &nodeLists,
                                               std::vector<std::string> &dataKeys,
                                               std::map<std::string, std::vector<double> *> &toNodeData,
                                               std::map<std::string, std::vector<double> *> &fromNodeData)
