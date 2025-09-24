@@ -1195,17 +1195,53 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
     auto id = std::stoi(node->getName());
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
 
-    interpolateDataForNode(nodeLists, dataKeys, toNodeData, fromNodeData);
+    interpolateDataForNode(id, nodeLists, dataKeys, toNodeData, fromNodeData);
   }
 }
 
-void SimulationSystem::interpolateDataForNode(std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+void SimulationSystem::interpolateDataForNode(int nodeId,
+                                              std::pair<std::vector<int>, std::vector<int>> &nodeLists,
                                               std::vector<std::string> &dataKeys,
                                               std::map<std::string, std::vector<double> *> &toNodeData,
                                               std::map<std::string, std::vector<double> *> &fromNodeData)
 {
   int distanceFromNode = nodeLists.first.size();
   int distanceToNode = nodeLists.second.size();
+
+  string name = std::to_string(nodeId);
+
+  auto sim = std::make_shared<heating::HeatingSimulation>();
+
+  auto getObjMapByType = [&](core::simulation::ObjectType type) -> ObjectMap * {
+    if (type == core::simulation::ObjectType::Consumer)
+      return &sim->Consumers();
+    else if (type == core::simulation::ObjectType::Producer)
+      return &sim->Producers();
+    return nullptr;
+  };
+
+  auto createObjAndAddToMap = [&](core::simulation::ObjectType type,
+                                  const std::string &name) {
+    auto obj =
+        core::simulation::createObject(type, name, {{std::string("value"), {}}});
+    auto map = getObjMapByType(type);
+    if (map == nullptr) return;
+    map->emplace(name, std::move(obj));
+  };
+
+  auto getObjPtr = [&](core::simulation::ObjectType type, const std::string &name) {
+    auto map = getObjMapByType(type);
+    auto it = map->find(name);
+    if (it != map->end()) return it->second.get();
+    createObjAndAddToMap(type, name);
+    return map->at(name).get();
+  };
+
+  auto addDataToMap = [&](core::simulation::ObjectType type, const std::string &name,
+                          const std::string &valName, double value) {
+    auto objPtr = getObjPtr(type, name);
+    objPtr->addData(valName, value);
+  };
 
   for (const auto& key : dataKeys) {
     if (fromNodeData.find(key) != fromNodeData.end() && toNodeData.find(key) != toNodeData.end() &&
@@ -1217,6 +1253,8 @@ void SimulationSystem::interpolateDataForNode(std::pair<std::vector<int>, std::v
         double weightFactor = static_cast<double>(distanceToNode + 1) / (distanceFromNode + distanceToNode + 2);
         double interpolatedValue = fromValue * weightFactor + toValue * (1 - weightFactor);
         interpolatedData[i] = interpolatedValue;
+        
+        addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue);
       }
     }
   }
