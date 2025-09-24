@@ -177,6 +177,7 @@ class SimulationSystem final : public core::interface::ISystem {
   void interpolateMissingDataInHeatingGrid();
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,
+                                 std::pair<std::vector<int>, std::vector<int>> &nodeLists,
                                  std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                  const core::simulation::ObjectMap &consumers,
                                  const core::simulation::ObjectMap &producers,
@@ -184,13 +185,15 @@ class SimulationSystem final : public core::interface::ISystem {
                                  std::map<std::string, std::vector<double> *> &toNodeData,
                                  std::map<std::string, std::vector<double> *> &fromNodeData);
   void getDataOfFromNode(int fromId,
-                       grid::Points &nodes,
-                       const core::simulation::ObjectMap &consumers,
-                       const core::simulation::ObjectMap &producers,
-                       osg::Node::DescriptionList &dataKeys,
-                       grid::Lines &connections,
-                       std::map<std::string, std::vector<double> *> &fromNodeData);
+                         std::vector<int> &fromNodeList,
+                         grid::Points &nodes,
+                         const core::simulation::ObjectMap &consumers,
+                         const core::simulation::ObjectMap &producers,
+                         osg::Node::DescriptionList &dataKeys,
+                         grid::Lines &connections,
+                         std::map<std::string, std::vector<double> *> &fromNodeData);
   void getDataOfToNode(int toId,
+                       std::vector<int> &toNodeList,
                        grid::Points &nodes,
                        const core::simulation::ObjectMap &consumers,
                        const core::simulation::ObjectMap &producers,
