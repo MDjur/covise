@@ -1194,8 +1194,35 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
    for (const auto& node: nodes) {
     auto id = std::stoi(node->getName());
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
+
+    interpolateDataForNode(node, nodeLists, dataKeys, toNodeData, fromNodeData);
   }
 }
+
+void SimulationSystem::interpolateDataForNode(const osg::ref_ptr<grid::Point> &node,
+                                              std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+                                              std::vector<std::string> &dataKeys,
+                                              std::map<std::string, std::vector<double> *> &toNodeData,
+                                              std::map<std::string, std::vector<double> *> &fromNodeData)
+{
+  int distanceFromNode = nodeLists.first.size();
+  int distanceToNode = nodeLists.second.size();
+
+  for (const auto& key : dataKeys) {
+    if (fromNodeData.find(key) != fromNodeData.end() && toNodeData.find(key) != toNodeData.end() &&
+        fromNodeData[key]->size() == toNodeData[key]->size()) {
+      std::vector<double> interpolatedData(fromNodeData[key]->size(), 0.0);
+      for (size_t i = 0; i < fromNodeData[key]->size(); ++i) {
+        double fromValue = (*(fromNodeData[key]))[i];
+        double toValue = (*(toNodeData[key]))[i];
+        double weightFactor = static_cast<double>(distanceToNode + 1) / (distanceFromNode + distanceToNode + 2);
+        double interpolatedValue = fromValue * weightFactor + toValue * (1 - weightFactor);
+        interpolatedData[i] = interpolatedValue;
+      }
+    }
+  }
+}
+
 
 void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
                                                  int &id,

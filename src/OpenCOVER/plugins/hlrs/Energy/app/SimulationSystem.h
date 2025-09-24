@@ -174,6 +174,11 @@ class SimulationSystem final : public core::interface::ISystem {
   void readHeatingGridStream(CSVStream &heatingStream);
   std::vector<osg::ref_ptr<grid::Point>> getNodesToInterpolateData();
   void interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes);
+  void interpolateDataForNode(const osg::ref_ptr<grid::Point> &node,
+                              std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+                              std::vector<std::string> &dataKeys,
+                              std::map<std::string, std::vector<double> *> &toNodeData,
+                              std::map<std::string, std::vector<double> *> &fromNodeData);
   void interpolateMissingDataInHeatingGrid();
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,
