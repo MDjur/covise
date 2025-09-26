@@ -1207,6 +1207,7 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
 {
   int distanceFromNode = nodeLists.first.size();
   int distanceToNode = nodeLists.second.size();
+  double weightFactor = static_cast<double>(distanceToNode + 1) / (distanceFromNode + distanceToNode + 2);
 
   string name = std::to_string(nodeId);
 
@@ -1250,7 +1251,6 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
       for (size_t i = 0; i < fromNodeData[key]->size(); ++i) {
         double fromValue = (*(fromNodeData[key]))[i];
         double toValue = (*(toNodeData[key]))[i];
-        double weightFactor = static_cast<double>(distanceToNode + 1) / (distanceFromNode + distanceToNode + 2);
         double interpolatedValue = fromValue * weightFactor + toValue * (1 - weightFactor);
         interpolatedData[i] = interpolatedValue;
         
@@ -1272,8 +1272,8 @@ void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
                                                  std::map<std::string, std::vector<double> *> &fromNodeData)
 {
   string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
-  std::vector<int> fromNodeList = nodeLists.first;
-  std::vector<int> toNodeList = nodeLists.second;
+  std::vector<int>& fromNodeList = nodeLists.first;
+  std::vector<int>& toNodeList = nodeLists.second;
 
   for (const auto &connection : connections)
   {
@@ -1303,13 +1303,13 @@ void SimulationSystem::getDataOfFromNode(int fromId,
 {
   if (std::find(fromNodeList.begin(), fromNodeList.end(), fromId) != fromNodeList.end()){
     return;
+  } else {
+    fromNodeList.push_back(fromId);
   }
 
   auto fromNode = searchHeatingGridPointById(nodes, fromId);
 
   if (fromNode == nullptr){
-    fromNodeList.push_back(fromId);
-  
     auto consumerIt = consumers.find(std::to_string(fromId));
     auto producerIt = producers.find(std::to_string(fromId));
     if (consumerIt != consumers.end()) {
@@ -1354,14 +1354,14 @@ void SimulationSystem::getDataOfToNode(int toId,
 {
   if (std::find(toNodeList.begin(), toNodeList.end(), toId) != toNodeList.end()){
     return;
+  } else {
+    toNodeList.push_back(toId);
   }
 
   auto toNode = searchHeatingGridPointById(nodes, toId);
 
   if (toNode == nullptr)
   {
-    toNodeList.push_back(toId);
-
     auto consumerIt = consumers.find(std::to_string(toId));
     auto producerIt = producers.find(std::to_string(toId));
     if (consumerIt != consumers.end())
