@@ -4,6 +4,7 @@
 #include <lib/core/interfaces/IEnergyGrid.h>
 #include <lib/core/interfaces/ISystem.h>
 #include <lib/core/simulation/simulation.h>
+#include <lib/core/simulation/heating.h>
 
 // COVER
 #include <PluginUtil/colors/ColorBar.h>
@@ -178,7 +179,8 @@ class SimulationSystem final : public core::interface::ISystem {
                               std::pair<std::vector<int>, std::vector<int>> &nodeLists,
                               std::vector<std::string> &dataKeys,
                               std::map<std::string, std::vector<double> *> &toNodeData,
-                              std::map<std::string, std::vector<double> *> &fromNodeData);
+                              std::map<std::string, std::vector<double> *> &fromNodeData,
+                              std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   void interpolateMissingDataInHeatingGrid();
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,

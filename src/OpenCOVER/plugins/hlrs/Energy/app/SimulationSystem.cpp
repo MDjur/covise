@@ -1155,13 +1155,29 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   // interpolate data regarding the distance of the node with data
   // apply the interpolated data to the node
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  if (m_energyGrids[idx].grid == nullptr) {
+    cout << "No heating grid available for interpolation" << endl;
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    return;
+  }
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
   auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
+
+  auto sim = std::make_shared<heating::HeatingSimulation>();
 
   auto connections = heatingGrid->getLines();
 
   const auto& consumers = heatingSim->Consumers();
   const auto& producers = heatingSim->Producers();
+
+  // Add all existing consumers and producers to the new simulation
+  for (const auto& [id, consumer] : consumers) {
+    sim->Consumers().emplace(id, std::move(std::make_unique<Object>(*consumer)));
+  }
+
+  for (const auto& [id, producer] : producers) {
+    sim->Producers().emplace(id, std::move(std::make_unique<Object>(*producer)));
+  }
 
   std::map<std::string, std::vector<double> *> toNodeData;
   std::map<std::string, std::vector<double> *> fromNodeData;
@@ -1195,23 +1211,28 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
     auto id = std::stoi(node->getName());
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
 
-    interpolateDataForNode(id, nodeLists, dataKeys, toNodeData, fromNodeData);
+    interpolateDataForNode(id, nodeLists, dataKeys, toNodeData, fromNodeData, sim);
   }
+
+  auto &heatingGridSim = m_energyGrids[idx];
+
+  heatingGridSim.simUI =
+      std::make_unique<HeatingSimulationUI<IEnergyGrid>>(sim, heatingGridSim.grid);
+  heatingGridSim.sim = std::move(sim);
 }
 
 void SimulationSystem::interpolateDataForNode(int nodeId,
                                               std::pair<std::vector<int>, std::vector<int>> &nodeLists,
                                               std::vector<std::string> &dataKeys,
                                               std::map<std::string, std::vector<double> *> &toNodeData,
-                                              std::map<std::string, std::vector<double> *> &fromNodeData)
+                                              std::map<std::string, std::vector<double> *> &fromNodeData,
+                                              std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim)
 {
   int distanceFromNode = nodeLists.first.size();
   int distanceToNode = nodeLists.second.size();
   double weightFactor = static_cast<double>(distanceToNode + 1) / (distanceFromNode + distanceToNode + 2);
 
   string name = std::to_string(nodeId);
-
-  auto sim = std::make_shared<heating::HeatingSimulation>();
 
   auto getObjMapByType = [&](core::simulation::ObjectType type) -> ObjectMap * {
     if (type == core::simulation::ObjectType::Consumer)
