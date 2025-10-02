@@ -1132,9 +1132,17 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
 
     bool hasConnections = false;
     for (const auto& connection: connections) {
-      if (connection->getName().find(id) != std::string::npos) {
-        hasConnections = true;
-        break;
+      auto connectionName = connection->getName();
+      string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
+      
+      // Parse connection name to get exact from and to IDs
+      auto delimiterPos = connectionName.find(delimiter);
+      if (delimiterPos != std::string::npos) {
+        auto fromIdStr = connectionName.substr(0, delimiterPos);
+        auto toIdStr = connectionName.substr(delimiterPos + delimiter.length());
+          
+          hasConnections = true;
+          break;
       }
     }
 
