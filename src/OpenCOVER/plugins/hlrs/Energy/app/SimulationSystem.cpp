@@ -1147,19 +1147,12 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
 }
 
 void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes) {
-  // loop through all nodes without data and with connections to other nodes
-  // for each node, get the connected nodes and their data
-  // check if connected nodes have data
-  // if connected nodes have data, interpolate the data from the connected nodes
-  // else follow the connection upwards or downwards until a node with data is found
-  // interpolate data regarding the distance of the node with data
-  // apply the interpolated data to the node
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   if (m_energyGrids[idx].grid == nullptr) {
     cout << "No heating grid available for interpolation" << endl;
-    std::this_thread::sleep_for(std::chrono::seconds(5));
     return;
   }
+
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
   auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
 
@@ -1170,7 +1163,6 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   const auto& consumers = heatingSim->Consumers();
   const auto& producers = heatingSim->Producers();
 
-  // Add all existing consumers and producers to the new simulation
   for (const auto& [id, consumer] : consumers) {
     sim->Consumers().emplace(id, std::move(std::make_unique<Object>(*consumer)));
   }
@@ -1425,20 +1417,9 @@ void SimulationSystem::getDataOfToNode(int toId,
 }
 
 void SimulationSystem::interpolateMissingDataInHeatingGrid() {
-  // 1. identify nodes without data
-  // loop through all nodes and check if they obtain simulation data and at least one connection to
-  // another node
-  // return a list of pointers to the nodes without data
   std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor = getNodesToInterpolateData();
 
-  // 2. interpolate data for those nodes
-  // for each node without data and with connections to other nodes, interpolate the data obtained
-  // from the connected nodes
-  // return the interpolated data
   interpolateData(nodesToInterpolateDataFor);
-
-  // 3. apply interpolated data to the grid
-  // apply interpolated data to the grid
 }
 
 void SimulationSystem::initHeatingGrid() {
