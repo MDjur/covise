@@ -1135,14 +1135,23 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
       auto connectionName = connection->getName();
       string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
       
-      // Parse connection name to get exact from and to IDs
       auto delimiterPos = connectionName.find(delimiter);
       if (delimiterPos != std::string::npos) {
         auto fromIdStr = connectionName.substr(0, delimiterPos);
         auto toIdStr = connectionName.substr(delimiterPos + delimiter.length());
-          
+
+        
+        if (id == fromIdStr || id == toIdStr) {
+          if (id == "45") {
+            cout << "Debugging node 45" << endl;
+            cout << "Connection: " << connectionName << endl;
+            cout << "From: " << fromIdStr << ", To: " << toIdStr << endl;
+
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+          }
           hasConnections = true;
           break;
+        }
       }
     }
 
@@ -1385,6 +1394,7 @@ void SimulationSystem::getDataOfToNode(int toId,
   {
     auto consumerIt = consumers.find(std::to_string(toId));
     auto producerIt = producers.find(std::to_string(toId));
+
     if (consumerIt != consumers.end())
     {
       for (const auto &key : dataKeys)
