@@ -1140,15 +1140,7 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
         auto fromIdStr = connectionName.substr(0, delimiterPos);
         auto toIdStr = connectionName.substr(delimiterPos + delimiter.length());
 
-        
         if (id == fromIdStr || id == toIdStr) {
-          if (id == "45") {
-            cout << "Debugging node 45" << endl;
-            cout << "Connection: " << connectionName << endl;
-            cout << "From: " << fromIdStr << ", To: " << toIdStr << endl;
-
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-          }
           hasConnections = true;
           break;
         }
@@ -1217,6 +1209,9 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   string connectionString;
 
    for (const auto& node: nodes) {
+    nodeLists.first.clear();
+    nodeLists.second.clear();
+
     auto id = std::stoi(node->getName());
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
 
