@@ -1180,13 +1180,11 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
     sim->Producers().emplace(id, std::move(std::make_unique<Object>(*producer)));
   }
 
-  std::map<std::string, std::vector<double> *> toNodeData;
-  std::map<std::string, std::vector<double> *> fromNodeData;
-
-  std::pair<std::vector<int>, std::vector<int>> nodeLists;
+  std::map<int, std::map<std::string, std::vector<double> *>> nodeData;
+  std::map<int, std::vector<int>> nodeLists;
 
   auto getDataKeys = [&]() -> vector<string> {
-    int testId;
+    int testId = -1;
     for (int id = 0; id < connections.size(); ++id) {
       auto node = searchHeatingGridPointById(nodes, id);
       if (node == nullptr){
@@ -1196,6 +1194,9 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
     }
 
     auto consumerIt = consumers.find(std::to_string(testId));
+    if (consumerIt == consumers.end()) {
+      return {};
+    }
     auto consumerData = consumerIt->second->getData();
     vector<string> dataKeys;
     for (const auto& dataEntry : consumerData) {
@@ -1209,13 +1210,14 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   string connectionString;
 
    for (const auto& node: nodes) {
-    nodeLists.first.clear();
-    nodeLists.second.clear();
+
+    nodeLists.clear();
+    nodeData.clear();
 
     auto id = std::stoi(node->getName());
-    getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, toNodeData, fromNodeData);
+    getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, nodeData);
 
-    interpolateDataForNode(id, nodeLists, dataKeys, toNodeData, fromNodeData, sim);
+    interpolateDataForNode(id, nodeLists, dataKeys, nodeData, sim);
   }
 
   auto &heatingGridSim = m_energyGrids[idx];
@@ -1226,15 +1228,28 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
 }
 
 void SimulationSystem::interpolateDataForNode(int nodeId,
-                                              std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+                                              std::map<int, std::vector<int>> &nodeLists,
                                               std::vector<std::string> &dataKeys,
-                                              std::map<std::string, std::vector<double> *> &toNodeData,
-                                              std::map<std::string, std::vector<double> *> &fromNodeData,
+                                              std::map<int, std::map<std::string, std::vector<double> *>> &nodeData,
                                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim)
 {
-  int distanceFromNode = nodeLists.first.size();
-  int distanceToNode = nodeLists.second.size();
-  double weightFactor = static_cast<double>(distanceToNode + 1) / (distanceFromNode + distanceToNode + 2);
+  if (nodeData.empty()) {
+    std::cerr << "No nodeData available for interpolation of node " << nodeId << std::endl;
+    return;
+  }
+  
+  std::map<int, double> weightFactors;
+  double totalWeight = 0.0;
+
+  for (const auto& [currentNodeId, currentNodeList] : nodeLists) {
+    double weight = 1.0 / (currentNodeList.size() + 1);
+    weightFactors[currentNodeId] = weight;
+    totalWeight += weight;
+  }
+
+  for (auto& [nodeId, weight] : weightFactors) {
+    weight /= totalWeight;
+  }
 
   string name = std::to_string(nodeId);
 
@@ -1270,17 +1285,27 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
   };
 
   for (const auto& key : dataKeys) {
-    if (fromNodeData.find(key) != fromNodeData.end() && toNodeData.find(key) != toNodeData.end() &&
-        fromNodeData[key]->size() == toNodeData[key]->size()) {
-      std::vector<double> interpolatedData(fromNodeData[key]->size(), 0.0);
-      for (size_t i = 0; i < fromNodeData[key]->size(); ++i) {
-        double fromValue = (*(fromNodeData[key]))[i];
-        double toValue = (*(toNodeData[key]))[i];
-        double interpolatedValue = fromValue * weightFactor + toValue * (1 - weightFactor);
-        interpolatedData[i] = interpolatedValue;
-        
-        addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue);
+    int numTimesteps = nodeData.begin()->second[key]->size();
+
+    for (size_t i = 0; i < numTimesteps; ++i) {
+      double interpolatedValue = 0.0;
+
+      for (const auto& [nodeId, nodeDataMap]: nodeData) {
+        auto it = nodeDataMap.find(key);
+        if (it == nodeDataMap.end()) continue;
+        double value = (*(it->second))[i];
+        double weightFactor = weightFactors[nodeId];
+        interpolatedValue += value * weightFactor;
       }
+
+      for (const auto& [id, nodeDataMap] : nodeData) {
+        auto it = nodeDataMap.find(key);
+        if (it != nodeDataMap.end()) {
+          double value = (*(it->second))[i];
+        }
+      }
+
+      addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue);
     }
   }
 }
@@ -1288,17 +1313,14 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
 
 void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
                                                  int &id,
-                                                 std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+                                                 std::map<int, std::vector<int>> &nodeLists,
                                                  std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                                  const core::simulation::ObjectMap &consumers,
                                                  const core::simulation::ObjectMap &producers,
                                                  std::vector<std::string> &dataKeys,
-                                                 std::map<std::string, std::vector<double> *> &toNodeData,
-                                                 std::map<std::string, std::vector<double> *> &fromNodeData)
+                                                 std::map<int, std::map<std::string, std::vector<double> *>> &nodeData)
 {
   string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
-  std::vector<int>& fromNodeList = nodeLists.first;
-  std::vector<int>& toNodeList = nodeLists.second;
 
   for (const auto &connection : connections)
   {
@@ -1306,49 +1328,55 @@ void SimulationSystem::getDataOfNeighboringNodes(grid::Lines &connections,
     int fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
     int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
 
+    std::vector<int> tempNodeList;
+
     if (id == fromId)
     {
-      getDataOfToNode(toId, toNodeList, nodes, consumers, producers, dataKeys, connections, toNodeData);
+      getDataOfToNode(toId, tempNodeList, nodeLists, nodes, consumers, producers, dataKeys, connections, nodeData);
     }
     else if (id == toId)
     {
-      getDataOfFromNode(fromId, fromNodeList, nodes, consumers, producers, dataKeys, connections, fromNodeData);
+      getDataOfFromNode(fromId, tempNodeList, nodeLists, nodes, consumers, producers, dataKeys, connections, nodeData);
     }
   }
 }
 
 void SimulationSystem::getDataOfFromNode(int fromId,
-                                         std::vector<int> &fromNodeList,
+                                         std::vector<int> &tempNodeList,
+                                         std::map<int, std::vector<int>> &nodeLists,
                                          std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                          const core::simulation::ObjectMap &consumers,
                                          const core::simulation::ObjectMap &producers,
                                          std::vector<std::string> &dataKeys,
                                          grid::Lines &connections,
-                                         std::map<std::string, std::vector<double> *> &fromNodeData)
+                                         std::map<int, std::map<std::string, std::vector<double> *>> &fromNodeData)
 {
-  if (std::find(fromNodeList.begin(), fromNodeList.end(), fromId) != fromNodeList.end()){
+  if (std::find(tempNodeList.begin(), tempNodeList.end(), fromId) != tempNodeList.end()){
     return;
   } else {
-    fromNodeList.push_back(fromId);
+    tempNodeList.push_back(fromId);
   }
 
   auto fromNode = searchHeatingGridPointById(nodes, fromId);
 
   if (fromNode == nullptr){
+    nodeLists[fromId] = tempNodeList;
+    tempNodeList.clear();
+
     auto consumerIt = consumers.find(std::to_string(fromId));
     auto producerIt = producers.find(std::to_string(fromId));
     if (consumerIt != consumers.end()) {
       for (const auto &key : dataKeys) {
         auto dataIt = consumerIt->second->getData().find(key);
         if (dataIt != consumerIt->second->getData().end()) {
-          fromNodeData[key] = &(dataIt->second);
+          fromNodeData[fromId][key] = &(dataIt->second);
         }
       }
     } else if (producerIt != producers.end()) {
       for (const auto &key : dataKeys) {
         auto dataIt = producerIt->second->getData().find(key);
         if (dataIt != producerIt->second->getData().end()) {
-          fromNodeData[key] = &(dataIt->second);
+          fromNodeData[fromId][key] = &(dataIt->second);
         }
       }
     }
@@ -1362,31 +1390,35 @@ void SimulationSystem::getDataOfFromNode(int fromId,
       int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
 
       if (id == toId) {
-        getDataOfFromNode(fromId, fromNodeList, nodes, consumers, producers, dataKeys, connections, fromNodeData);
+        getDataOfFromNode(fromId, tempNodeList, nodeLists, nodes, consumers, producers, dataKeys, connections, fromNodeData);
       }
     }
   }
 }
 
 void SimulationSystem::getDataOfToNode(int toId,
-                                       std::vector<int> &toNodeList,
+                                       std::vector<int> &tempNodeList,
+                                       std::map<int, std::vector<int>> &nodeLists,
                                        std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                        const core::simulation::ObjectMap &consumers,
                                        const core::simulation::ObjectMap &producers,
                                        std::vector<std::string> &dataKeys,
                                        grid::Lines &connections,
-                                       std::map<std::string, std::vector<double> *> &toNodeData)
+                                       std::map<int, std::map<std::string, std::vector<double> *>> &toNodeData)
 {
-  if (std::find(toNodeList.begin(), toNodeList.end(), toId) != toNodeList.end()){
+  if (std::find(tempNodeList.begin(), tempNodeList.end(), toId) != tempNodeList.end()){
     return;
   } else {
-    toNodeList.push_back(toId);
+    tempNodeList.push_back(toId);
   }
 
   auto toNode = searchHeatingGridPointById(nodes, toId);
 
   if (toNode == nullptr)
   {
+    nodeLists[toId] = tempNodeList;
+    tempNodeList.clear();
+
     auto consumerIt = consumers.find(std::to_string(toId));
     auto producerIt = producers.find(std::to_string(toId));
 
@@ -1397,7 +1429,7 @@ void SimulationSystem::getDataOfToNode(int toId,
         auto dataIt = consumerIt->second->getData().find(key);
         if (dataIt != consumerIt->second->getData().end())
         {
-          toNodeData[key] = &(dataIt->second);
+          toNodeData[toId][key] = &(dataIt->second);
         }
       }
     }
@@ -1408,7 +1440,7 @@ void SimulationSystem::getDataOfToNode(int toId,
         auto dataIt = producerIt->second->getData().find(key);
         if (dataIt != producerIt->second->getData().end())
         {
-          toNodeData[key] = &(dataIt->second);
+          toNodeData[toId][key] = &(dataIt->second);
         }
       }
     }
@@ -1423,7 +1455,7 @@ void SimulationSystem::getDataOfToNode(int toId,
       toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
 
       if (id == fromId) {
-        getDataOfToNode(toId, toNodeList, nodes, consumers, producers, dataKeys, connections, toNodeData);
+        getDataOfToNode(toId, tempNodeList, nodeLists, nodes, consumers, producers, dataKeys, connections, toNodeData);
       }
     }
   }

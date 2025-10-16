@@ -176,37 +176,37 @@ class SimulationSystem final : public core::interface::ISystem {
   std::vector<osg::ref_ptr<grid::Point>> getNodesToInterpolateData();
   void interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes);
   void interpolateDataForNode(int nodeId,
-                              std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+                              std::map<int, std::vector<int>> &nodeLists,
                               std::vector<std::string> &dataKeys,
-                              std::map<std::string, std::vector<double> *> &toNodeData,
-                              std::map<std::string, std::vector<double> *> &fromNodeData,
+                              std::map<int, std::map<std::string, std::vector<double> *>> &nodeData,
                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   void interpolateMissingDataInHeatingGrid();
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,
-                                 std::pair<std::vector<int>, std::vector<int>> &nodeLists,
+                                 std::map<int, std::vector<int>> &nodeLists,
                                  std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                  const core::simulation::ObjectMap &consumers,
                                  const core::simulation::ObjectMap &producers,
                                  std::vector<std::string> &dataKeys,
-                                 std::map<std::string, std::vector<double> *> &toNodeData,
-                                 std::map<std::string, std::vector<double> *> &fromNodeData);
+                                 std::map<int, std::map<std::string, std::vector<double> *>> &nodeData);
   void getDataOfFromNode(int fromId,
-                         std::vector<int> &fromNodeList,
+                         std::vector<int> &tempNodeList,
+                         std::map<int, std::vector<int>> &nodeLists,
                          grid::Points &nodes,
                          const core::simulation::ObjectMap &consumers,
                          const core::simulation::ObjectMap &producers,
                          osg::Node::DescriptionList &dataKeys,
                          grid::Lines &connections,
-                         std::map<std::string, std::vector<double> *> &fromNodeData);
+                         std::map<int, std::map<std::string, std::vector<double> *>> &fromNodeData);
   void getDataOfToNode(int toId,
-                       std::vector<int> &toNodeList,
+                       std::vector<int> &tempNodeList,
+                       std::map<int, std::vector<int>> &nodeLists,
                        grid::Points &nodes,
                        const core::simulation::ObjectMap &consumers,
                        const core::simulation::ObjectMap &producers,
                        osg::Node::DescriptionList &dataKeys,
                        grid::Lines &connections,
-                       std::map<std::string, std::vector<double> *> &toNodeData);
+                       std::map<int, std::map<std::string, std::vector<double> *>> &toNodeData);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
