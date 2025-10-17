@@ -1109,39 +1109,39 @@ void SimulationSystem::initHeatingGridStreams() {
   }
 }
 
-  auto getObjMapByType = [&](core::simulation::ObjectType type, 
-                             std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) -> ObjectMap * {
-    if (type == core::simulation::ObjectType::Consumer)
-      return &sim->Consumers();
-    else if (type == core::simulation::ObjectType::Producer)
-      return &sim->Producers();
-    return nullptr;
-  };
+ObjectMap * getObjMapByType(core::simulation::ObjectType type, 
+                     std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  if (type == core::simulation::ObjectType::Consumer)
+    return &sim->Consumers();
+  else if (type == core::simulation::ObjectType::Producer)
+    return &sim->Producers();
+  return nullptr;
+};
 
-  auto createObjAndAddToMap = [&](core::simulation::ObjectType type, const std::string &name,
-                                  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
-    auto obj =
-        core::simulation::createObject(type, name, {{std::string("value"), {}}});
-    auto map = getObjMapByType(type, sim);
-    if (map == nullptr) return;
-    map->emplace(name, std::move(obj));
-  };
-
-  auto getObjPtr = [&](core::simulation::ObjectType type, const std::string &name,
-                       std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) -> core::simulation::Object * {
-    auto map = getObjMapByType(type, sim);
-    auto it = map->find(name);
-    if (it != map->end()) return it->second.get();
-    createObjAndAddToMap(type, name, sim);
-    return map->at(name).get();
-  };
-
-  auto addDataToMap = [&](core::simulation::ObjectType type, const std::string &name,
-                          const std::string &valName, double value,
+void createObjAndAddToMap(core::simulation::ObjectType type, const std::string &name,
                           std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
-    auto objPtr = getObjPtr(type, name, sim);
-    objPtr->addData(valName, value);
-  };
+  auto obj =
+      core::simulation::createObject(type, name, {{std::string("value"), {}}});
+  auto map = getObjMapByType(type, sim);
+  if (map == nullptr) return;
+  map->emplace(name, std::move(obj));
+};
+
+core::simulation::Object* getObjPtr(core::simulation::ObjectType type, const std::string &name,
+         std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  auto map = getObjMapByType(type, sim);
+  auto it = map->find(name);
+  if (it != map->end()) return it->second.get();
+  createObjAndAddToMap(type, name, sim);
+  return map->at(name).get();
+};
+
+void addDataToMap(core::simulation::ObjectType type, const std::string &name,
+                  const std::string &valName, double value,
+                  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  auto objPtr = getObjPtr(type, name, sim);
+  objPtr->addData(valName, value);
+};
 
 std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateData() {
   std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor;
@@ -1243,12 +1243,26 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
 
   string connectionString;
 
-   for (const auto& node: nodes) {
+  for (const auto& node: nodes) {
+    if (!node) {
+      std::cerr << "Null node encountered, skipping" << std::endl;
+      continue;
+    }
+
+    int id;
+    try {
+      id = std::stoi(node->getName());
+    } catch (const std::invalid_argument& e) {
+      std::cerr << "Invalid node name for conversion: " << node->getName() << std::endl;
+      continue;
+    } catch (const std::out_of_range& e) {
+      std::cerr << "Node name out of range: " << node->getName() << std::endl;
+      continue;
+    }
 
     nodeLists.clear();
     nodeData.clear();
 
-    auto id = std::stoi(node->getName());
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, nodeData);
 
     interpolateDataForNode(id, nodeLists, dataKeys, nodeData, sim);
