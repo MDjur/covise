@@ -89,3 +89,13 @@ endif()
 
 set(CROW_USE_BOOST ON CACHE BOOL "Use Boost.Asio for Crow" FORCE)
 add_subdirectory(crow)
+
+#include(sigslot/cmake/SigSlotUtils.cmake)
+add_library(PalSigslot INTERFACE sigslot/include/sigslot/signal.hpp)
+target_include_directories(PalSigslot INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sigslot/include>
+    $<INSTALL_INTERFACE:include>
+)
+install(TARGETS PalSigslot EXPORT covise-targets)
+covise_export_target(PalSigslot)
+add_library(Pal::Sigslot ALIAS PalSigslot)

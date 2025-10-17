@@ -81,6 +81,9 @@ public:
         NavOther=-1,
         NavNone,
         XForm,
+        Point,
+        PointRotate,
+        PointTranslate,
         Scale,
         Fly,
         Glide,
@@ -183,6 +186,9 @@ public:
     void startFly();
     void doFly();
     void stopFly();
+    void stopPointNav();
+    void doPointNav();
+    void startPointNav();
     void doMouseFly();
     void doMouseXform();
     void doMouseScale();
@@ -355,7 +361,7 @@ private:
     ui::Group *navModes_ = nullptr;
     ui::ButtonGroup *navGroup_ = nullptr;
     ui::Button *noNavButton_=nullptr;
-    ui::Button *xformButton_=nullptr, *scaleButton_=nullptr, *flyButton_=nullptr, *walkButton_=nullptr, *driveButton_=nullptr;
+    ui::Button *xformButton_=nullptr,*pointButton_ = nullptr, *scaleButton_=nullptr, *flyButton_=nullptr, *walkButton_=nullptr, *driveButton_=nullptr;
     ui::Button *xformRotButton_=nullptr, *xformTransButton_=nullptr, *selectButton_=nullptr, *showNameButton_=nullptr;
     ui::Button *selectInteractButton_=nullptr;
     ui::Button *measureButton_=nullptr, *traverseInteractorButton_=nullptr;
