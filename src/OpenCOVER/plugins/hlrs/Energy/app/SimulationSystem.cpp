@@ -1109,6 +1109,40 @@ void SimulationSystem::initHeatingGridStreams() {
   }
 }
 
+  auto getObjMapByType = [&](core::simulation::ObjectType type, 
+                             std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) -> ObjectMap * {
+    if (type == core::simulation::ObjectType::Consumer)
+      return &sim->Consumers();
+    else if (type == core::simulation::ObjectType::Producer)
+      return &sim->Producers();
+    return nullptr;
+  };
+
+  auto createObjAndAddToMap = [&](core::simulation::ObjectType type, const std::string &name,
+                                  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+    auto obj =
+        core::simulation::createObject(type, name, {{std::string("value"), {}}});
+    auto map = getObjMapByType(type, sim);
+    if (map == nullptr) return;
+    map->emplace(name, std::move(obj));
+  };
+
+  auto getObjPtr = [&](core::simulation::ObjectType type, const std::string &name,
+                       std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) -> core::simulation::Object * {
+    auto map = getObjMapByType(type, sim);
+    auto it = map->find(name);
+    if (it != map->end()) return it->second.get();
+    createObjAndAddToMap(type, name, sim);
+    return map->at(name).get();
+  };
+
+  auto addDataToMap = [&](core::simulation::ObjectType type, const std::string &name,
+                          const std::string &valName, double value,
+                          std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+    auto objPtr = getObjPtr(type, name, sim);
+    objPtr->addData(valName, value);
+  };
+
 std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateData() {
   std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor;
 
@@ -1253,37 +1287,6 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
 
   string name = std::to_string(nodeId);
 
-  auto getObjMapByType = [&](core::simulation::ObjectType type) -> ObjectMap * {
-    if (type == core::simulation::ObjectType::Consumer)
-      return &sim->Consumers();
-    else if (type == core::simulation::ObjectType::Producer)
-      return &sim->Producers();
-    return nullptr;
-  };
-
-  auto createObjAndAddToMap = [&](core::simulation::ObjectType type,
-                                  const std::string &name) {
-    auto obj =
-        core::simulation::createObject(type, name, {{std::string("value"), {}}});
-    auto map = getObjMapByType(type);
-    if (map == nullptr) return;
-    map->emplace(name, std::move(obj));
-  };
-
-  auto getObjPtr = [&](core::simulation::ObjectType type, const std::string &name) {
-    auto map = getObjMapByType(type);
-    auto it = map->find(name);
-    if (it != map->end()) return it->second.get();
-    createObjAndAddToMap(type, name);
-    return map->at(name).get();
-  };
-
-  auto addDataToMap = [&](core::simulation::ObjectType type, const std::string &name,
-                          const std::string &valName, double value) {
-    auto objPtr = getObjPtr(type, name);
-    objPtr->addData(valName, value);
-  };
-
   for (const auto& key : dataKeys) {
     int numTimesteps = nodeData.begin()->second[key]->size();
 
@@ -1305,7 +1308,7 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
         }
       }
 
-      addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue);
+      addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue, sim);
     }
   }
 }
@@ -1558,48 +1561,17 @@ void SimulationSystem::readSimulationDataStream(CSVStream &heatingSimStream) {
   double val = 0.0f;
   std::string name(""), valName("");
 
-  auto getObjMapByType = [&](core::simulation::ObjectType type) -> ObjectMap * {
-    if (type == core::simulation::ObjectType::Consumer)
-      return &sim->Consumers();
-    else if (type == core::simulation::ObjectType::Producer)
-      return &sim->Producers();
-    return nullptr;
-  };
-
-  auto createObjAndAddToMap = [&](core::simulation::ObjectType type,
-                                  const std::string &name) {
-    auto obj =
-        core::simulation::createObject(type, name, {{std::string("value"), {}}});
-    auto map = getObjMapByType(type);
-    if (map == nullptr) return;
-    map->emplace(name, std::move(obj));
-  };
-
-  auto getObjPtr = [&](core::simulation::ObjectType type, const std::string &name) {
-    auto map = getObjMapByType(type);
-    auto it = map->find(name);
-    if (it != map->end()) return it->second.get();
-    createObjAndAddToMap(type, name);
-    return map->at(name).get();
-  };
-
-  auto addDataToMap = [&](core::simulation::ObjectType type, const std::string &name,
-                          const std::string &valName, double value) {
-    auto objPtr = getObjPtr(type, name);
-    objPtr->addData(valName, value);
-  };
-
   while (heatingSimStream.readNextRow(row)) {
     for (const auto &col : header) {
       ACCESS_CSV_ROW(row, col, val);
       if (std::regex_search(col, match, consumer_value_split_regex)) {
         name = match[1];
         valName = match[2];
-        addDataToMap(core::simulation::ObjectType::Consumer, name, valName, val);
+        addDataToMap(core::simulation::ObjectType::Consumer, name, valName, val, sim);
       } else if (std::regex_search(col, match, producer_value_split_regex)) {
         name = match[1];
         valName = match[2];
-        addDataToMap(core::simulation::ObjectType::Producer, name, valName, val);
+        addDataToMap(core::simulation::ObjectType::Producer, name, valName, val, sim);
       } else {
         if (val == 0) continue;
         sim->addData(col, val);
