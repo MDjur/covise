@@ -32,6 +32,23 @@ add_executable(
     ${Name} ${TEST_SOURCES} 
 )
 
+# Ensure the test binary can find the project's shared libraries at runtime.
+# This embeds absolute RPATHs pointing to the linux64opt lib directories from
+# the source and build trees so GoogleTest's discovery (which executes the
+# binary) won't fail due to unresolved shared libraries in CI.
+if(UNIX)
+  set(_rpaths
+    "${CMAKE_SOURCE_DIR}/linux64opt/lib"
+    "${CMAKE_BINARY_DIR}/linux64opt/lib"
+  )
+  set_target_properties(${Name} PROPERTIES
+    BUILD_RPATH "${_rpaths}"
+    INSTALL_RPATH "${_rpaths}"
+    BUILD_WITH_INSTALL_RPATH ON
+  )
+endif()
+
+# include directories and linkage
 target_include_directories(${Name} 
     PRIVATE ${CMAKE_SOURCE_DIR}/src/OpenCOVER/plugins/hlrs/Energy 
     PRIVATE ${OPENSCENEGRAPH_INCLUDE_DIRS}
