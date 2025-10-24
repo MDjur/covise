@@ -1311,16 +1311,7 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
       for (const auto& [nodeId, nodeDataMap]: nodeData) {
         auto it = nodeDataMap.find(key);
         if (it == nodeDataMap.end()) continue;
-        double value = (*(it->second))[i];
-        double weightFactor = weightFactors[nodeId];
-        interpolatedValue += value * weightFactor;
-      }
-
-      for (const auto& [id, nodeDataMap] : nodeData) {
-        auto it = nodeDataMap.find(key);
-        if (it != nodeDataMap.end()) {
-          double value = (*(it->second))[i];
-        }
+        interpolatedValue += (*(it->second))[i] * weightFactors[nodeId];
       }
 
       addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue, sim);
