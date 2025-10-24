@@ -98,5 +98,5 @@ struct ParticleField
   int nrpart;
   std::vector<partVec> particlePosition;
   std::vector<partVec> particleVelocity;
-  std::vector<double> particleMass;
+  std::vector<float> particleMass;
 };

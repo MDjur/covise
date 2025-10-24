@@ -1,21 +1,22 @@
-#include "opcua.h"
 #include "opcuaClient.h"
+#include "opcua.h"
+#include "variantAccess.h"
 
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel.h>
+#include <open62541/plugin/log_stdout.h>
+#include <open62541/plugin/pki_default.h>
 #include <open62541/client_subscriptions.h>
 #include <open62541/client.h>
 #include <open62541/common.h>
-#include <open62541/plugin/log_stdout.h>
-#include <open62541/plugin/pki_default.h>
+#include <iostream>
 
-#include <cover/coVRMSController.h>
 #include <cover/coVRPluginSupport.h>
-#include <cover/ui/SelectionList.h>
 #include <cover/ui/VectorEditField.h>
+#include <cover/coVRMSController.h>
+#include <cover/ui/SelectionList.h>
 
 #include <algorithm>
-#include <iostream>
 
 using namespace opencover::opcua;
 using namespace opencover::opcua::detail;
@@ -332,6 +333,12 @@ void Client::registerNode(const NodeRequest &nodeRequest)
 
 }
 
+void Client::queueUnregisterNode(size_t id)
+{
+    Guard g(m_mutex);
+    m_nodesToUnregister.push_back(id);
+}
+
 void Client::unregisterNode(size_t id)
 {
     for(auto &node : m_availableNodes)
@@ -393,65 +400,17 @@ UA_Variant_ptr Client::getValue(ClientNode *node)
     return UA_Variant_ptr();
 }
 
-std::unique_ptr<opencover::dataclient::detail::MultiDimensionalArrayBase> Client::getArrayImpl(std::type_index type, const std::string &name)
+double Client::getNumericScalar(const ObserverHandle &handle, UA_DateTime *timestamp)
 {
-    auto node = findNode(name);
-    if(!node)
-        return nullptr;
-    return getArrayImpl(type, node);
-
+    return getNumericScalar(handle.m_node->name, timestamp);
 }
 
-std::unique_ptr<opencover::dataclient::detail::MultiDimensionalArrayBase> Client::getArrayImpl(std::type_index type, ClientNode* node)
+double Client::getNumericScalar(const std::string &nodeName, UA_DateTime *timestamp)
 {
-    if(!node)
-        return nullptr;
-    std::lock_guard<std::mutex> g(m_mutex);
-    auto variant = getValue(node);
-
-    if(!variant.get())
-        return nullptr;
-    for_<8>([this, &node, &variant, &type] (auto i) {      
-        typedef typename detail::Type<numericalTypes[i.value]>::type T;
-        if(node->type == numericalTypes[i.value])
-        {
-            if(type != std::type_index(typeid(T)))
-            {
-                std::cerr << "opcua type mismatch " << node->type << " requested " << type.name() << std::endl;
-                return;
-            }
-            auto array = std::make_unique<dataclient::MultiDimensionalArray<T>>();
-            array->timestamp = variant.timestamp;
-            auto size = std::max(size_t(1), variant->arrayLength);
-            array->dimensions.push_back(size);
-            array->data.resize(size);
-            std::memcpy(array->data.data(), variant->data, size * sizeof(T));
-            if(variant.get()->arrayDimensionsSize > 0)
-            {
-                array->dimensions.resize(variant->arrayDimensionsSize);
-                for (size_t i = 0; i < variant.get()->arrayDimensionsSize; i++)
-                {
-                    array->dimensions.push_back(variant->arrayDimensions[i]);
-                }
-            }
-        }
-    });
-    return nullptr;
+    return getNumericScalar(findNode(nodeName), timestamp);
 }
 
-
-double Client::getNumericScalar(const opencover::dataclient::ObserverHandle &handle, double *timestamp)
-{
-    return 0;
-}
-
-double Client::getNumericScalar(const std::string &nodeName, double *timestamp)
-{
-    return 0;
-    // return getNumericScalar(findNode(nodeName), timestamp);
-}
-
-double Client::getNumericScalar(ClientNode *node, double *timestamp)
+double Client::getNumericScalar(ClientNode *node, UA_DateTime *timestamp)
 {
     double retval = 0;
     if(!node)
@@ -461,12 +420,11 @@ double Client::getNumericScalar(ClientNode *node, double *timestamp)
         typedef typename detail::Type<numericalTypes[i.value]>::type T;
         if(node->type == numericalTypes[i.value])
         {
-            auto array = getArrayImpl(std::type_index(typeid(T)), node);
-            auto v = dynamic_cast<dataclient::MultiDimensionalArray<T>*>(array.get());
-            if(v->isScalar()){
+            auto v = getArray<T>(node);
+            if(v.isScalar()){
                 if(timestamp)
-                    *timestamp = v->timestamp;
-                retval = static_cast<double>(v->data[0]);
+                    *timestamp = v.timestamp;
+                retval = (double)v.data[0];
             }
         }
     });
@@ -534,10 +492,10 @@ bool Client::connectCommunication()
         return true;
 }
 
-opencover::dataclient::ObserverHandle Client::observeNode(const std::string &name)
+ObserverHandle Client::observeNode(const std::string &name)
 {
     Guard g(m_mutex);
-    dataclient::ObserverHandle id(m_requestId, this);
+    ObserverHandle id(m_requestId, this);
     auto node = findNode(name);
     if(!node)
     {
@@ -546,8 +504,8 @@ opencover::dataclient::ObserverHandle Client::observeNode(const std::string &nam
         return id;
 
     }
-    m_nodesToObserve.push_back(NodeRequest{node, m_requestId, getClientReference(id)});
-    // id.m_node = node;
+    m_nodesToObserve.push_back(NodeRequest{node, m_requestId, &id.m_deleter->m_client});
+    id.m_node = node;
     ++m_requestId;
     return id;
 }
@@ -612,36 +570,59 @@ bool Client::isConnected() const
     return b; 
 }
 
-std::vector<std::string> Client::getNodesWith(std::type_index type, bool isScalar) const
+Client::StatusChange Client::statusChanged(void* caller)
 {
-    std::vector<std::string> vec{NoNodeName};
-    for(const auto &node : m_availableNodes)
+    Guard g(m_mutex);
+    StatusChange retval = Unchanged;
+    if(msController->isMaster())
     {
-        if(node.isScalar() != isScalar)
-            continue;
-        for_<8>([this, &node, &type, &vec] (auto i) {
-            typedef typename detail::Type<numericalTypes[i.value]>::type T;
-            if(type == std::type_index(typeid(T)))
-                vec.push_back(node.name);
-        });
-    }
-    return msController->syncVector(vec); 
+        auto obs = m_statusObservers.find(caller);
+        if(obs == m_statusObservers.end())
+        {
+            obs = m_statusObservers.insert(obs, std::make_pair(caller, false));
+        }
+        if(!obs->second)
+        {
+            obs->second = true;
+            retval = client != nullptr ? Connected : Disconnected;
+        }
+    } 
+    msController->syncData(&retval, sizeof(StatusChange));
+    return retval;
 }
 
-std::vector<std::string> Client::getNodesWith(bool isArithmetic, bool isScalar) const
+std::vector<std::string> Client::findAvailableNodesWith(const std::function<bool(const ClientNode &)> &compare) const
 {
     std::vector<std::string> vec{NoNodeName};
     for(const auto &node : m_availableNodes)
     {
-        if(node.isScalar() != isScalar)
-            continue;
-        for_<8>([this, &node, isArithmetic, &vec] (auto i) {
-            typedef typename detail::Type<numericalTypes[i.value]>::type T;
-            if(std::is_arithmetic<T>::value == isArithmetic)
-                vec.push_back(node.name);
-        });
+        if(compare(node))
+            vec.push_back(node.name);
     }
-    return msController->syncVector(vec); 
+    return msController->syncVector(vec);
 }
+
+std::vector<std::string> Client::allAvailableScalars() const
+{
+    return findAvailableNodesWith([](const ClientNode &n){return n.isScalar();});
+}
+
+std::vector<std::string> Client::availableNumericalScalars() const
+{
+    return findAvailableNodesWith([](const ClientNode &n){return n.isScalar() && std::find(numericalTypes.begin(), numericalTypes.end(), n.type) != numericalTypes.end() ;});
+}
+
+std::vector<std::string> Client::allAvailableArrays() const
+{
+    return findAvailableNodesWith([](const ClientNode &n){return !n.isScalar();});
+
+
+}
+std::vector<std::string> Client::availableNumericalArrays() const
+{
+    return findAvailableNodesWith([](const ClientNode &n){return !n.isScalar() && std::find(numericalTypes.begin(), numericalTypes.end(), n.type) != numericalTypes.end() ;});
+}
+
+
 
 

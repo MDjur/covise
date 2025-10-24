@@ -19,7 +19,7 @@
 #include <cover/coVRNavigationManager.h>
 #include <cover/coVRPlugin.h>
 #include <OpenThreads/Thread>
-#include <cover/input/deviceDiscovery.h>
+
 
 
 #define MAX_CALLSIGN_LEN        8
@@ -59,14 +59,13 @@ class PLUGINEXPORT TacxFTMS : public opencover::coVRPlugin, public opencover::co
 public:
     TacxFTMS();
     ~TacxFTMS();
-    bool update() override;
-    void preFrame() override;
-    float getAngle() const;
-    float getBrakeForce() const;
-    float getAccelleration() const;
-    float getSpeed() const;
+    bool update();
+    float getAngle();
+    float getBrakeForce();
+    float getAccelleration();
+    float getSpeed();
     volatile bool running;
-    void run() override;
+    virtual void run();
     bool doStop;
 
 private:
@@ -74,25 +73,24 @@ private:
     float stepSizeDown;
     const float BrakeThreshold = 1.0;
     bool braking = true;
-    bool init() override;
-    void addDevice(const opencover::deviceInfo *dev);
+    bool init();
     float getYAcceleration();
     float getGrade();
     float resistance;
-    osg::Matrix getMatrix() const;
+    osg::Matrix getMatrix();
     osg::Matrix TransformMat;
     osg::Matrix TacxFTMSPos;
-    void setEnabled(bool) override;
+    virtual void setEnabled(bool);
     void updateThread();
-    UDPComm* udpNeo; 
+    UDPComm* udpNeo;
     UDPComm* udpAlpine;
-    UDPComm* udpListen; // for listening to all devices
     FTMSBikeData ftmsData;
     FTMSControlData ftmsControl;
     AlpineData alpineData;
     int ret;
     OpenThreads::Mutex mutex;
     float wheelBase = 0.97;
+    void Initialize();
     void sendIndoorBikeSimulationParameters();
 };
 #endif /* TacxFTMSPlugin_H */

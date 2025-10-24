@@ -1,8 +1,7 @@
 #include "MathExpressions.h"
-#include <boost/algorithm/string.hpp>
-#include <cassert>
 #include <exprtk.hpp>
-#include <iostream>
+#include <cassert>
+#include <boost/algorithm/string.hpp>
 
 bool istReserved(const std::string& symbol)
 {
@@ -16,7 +15,7 @@ std::vector<std::string> getSymbols(const std::string &expression_string)
    return symbols;
 }
 
-MathExpressionObserver::MathExpressionObserver(opencover::dataclient::Client *client)
+MathExpressionObserver::MathExpressionObserver(opencover::opcua::Client *client)
 : m_client(client){}
 
 MathExpressionObserver::ObserverHandle::~ObserverHandle()
@@ -46,7 +45,7 @@ MathExpressionObserver::ObserverHandle::ptr MathExpressionObserver::observe(cons
                         [&s](const std::string &node) {
                             return boost::iequals(s, node);
                         });
-        if(*serverSymbol == opencover::dataclient::NoNodeName)
+        if(*serverSymbol == opencover::opcua::NoNodeName)
             return nullptr;
 
         if(serverSymbol == availableNodes.end())

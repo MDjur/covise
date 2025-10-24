@@ -17,8 +17,6 @@
 #ifndef COMMON_H_
 #define COMMON_H_
 
-#include <string>
-
 //"\e[31;4m"
 const char cout_red[] = "\x1b[31m"; // errors and important warnings
 const char cout_green[] = "\x1b[32m";
@@ -39,12 +37,13 @@ struct params
 {
     bool b_load_2d;
     bool b_use_string;
-    std::string sections_string;
+    string sections_string;
 
     int param_vx, param_vy, param_vz;
 
     int param_f[4];
 };
 
+string int2str(int n);
 
 #endif /* COMMON_H_ */

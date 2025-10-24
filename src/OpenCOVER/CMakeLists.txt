@@ -7,6 +7,7 @@
 #COVISE_UNFINISHED()
 
 PROJECT(OpenCOVER C CXX)
+# this is already set in the top most CMakeLists.txt set (CMAKE_CXX_STANDARD 11)
 set(COVISE_BUILDING_COVER TRUE)
 
 option(COVER_ENABLE_VOIP "Enable VoIP linphone client plugin" OFF)
@@ -125,7 +126,6 @@ if (COVISE_USE_VIRVO)
 endif()
 ADD_SUBDIRECTORY(OpenVRUI)
 ADD_SUBDIRECTORY(PluginUtil)
-ADD_SUBDIRECTORY(DataClient)
 ADD_SUBDIRECTORY(OpcUaClient)
 ADD_SUBDIRECTORY(HTTPClient)
 ADD_SUBDIRECTORY(cover)

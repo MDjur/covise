@@ -103,12 +103,6 @@ namespace opencover
 	    }
     }
     toAdd.clear();
-    auto firstNew = devices.end() - numToAdd;
-    for (int i = 0; i < numToAdd; i++)
-    {
-        deviceAdded(*firstNew);
-        ++firstNew;
-    }
     }
     void deviceDiscovery::run()
     {

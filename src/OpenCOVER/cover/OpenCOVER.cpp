@@ -1535,7 +1535,7 @@ OpenCOVER::requestQuit()
 {
     setExitFlag(true);
     bool terminateOnCoverQuit = coCoviseConfig::isOn("COVER.TerminateCoviseOnQuit", false);
-    if (getenv("COVER_TERMINATE_SESSION"))
+    if (getenv("COVISE_TERMINATE_ON_QUIT"))
     {
         terminateOnCoverQuit = true;
     }

@@ -1,8 +1,9 @@
 #ifndef  TOOLMACHNINE_MATH_EXPRESSIONS_H
 #define TOOLMACHNINE_MATH_EXPRESSIONS_H
 
+#include <OpcUaClient/opcua.h>
 #include <exprtk.hpp>
-#include <DataClient/DataClient.h>
+
 class MathExpressionObserver{
 public:
     struct ObserverHandle{
@@ -16,14 +17,14 @@ public:
         double value() const {return m_expression.value();}
     };
     
-    MathExpressionObserver(opencover::dataclient::Client *client);
+    MathExpressionObserver(opencover::opcua::Client *client);
     [[nodiscard]] ObserverHandle::ptr observe(const std::string &expression);
     void update(); //call before using ObserverHandle::value
 private:
-    opencover::dataclient::Client *m_client;
+    opencover::opcua::Client *m_client;
     struct RefCountObserveHandle{
         int count = 0;
-        opencover::dataclient::ObserverHandle handle;
+        opencover::opcua::ObserverHandle handle;
         double value = 0;
     };
     std::map<std::string, RefCountObserveHandle> m_opcuaHandles;

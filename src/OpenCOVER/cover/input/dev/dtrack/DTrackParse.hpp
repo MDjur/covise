@@ -1,8 +1,8 @@
-/* DTrackSDK in C++: DTrackParse.hpp
+/* DTrackParse: C++ header file
  *
- * Functions for parsing ASCII data.
+ * Functions for processing data
  *
- * Copyright (c) 2007-2023 Advanced Realtime Tracking GmbH & Co. KG
+ * Copyright 2007-2021, Advanced Realtime Tracking GmbH & Co. KG
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,15 +26,17 @@
  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * Version v2.7.0
+ * 
  */
 
-#ifndef _ART_DTRACKSDK_PARSE_HPP_
-#define _ART_DTRACKSDK_PARSE_HPP_
+#ifndef _ART_DTRACKPARSE_H_
+#define _ART_DTRACKPARSE_H_
 
 #include <string>
 
-namespace DTrackSDK_Parse
-{
+namespace DTrackSDK_Parse {
 
 /**
  *	\brief	Search next line in buffer
@@ -112,17 +114,14 @@ char* string_get_word(char* str, std::string& w);
 char* string_get_quoted_text(char* str, std::string& qt);
 
 /**
- * \brief Compare string regarding DTrack2 parameter rules.
+ * 	\brief	Compare strings regarding DTrack2 parameter rules
  *
- *	@param[in] str string
- * @param[in] pos position in string to start comparison
- *	@param[in] par parameter string
- *	@return        position in string behind parameter; std::string::npos in case of error
+ *	@param 	str		string
+ *	@param 	p		parameter string
+ *	@return pointer behind parameter in str; NULL in case of error
  */
-size_t string_cmp_parameter( const std::string& str, size_t pos, const std::string& par );
+char* string_cmp_parameter(char* str, const char* p);
 
+}
 
-}  // namespace DTrackSDK_Parse
-
-#endif  // _ART_DTRACKSDK_PARSE_HPP_
-
+#endif /* _ART_DTRACKPARSE_H_ */

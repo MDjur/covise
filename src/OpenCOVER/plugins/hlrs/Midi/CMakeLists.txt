@@ -2,9 +2,6 @@ using(MIDIFILE)
 using(SDL2)
 using(FFTW)
 using(VRML)
-IF(WIN32)
-  message("noAlsa")
-ENDIF(WIN32)
 #using(OPEN62541)
 #USE_MIDIFILE()
 #    MESSAGE(${MIDIFILE_INCLUDE_DIR})
@@ -14,6 +11,7 @@ SET(HEADERS
 )
 SET(SOURCES
   midiPlugin.cpp
+  
 )
 cover_add_plugin(Midi)
 IF(WIN32)

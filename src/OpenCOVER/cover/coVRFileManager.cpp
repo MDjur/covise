@@ -692,37 +692,25 @@ osg::Texture2D *coVRFileManager::loadTexture(const char *texture)
 const char *coVRFileManager::buildFileName(const char *texture)
 {
     const char *name = getName(texture);
-    if (name)
-    {
-        return name;
-    }
-
-    // If caller already provided an extension (e.g. .png/.jpg/.rgb) and a bare filename (no path),
-    // first try share/covise/icons/texture/<filename>
-    std::string look = coCoviseConfig::getEntry("COVER.LookAndFeel");
-    char *fn = new char[strlen(texture) + strlen(look.c_str()) + 50];
-    if (!look.empty())
-    {
-        sprintf(fn, "share/covise/icons/%s/%s", look.c_str(), texture);
-        name = getName(fn);
-        if (!name)
-        {
-            strcat(fn, ".rgb");
-            name = getName(fn);
-        }
-    }
-
+    std::string look;
     if (name == NULL)
     {
-        sprintf(fn, "share/covise/icons/%s", texture);
-        name = getName(fn);
-        if (!name)
+        look = coCoviseConfig::getEntry("COVER.LookAndFeel");
+        if (!look.empty())
         {
-            strcat(fn, ".rgb");
+            char *fn = new char[strlen(texture) + strlen(look.c_str()) + 50];
+            sprintf(fn, "share/covise/icons/%s/%s.rgb", look.c_str(), texture);
             name = getName(fn);
+            delete[] fn;
         }
     }
-    delete[] fn;
+    if (name == NULL)
+    {
+        char *fn = new char[strlen(texture) + 50];
+        sprintf(fn, "share/covise/icons/%s.rgb", texture);
+        name = getName(fn);
+        delete[] fn;
+    }
 
     return name;
 }
@@ -1667,7 +1655,6 @@ std::string coVRFileManager::getFilterList()
     extensions += "*.dae;";
     extensions += "*.md2;";
     extensions += "*.geo;";
-    extensions += "*.bvh;";
     extensions += "*";
 
     return extensions;

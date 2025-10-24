@@ -279,26 +279,6 @@
       ]
     },
     {
-      "description": "Airflow around a wind turbine",
-      "headline": "FLOWER",
-      "id": 7,
-      "image": "FLOWER.png",
-      "launch": [
-        {
-          "args": [
-            "-e",
-            "/data/iag/windpark_gagnon/FLOWer_Beispiel_MERIDIONAL/workflows/tracer_cluster.vsl"
-          ],
-          "program": "vistle"
-        }
-      ],
-      "tags": [
-        "energy",
-        "meridional",
-        "cfd"
-      ]
-    },
-    {
       "description": "With the topographical conditions of the traditional power plant and the strong support of the local community, Forbach offers ideal framework conditions for expanding the site. The project is intended to exemplify sustainable action in every respect. The underground construction method minimizes the impact on nature and the population during the construction phase. To compensate for the few remaining effects, extensive measures have already been implemented, such as relocating native lizards for species conservation. From planning to operation, the project is accompanied by environmental planning offices and nature conservation experts. The project includes the realization of an underground cavern storage facility and a cavern power plant. The existing machinery, some of which is up to 100 years old, will be decommissioned and replaced with new, more efficient units. Together with the existing equalization basin, these components will form the new lower stage. The Schwarzenbach Dam serves as the upper reservoir.",
       "headline": "Forbach",
       "id": 12,
@@ -549,7 +529,7 @@
       "description": "",
       "headline": "Magnetgetriebe",
       "id": 74,
-      "image": "Magnetgetriebe.png",
+      "image": "",
       "launch": [
         {
           "args": [
@@ -560,7 +540,7 @@
         }
       ],
       "tags": [
-        "electromagnetics"
+        "broken"
       ]
     },
     {
@@ -840,14 +820,14 @@
   ],
   "RECOM": [
     {
-      "description": "combustion in a boiler of a cole power plant",
+      "description": "Combustion chamber in a cole power plant",
       "headline": "HKW2 Altbach",
       "id": 1,
       "image": "HKW2Altbach.png",
       "launch": [
         {
           "args": [
-            "/data/recom/HKW2-SM5-SE-V3a_und_SM4/Cavepraesentation-SM4_und_SM5-SE-V3a.wrl"
+            "data/recom/SWB/Praesentation/Cavepraesentation-SWBremen.wrl"
           ],
           "program": "opencover"
         }
@@ -880,7 +860,7 @@
       ]
     },
     {
-      "description": "Combustion in a district heating plant burning gas",
+      "description": "Combustion chamber in a cole power plant",
       "headline": "SWA Augsburg",
       "id": 3,
       "image": "SWAAugsburg.png",
@@ -892,6 +872,25 @@
           "program": "opencover"
         }
       ],
+      "tags": [
+        "cfd",
+        "noise",
+        "machinery",
+        "RECOM"
+      ]
+    },
+    {
+      "description": "toDO",
+      "headline": "SWA Augsburg (Variante)",
+      "id": 4,
+      "image": "toDO",
+      "launch": [
+        {
+          "args": [],
+          "program": "run_swa_var"
+        }
+      ],
+      "note": "shell function, see hlrsDemo",
       "tags": [
         "cfd",
         "noise",
@@ -912,7 +911,7 @@
             "-e",
             "/data/StuttgartForecast/feinstaub_stadtmodell_LGL_tracerNewVistle.vsl"
           ],
-          "program": "vistle"
+          "program": "Vistle"
         },
         {
           "args": [
@@ -1030,62 +1029,6 @@
       ],
       "tags": [
         "urban planning"
-      ]
-    }
-  ],
-  "Utility": [
-    {
-      "description": "Kill all covise and vistle proocesses and their shm",
-      "headline": "Clean",
-      "id": 6,
-      "image": "Clean.png",
-      "launch": [
-        {
-          "args": [
-            "-9",
-            "covise"
-          ],
-          "program": "killall"
-        },
-        {
-          "args": [
-            "-9",
-            "vistle"
-          ],
-          "program": "killall"
-        },
-        {
-          "args": [
-            "-9",
-            "opencover"
-          ],
-          "program": "killall"
-        },
-        {
-          "args": [
-            "-9",
-            "COVER"
-          ],
-          "program": "killall"
-        },
-        {
-          "args": [
-            "-9",
-            "sumo"
-          ],
-          "program": "killall"
-        },
-        {
-          "args": [],
-          "program": "clean_vistle"
-        },
-        {
-          "args": [],
-          "program": "clean_covise"
-        }
-      ],
-      "tags": [
-        "utility"
       ]
     }
   ],

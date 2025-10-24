@@ -17,9 +17,8 @@
 #include <osg/MatrixTransform>
 #include <osg/Observer>
 #include <PluginUtil/colors/ColorBar.h>
-#include <DataClient/DataClient.h>
-#include <DataClient/MultiDimensionalArray.h>
-
+#include <OpcUaClient/opcua.h>
+#include <OpcUaClient/variantAccess.h>
 
 #include <exprtk.hpp>
 
@@ -35,13 +34,13 @@ public:
     friend SelfDeletingTool;
     Tool(opencover::ui::Group* group, opencover::config::File &file, osg::MatrixTransform *toolHeadNode, osg::MatrixTransform *tableNode);
     virtual ~Tool() = default;
-    void update(const opencover::dataclient::MultiDimensionalArray<double> &data);
+    void update(const opencover::opcua::MultiDimensionalArray<double> &data);
     void update();
     void pause(bool state);
     const std::vector<UpdateValues> &getUpdateValues();
     void frameOver();
 protected:
-    virtual void updateGeo(bool paused, const opencover::dataclient::MultiDimensionalArray<double> &data) = 0;
+    virtual void updateGeo(bool paused, const opencover::opcua::MultiDimensionalArray<double> &data) = 0;
     virtual void clear() = 0;
     virtual void applyShader(const opencover::ColorMap& map) = 0;
     virtual std::vector<std::string> getAttributes() = 0;
@@ -55,7 +54,7 @@ protected:
     std::unique_ptr<opencover::ui::SliderConfigValue> m_numSectionsSlider;
     opencover::CoverColorBar *m_colorMapSelector;
 
-    opencover::dataclient::Client *m_client;
+    opencover::opcua::Client *m_client;
     bool m_paused = false;
 private:
     void observeCustomAttributes();

@@ -1,6 +1,10 @@
 USING(Pthreads)
 using(VRML)
 
+if(APPLE)
+   return()
+endif()
+
 SET(HEADERS
   TacxFTMS.h
 )

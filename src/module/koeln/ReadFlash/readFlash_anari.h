@@ -41,7 +41,6 @@ struct sim_info_t
 #ifdef _MSC_VER
 #define PACK(...) __pragma( pack(push, 1) ) __VA_ARGS__  __pragma( pack(pop))
 #endif
-
 // Data structure of grid
 struct grid_t
 {
@@ -100,8 +99,6 @@ struct particle_t
   
   int ind_mass;
 
-  int ind_tag;
-
   // Number of particles and properties
   int npart;
   int nprop;
@@ -142,131 +139,6 @@ inline void read_sim_info(sim_info_t &dest, H5::H5File const &file)
   H5::DataSet dataset = file.openDataSet("sim info");
 
   dataset.read(&dest, ct);
-}
-
-
-struct sim_real_t
-{
-  char name[MAX_STRING_LENGTH];
-  double value;
-};
-
-struct sim_bool_t
-{
-  char name[MAX_STRING_LENGTH];
-  int value;
-};
-
-struct sim_ints_t
-{
-  char name[MAX_STRING_LENGTH];
-  int value;
-};
-
-struct set_params_t
-{
-  int nr_integers = 0;
-  int nr_reals = 0;
-  int nr_booleans = 0;
-  const char* name_real;
-  const char* name_bool;
-  const char* name_ints;
-  std::vector<sim_real_t> dset_real;
-  std::vector<sim_ints_t> dset_ints;
-  std::vector<sim_bool_t> dset_bool;
-};
-
-// Read Runtime Parameters and Scalars
-inline void read_params(
-  set_params_t &parameters,
-  H5::H5File const &file
-)
-{
-  // Initialize the dataset and dataspace
-  H5::DataSet dataset;
-  H5::DataSpace dataspace;
-  H5::StrType str80(H5::PredType::C_S1, 79);
-
-  // Reals
-  // Open dataset
-  dataset = file.openDataSet(parameters.name_real);
-  // Get dataspace
-  dataspace = dataset.getSpace();
-  // Get number of entries
-  int npoints_r = dataspace.getSimpleExtentNpoints();
-  // Create compound type of
-  // name and value
-  H5::CompType ct_r(sizeof(sim_real_t));
-  ct_r.insertMember("name", 0, str80);
-  ct_r.insertMember("value", 80, H5::PredType::NATIVE_DOUBLE);
-  // Reshape vector to confrom to number of entries
-  parameters.dset_real.resize(npoints_r);
-  parameters.nr_reals = npoints_r;
-  // Read dataset into data array
-  dataset.read(parameters.dset_real.data(), ct_r, dataspace, dataspace);
-
-  /*
-  std::cout << npoints_r << "\n\n";
-  for (int i=0; i < npoints_r; ++i)
-  {
-    std::cout << i << "\t\t|" << parameters.dset_real[i].name << "|" << parameters.dset_real[i].value << "\n";
-  }
-  */
-
-  // Integers
-  // Create compound type of
-  // name and value
-  H5::CompType ct_i(sizeof(sim_ints_t));
-  ct_i.insertMember("name", 0, str80);
-  ct_i.insertMember("value", 80, H5::PredType::NATIVE_INT32);
-
-  // Open dataset
-  dataset = file.openDataSet(parameters.name_ints);
-  // Get dataspace
-  dataspace = dataset.getSpace();
-  // Get number of entries
-  int npoints_i = dataspace.getSimpleExtentNpoints();
-  // Reshape vector to confrom to number of entries
-  parameters.dset_ints.resize(npoints_i);
-  parameters.nr_integers = npoints_i;
-  // Read dataset into data array
-  dataset.read(parameters.dset_ints.data(), ct_i);
-
-  /*
-  std::cout << npoints_i << "\n\n";
-  for (int i=0; i < npoints_i; ++i)
-  {
-    std::cout << i << "\t\t|" << parameters.dset_ints[i].name << "|" << parameters.dset_ints[i].value << "\n";
-  }
-  */
-
-  // Booleans
-  // Create compound type of
-  // name and value
-  H5::CompType ct_b(sizeof(sim_bool_t));
-  ct_b.insertMember("name", 0, str80);
-  ct_b.insertMember("value", 80, H5::PredType::NATIVE_INT32);
-
-  // Open dataset
-  dataset = file.openDataSet(parameters.name_bool);
-  // Get dataspace
-  dataspace = dataset.getSpace();
-  // Get number of entries
-  int npoints_b = dataspace.getSimpleExtentNpoints();
-  // Reshape vector to confrom to number of entries
-  parameters.dset_bool.resize(npoints_b);
-  parameters.nr_booleans = npoints_b;
-  // Read dataset into data array
-  dataset.read(parameters.dset_bool.data(), ct_b);
-
-  /*
-  std::cout << npoints_b << "\n\n";
-  for (int i=0; i < npoints_b; ++i)
-  {
-    std::cout << i << "\t\t|" << parameters.dset_bool[i].name << "|" << parameters.dset_bool[i].value << "\n";
-  }
-  */
-  
 }
 
 // Read grid data
@@ -419,8 +291,7 @@ inline void read_grid(grid_t &dest, H5::H5File const &file)
   }
 }
 
-// Read particle data
-inline void read_sinks(particle_t &part, H5::H5File const &file, int npart=-1)
+inline void read_sinks(particle_t &part, H5::H5File const &file)
 {
   // Initialize the dataset and dataspace
   H5::DataSet dataset;
@@ -447,36 +318,27 @@ inline void read_sinks(particle_t &part, H5::H5File const &file, int npart=-1)
     part.ind_vely = 4;
     part.ind_velz = 5;
     part.ind_mass = 59;
-    part.ind_tag = 84;
 
     // Loop over all possible number of particles
     // Particles are always allocated in chucks of 100
-    if (npart <= 0)
+    for (size_t i=1; i < 100; ++i)
     {
-      for (size_t i=1; i < 100; ++i)
+      // Determine number of particles in current iteration step
+      part.npart = 100 * i;
+      // Check if we found the correct size
+      // Fraction of total number of entries to number of particles
+      // should result in number of properties
+      // First condition checks that we are in the right ball park
+      // second condition check that the fraction is round.
+      if ((tot_entries / (100 * i) < 150) && (tot_entries % (100 * i) == 0))
       {
-        // Determine number of particles in current iteration step
-        part.npart = 100 * i;
-        // Check if we found the correct size
-        // Fraction of total number of entries to number of particles
-        // should result in number of properties
-        // First condition checks that we are in the right ball park
-        // second condition check that the fraction is round.
-        if ((tot_entries / (100 * i) < 150) && (tot_entries % (100 * i) == 0))
-        {
-          // Determine number of properties
-          // and exit loop
-          part.nprop = tot_entries / (100 * i);
-          break;
-        }
+        // Determine number of properties
+        // and exit loop
+        part.nprop = tot_entries / (100 * i);
+        break;
       }
-    } else
-    {
-      part.npart = npart;
-      part.nprop = tot_entries / part.npart;
     }
   }
-
   std::cout << "Number of particles: " << part.npart << "\n";
   std::cout << "Number of properties: " << part.nprop << "\n";
 }
@@ -517,17 +379,17 @@ inline ParticleField toParticleField(particle_t particles)
   // Count all particles that exist
   int cnt_part = 0;
 
-  // Loop over all particles
   for (size_t part_ind=0; part_ind < particles.npart; ++part_ind)
   {
-    // Check if a particle "exist" which means that it has a tag
     bool particle_exist = false;
-    if (particles.data[part_ind * particles.nprop + particles.ind_tag] > 0.5)
+    for (size_t prop_ind=0; prop_ind < particles.nprop; ++prop_ind)
     {
-      particle_exist = true;
+      if (particles.data[part_ind * particles.nprop + prop_ind] != 0.0)
+      {
+        particle_exist = true;
+        break;
+      }
     }
-
-    // Retrieve particle properties and store in partiles.data
     if (particle_exist)
     {
       partVec position;
@@ -545,19 +407,16 @@ inline ParticleField toParticleField(particle_t particles)
 
       // Store data of current particle
       result.particlePosition.push_back(position);
-      result.particleVelocity.push_back(velocity);
+      result.particlePosition.push_back(position);
       result.particleMass.push_back(particles.data[part_ind * particles.nprop + particles.ind_mass]);
 
       // Increase counter of active particles
       cnt_part++;
     }
+
+    // Store total number of particles
+    result.nrpart = cnt_part;
   }
-
-  // Store total number of particles
-  result.nrpart = cnt_part;
-  
-  std::cout << "Active nr. of particles: " << cnt_part << "\n";
-
   return result;
 }
 
@@ -575,14 +434,11 @@ inline AMRField toAMRField(
   int common_ref = 1000;
   int max_ref = 0;
 
-  // Loop over all blocks
   for (size_t i = 0; i < var.global_num_blocks; ++i) {
-    // Check if we are at a leaf node
     if (grid.node_type[i] != 1) {
       in_reg[i] = false;
       continue;
     }
-    // Check if we are in region of interest
     if (grid.bnd_box[i].max.x < reg_roi[0] || grid.bnd_box[i].min.x > reg_roi[1]) {
       in_reg[i] = false;
       continue;
@@ -645,7 +501,7 @@ inline AMRField toAMRField(
     max_ref = usr_max_level;
   }
 
-  // "Replace" parent blocks by children
+  // Replacement parent blocks by children
   for (size_t ri = 0; ri < max_ref - common_ref; ++ri) {
     for (size_t i = 0; i < var.global_num_blocks; ++i) {
       if (!in_reg[i]) continue;
@@ -681,10 +537,10 @@ inline AMRField toAMRField(
 
   // Length of the sides of the bounding box
   double len_total[3] = {
+    // var.global_num_blocks-1
     grid.bnd_box[bid_last].max.x - grid.bnd_box[bid_first].min.x,
     grid.bnd_box[bid_last].max.y - grid.bnd_box[bid_first].min.y,
-    grid.bnd_box[bid_last].max.z - grid.bnd_box[bid_first].min.z
-  };
+    grid.bnd_box[bid_last].max.z - grid.bnd_box[bid_first].min.z};
 
   std::cout << "Size of simulation domain:\n";
   std::cout << "x\t\ty\t\tz\n";
@@ -729,8 +585,6 @@ inline AMRField toAMRField(
   vox[1] = static_cast<int>(round(len_total[1] / len[1]));
   vox[2] = static_cast<int>(round(len_total[2] / len[2]));
 
-  // Determine the pre-factor to get the correct smallest cell size
-  // when higher refinement is requested than is available in region
   int corr_fac = 1;
   if (max_level < max_ref)
   {
@@ -748,6 +602,9 @@ inline AMRField toAMRField(
   result.domainSize[1] = vox[1] * corr_fac;
   result.domainSize[2] = vox[2] * corr_fac;
 
+
+
+
   std::cout << vox[0]*corr_fac << ' ' << vox[1]*corr_fac << ' ' << vox[2]*corr_fac << '\n';
 
   // Set initial limits of dataset
@@ -755,7 +612,6 @@ inline AMRField toAMRField(
   float min_scalar = FLT_MAX;
 
   // Count the number of leaf blocks
-  // Currently not used
   size_t numLeaves = 0;
   for (size_t i = 0; i < var.global_num_blocks; ++i) {
     if (!in_reg[i]) continue;
@@ -764,11 +620,8 @@ inline AMRField toAMRField(
   }
   
   // This is the slowest part
-  // Map all blocks which are in the region of interest
-  // onto a uniform grid
   for (size_t i = 0; i < var.global_num_blocks; ++i) {
-    // Only perform mapping if block is included
-    // Pre selection takes places above
+    // if (grid.node_type[i] == 1) // leaf!
     if (!in_reg[i]) continue;
     {
       // Project min on vox grid
@@ -783,8 +636,7 @@ inline AMRField toAMRField(
         static_cast<int>(
           round((grid.bnd_box[i].min.y - grid.bnd_box[bid_first].min.y) / len[1] * corr_fac)),
         static_cast<int>(
-          round((grid.bnd_box[i].min.z - grid.bnd_box[bid_first].min.z) / len[2] * corr_fac))
-      };
+          round((grid.bnd_box[i].min.z - grid.bnd_box[bid_first].min.z) / len[2] * corr_fac))};
 
       // Bounding box in index reference frame assuming
       // uniform grid at lowest refinement
@@ -796,9 +648,7 @@ inline AMRField toAMRField(
           lower[0], lower[1], lower[2],
           lower[0] + (int)var.nxb * cellsize - 1,
           lower[1] + (int)var.nyb * cellsize - 1,
-          lower[2] + (int)var.nzb * cellsize - 1
-        }
-      };
+          lower[2] + (int)var.nzb * cellsize - 1}};
       
       // Initialise data object 
       BlockData data;
@@ -852,7 +702,8 @@ inline AMRField toAMRField(
 
 struct FlashReader
 {
-  bool open(const char *fileName) {
+  bool open(const char *fileName)
+  {
     if (!H5::H5File::isHdf5(fileName))
       return false;
 
@@ -861,25 +712,6 @@ struct FlashReader
       // Read simulation info
       sim_info_t sim_info;
       read_sim_info(sim_info, file);
-
-      // Read runtime parameter and scalar information
-      std::cout << "Reading runtime parameters\n";
-      rp_parameters.name_bool = "logical runtime parameters";
-      rp_parameters.name_real = "real runtime parameters";
-      rp_parameters.name_ints = "integer runtime parameters";
-      read_params(rp_parameters, file);
-      std::cout << "Found " << rp_parameters.nr_integers << " integer runtime parameters\n";
-      std::cout << "Found " << rp_parameters.nr_reals << " real runtime parameters\n";
-      std::cout << "Found " << rp_parameters.nr_booleans << " logical runtime parameters\n";
-
-      std::cout << "Reading scalars\n";
-      scalar_parameters.name_bool = "logical scalars";
-      scalar_parameters.name_real = "real scalars";
-      scalar_parameters.name_ints = "integer scalars";
-      read_params(scalar_parameters, file);
-      std::cout << "Found " << scalar_parameters.nr_integers << " integer scalars\n";
-      std::cout << "Found " << scalar_parameters.nr_reals << " real scalars\n";
-      std::cout << "Found " << scalar_parameters.nr_booleans << " logical scalars\n";
 
       // Read grid data
       read_grid(grid, file);
@@ -949,10 +781,10 @@ struct FlashReader
     return {};
   }
 
-  ParticleField getSinkList(int npart=-1)
+  ParticleField getSinkList()
   {
     try {
-      read_sinks(particle, file, npart);
+      read_sinks(particle, file);
       return toParticleField(particle);
 
     } catch (H5::DataSpaceIException error) {
@@ -996,11 +828,6 @@ struct FlashReader
   H5::H5File file;
   // Derived field names
   std::vector<std::string> fieldNames;
-
-  // Scalar values
-  set_params_t rp_parameters;
-  set_params_t scalar_parameters;
- 
   // Grid structure
   grid_t grid;
   // Particle structure

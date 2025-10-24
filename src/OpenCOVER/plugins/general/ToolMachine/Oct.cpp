@@ -2,7 +2,7 @@
 
 #include <cover/VRSceneGraph.h>
 #include <PluginUtil/coShaderUtil.h>
-#include <DataClient/DataClient.h>
+#include <OpcUaClient/opcuaClient.h>
 #include <osg/Point>
 #include <osg/VertexArrayState>
 
@@ -94,10 +94,10 @@ void Oct::applyShader(const opencover::ColorMap& map)
 const auto phaseOffset = osg::PI_4 + osg::PI_2 + 15 / 100 *osg::PI;
 
 
-void Oct::addPoints(const opencover::dataclient::MultiDimensionalArray<double> &data, const osg::Vec3 &toolHeadPos, const osg::Vec3 &up, float r)
+void Oct::addPoints(const opencover::opcua::MultiDimensionalArray<double> &data, const osg::Vec3 &toolHeadPos, const osg::Vec3 &up, float r)
 {
-    std::vector<double> offset, vector;
-    double scalar;
+    std::vector<UA_Double> offset, vector;
+    UA_Double scalar;
     if(!m_client->isConnected())
         return;
     scalar = data.data[3];
@@ -275,7 +275,7 @@ void Oct::Section::show(Visibility s)
     status = s;
 }
 
-void Oct::updateGeo(bool paused, const opencover::dataclient::MultiDimensionalArray<double> &data)
+void Oct::updateGeo(bool paused, const opencover::opcua::MultiDimensionalArray<double> &data)
 {
     if(paused)
         return;

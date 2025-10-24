@@ -16,14 +16,12 @@
 #include <filesystem>
 
 
-int fixLOD(float factor, const std::string& filename, bool includeData)
+int fixLOD(float factor, const std::string& filename)
 {
 
     osgDB::Options *options= new osgDB::Options;
-    if (includeData)
-        options->setOptionString("WriteImageHint=IncludeData");
-    else
-        options->setOptionString("WriteImageHint=IncludeFile");
+
+    options->setOptionString("WriteImageHint=IncludeFile");
     osg::Node *root=nullptr;
     std::filesystem::path p;
     p = filename;
@@ -41,17 +39,10 @@ int fixLOD(float factor, const std::string& filename, bool includeData)
         {
             nrl.push_back(ranges[i]);
         }
-        double newRad = factor * plod->getRadius();
-        if((int)ranges.size()==1)
-            nrl[0].first = 0;
-        else
-            nrl[0].first = newRad;
+        nrl[0].first = factor*plod->getRadius();
         nrl[0].second = 1.0E10;
-        for (int i = 1; i< (int)ranges.size(); i++)
-        {
-            nrl[i].first = 0.0;
-            nrl[i].second = newRad;
-        }
+        nrl[1].first = 0.0;
+        nrl[1].second = factor*plod->getRadius();
         plod->setRangeList(nrl);
         osgDB::writeNodeFile(*root, fn.c_str(), options);
     }
@@ -101,28 +92,19 @@ int fixLOD(float factor, const std::string& filename, bool includeData)
 }
 
 int main(int argc, char **argv) {
-    int argOffset = 0;
-    bool writeAsData = false;
-    if (argc > 1 && strcmp(argv[1], "data") == 0)
-    {
-        argc--;
-        argOffset++;
-        writeAsData = true;
-    }
     if (argc == 2)
     {
-        std::string filename = argv[1+ argOffset];
-        return fixLOD(5.0, filename, writeAsData);
+        std::string filename = argv[1];
+        return fixLOD(5.0, filename);
     }
     else if (argc == 3)
     {
-        std::string filename = argv[2 + argOffset];
-        return fixLOD(atof(argv[1 + argOffset]), filename, writeAsData);
+        std::string filename = argv[2];
+        return fixLOD(atof(argv[1]), filename);
     }
     else
     {
-        std::cerr << "Usage: fixLOD [data] [scaleFactor] [file.osgb]" << std::endl;
-        std::cerr << "if pictures are missing, use data option" << std::endl;
+        std::cerr << "Usage: fixLOD [scaleFactor] [file.osgb]" << std::endl;
     }
 
     return 0;

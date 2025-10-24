@@ -2,8 +2,7 @@
 #include <iostream>
 
 int main() {
-  //const char *pathtemplate = "/home/nuernberger/sims/5e8/DwarfGal_hdf5_plt_cnt_0029";
-  const char *pathtemplate = "/home/nuernberger/sim_tmp/5e8/DwarfGal_hdf5_plt_cnt_0012";
+  const char *pathtemplate = "/home/nuernberger/code/FlashISM/objTest/DwarfGalaxy_hdf5_plt_cnt_0000";
   char path_fname[1024];
 
   sprintf(path_fname, "%s", pathtemplate);
@@ -33,23 +32,12 @@ int main() {
   data = flashReader.getFieldByName("dens");
 
   auto &dat = data;
-  
-  int nr_sink_part;
-  for (int i=0; i < flashReader.scalar_parameters.nr_integers; ++i)
-  {
-    std::string str(flashReader.scalar_parameters.dset_ints[i].name);
-    if (str.find("hs_slcs") != std::string::npos)
-    {
-      nr_sink_part = flashReader.scalar_parameters.dset_ints[i].value;
-    }
-  }
-
-  particles = flashReader.getSinkList(nr_sink_part);
+  particles = flashReader.getSinkList();
   auto &part = particles;
-  for (size_t i=0; i < 10; ++i)
+  for (size_t i=0; i < 1; ++i)
   {
+    std::cout << dat.domainBounds[i] << "\n";
     std::cout << part.particleMass[i] << "\n";
-    //std::cout << dat.domainBounds[i] << "\n";
   }
 }
 

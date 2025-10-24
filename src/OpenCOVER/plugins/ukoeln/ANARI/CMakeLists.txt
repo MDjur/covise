@@ -1,4 +1,4 @@
-covise_find_package(anari CONFIG)
+covise_find_package(anari)
 if(NOT TARGET anari::anari)
     return()
 endif()

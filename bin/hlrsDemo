@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export COVER_TERMINATE_SESSION=1 # terminate covise session when COVER exits
+export COVISE_TERMINATE_ON_QUIT=1 # terminate covise session when COVER exits
 
 # some day there will be ansii color
 #LSCOLORS=exfxcxdxbxegedabagacad
@@ -314,13 +314,6 @@ run_marienplatz_mobilitaetswoche() {
     kill $SUMO
 }
 demo 140 "Zweite mobilitaetswoche" run_marienplatz_mobilitaetswoche 
-
-demo 141 "FLOWER" vistle /data/iag/windpark_gagnon/FLOWer_Beispiel_MERIDIONAL/workflows/tracer_cluster.vsl
-
-run_EP() {
-opencover opencover://plugin/GeoData /data/mack-research/Europa-Park-Twin/presentation.wrl
-}
-demo 142 "EuropaPark" run_EP
 
 # Vistle
 category="Vistle"

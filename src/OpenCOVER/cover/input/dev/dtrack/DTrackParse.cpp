@@ -1,8 +1,8 @@
-/* DTrackSDK in C++: DTrackParse.cpp
+/* DTrackParse: C++ source file
  *
- * Functions for parsing ASCII data.
+ * DTrackSDK: Functions for parsing ASCII data.
  *
- * Copyright (c) 2007-2023 Advanced Realtime Tracking GmbH & Co. KG
+ * Copyright 2007-2021, Advanced Realtime Tracking GmbH & Co. KG
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,6 +26,9 @@
  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * Version v2.7.0
+ * 
  */
 
 #include "DTrackParse.hpp"
@@ -75,7 +78,7 @@ char* string_nextline(char* str, char* start, int len)
 char* string_get_i(char* str, int* i)
 {
 	char* s;
-	*i = ( int )strtol( str, &s, 10 );
+	*i = (int )strtol(str, &s, 0);
 	return (s == str) ? NULL : s;
 }
 
@@ -90,7 +93,7 @@ char* string_get_i(char* str, int* i)
 char* string_get_ui(char* str, unsigned int* ui)
 {
 	char* s;
-	*ui = ( unsigned int )strtoul( str, &s, 10 );
+	*ui = (unsigned int )strtoul(str, &s, 0);
 	return (s == str) ? NULL : s;
 }
 
@@ -251,59 +254,62 @@ char* string_get_quoted_text(char* str, std::string& qt)
 }
 
 
-/*
- * Compare string regarding DTrack2 parameter rules.
+/**
+ * 	\brief	Compare strings regarding DTrack2 parameter rules
+ *
+ *	@param 	str		string
+ *	@param 	p		parameter string
+ *	@return pointer behind parameter in str; NULL in case of error
  */
-size_t string_cmp_parameter( const std::string& str, size_t pos, const std::string& par )
+char* string_cmp_parameter(char* str, const char* p)
 {
 	bool lastwasdigit = false;
-	const char* p = par.c_str();
-	const char* s = str.c_str() + pos;
-
-	while ( *p )
+	
+	while(*p)
 	{
 		if (!lastwasdigit)
 		{	// skip leading zeros
-			while ( *p == '0' )
+			while(*p == '0')
+			{
 				p++;
-
-			while ( *s == '0' )
-				s++;
-
+			}
+			while(*str == '0')
+			{
+				str++;
+			}
 			if ( *p == '\0' )  // can happen if zeros are last characters in parameter string
 				continue;
 		}
 
-		if ( ( *p == ' ' ) || ( *s == ' ' ) )
+		if ( (*p == ' ') || (*str == ' ') )
 		{	// skip leading white spaces
-			while ( *p == ' ' )
+			while (*p == ' ')
 				p++;
-
-			while ( *s == ' ' )
-				s++;
-
+			
+			while (*str == ' ')
+				str++;
+			
 			lastwasdigit = false;
 			continue;
 		}
-
-		if ( *s != *p )
+		
+		if (*str != *p)
 		{	// compare next character
-			return std::string::npos;
+			return NULL;
 		}
 
-		lastwasdigit = ( ( *p >= '0' ) && ( *p <= '9' ) );
-		s++;
+		lastwasdigit = (*p >= '0' && *p <= '9');
+		str++;
 		p++;
 	}
 
-	while ( *s == ' ' )
+	while (*str == ' ')
 	{	// skip leading white spaces in answer part
-		s++;
+		str++;
 	}
 
-	return s - str.c_str();
+	return str;
 }
 
-
-}  // namespace DTrackSDK_Parse
+} // end namespace
 
