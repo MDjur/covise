@@ -1287,17 +1287,18 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
   }
   
   std::map<int, double> weightFactors;
-  double totalWeight = 0.0;
 
-  for (const auto& [currentNodeId, currentNodeList] : nodeLists) {
-    double weight = 1.0 / (currentNodeList.size() + 1);
-    weightFactors[currentNodeId] = weight;
-    totalWeight += weight;
-  }
+  double totalWeight = std::accumulate(nodeLists.begin(), nodeLists.end(), 0.0,
+                                        [](double sum, const auto& pair) {
+                                          return sum + 1.0 / (pair.second.size() + 1);
+                                        });
 
-  for (auto& [nodeId, weight] : weightFactors) {
-    weight /= totalWeight;
-  }
+  std::transform(nodeLists.begin(), nodeLists.end(),
+           std::inserter(weightFactors, weightFactors.end()),
+           [totalWeight](const auto& pair) {
+           double weight = 1.0 / (pair.second.size() + 1);
+           return std::make_pair(pair.first, weight / totalWeight);
+           });
 
   string name = std::to_string(nodeId);
 
