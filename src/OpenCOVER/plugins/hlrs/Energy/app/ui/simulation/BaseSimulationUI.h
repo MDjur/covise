@@ -3,7 +3,7 @@
 #include <PluginUtil/colors/coColorBar.h>
 #include <PluginUtil/colors/coColorMap.h>
 #include <lib/core/interfaces/IColorable.h>
-#include <lib/core/interfaces/IDrawables.h>
+#include <lib/core/interfaces/IDrawable.h>
 #include <lib/core/interfaces/ITimedependable.h>
 #include <lib/core/simulation/object.h>
 #include <lib/core/simulation/simulation.h>
@@ -60,7 +60,7 @@ using namespace core::simulation;
  */
 template <typename T>
 class BaseSimulationUI {
-  static_assert(std::is_base_of_v<core::interface::IDrawables, T>,
+  static_assert(std::is_base_of_v<core::interface::IDrawable, T>,
                 "T must be derived from IDrawable");
   static_assert(std::is_base_of_v<core::interface::IColorable, T>,
                 "T must be derived from IColorable");

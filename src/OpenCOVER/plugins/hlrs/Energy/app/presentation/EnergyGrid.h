@@ -111,7 +111,7 @@ class InfoboardSensor : public coPickSensor {
 
  public:
   InfoboardSensor(osg::ref_ptr<osg::Group> parent,
-                  std::unique_ptr<Infoboard> &&infoboard,
+                  std::unique_ptr<InfoboardImpl> &&infoboard,
                   const std::string &content = "");
 
   void updateDrawable() { m_infoBoard->updateDrawable(); }
@@ -120,7 +120,7 @@ class InfoboardSensor : public coPickSensor {
 
  private:
   bool m_enabled = false;
-  std::unique_ptr<Infoboard> m_infoBoard;
+  std::unique_ptr<InfoboardImpl> m_infoBoard;
 };
 
 /**
@@ -134,12 +134,12 @@ class InfoboardSensor : public coPickSensor {
 class EnergyGrid : public interface::IEnergyGrid {
  public:
   EnergyGrid(const EnergyGridConfig &data, bool ignoreOverlap = true);
-  void initDrawables() override;
+  void initDrawable() override;
   void update() override {
     for (auto &infoboard : m_infoboards) infoboard->update();
   }
   void updateColor(const osg::Vec4 &color) override;
-  void updateDrawables() override;
+  void updateDrawable() override;
   void updateTime(int timestep) override;
 
   void setColorMap(const opencover::ColorMap &colorMap,
@@ -191,6 +191,7 @@ class EnergyGrid : public interface::IEnergyGrid {
   EnergyGridConfig m_config;
   grid::Connections m_connections;
   grid::Lines m_lines;
+  Drawables m_drawables;
   std::vector<std::unique_ptr<InfoboardSensor>> m_infoboards;
   bool m_ignoreOverlap;
 };

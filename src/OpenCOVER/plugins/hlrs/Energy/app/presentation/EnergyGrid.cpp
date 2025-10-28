@@ -33,7 +33,7 @@ auto get_string = [](const auto &data) {
 }  // namespace
 
 InfoboardSensor::InfoboardSensor(osg::ref_ptr<osg::Group> parent,
-                                 std::unique_ptr<Infoboard> &&infoboard,
+                                 std::unique_ptr<InfoboardImpl> &&infoboard,
                                  const std::string &content)
     : coPickSensor(parent), m_enabled(false), m_infoBoard(std::move(infoboard)) {
   m_infoBoard->initInfoboard();
@@ -232,7 +232,7 @@ void EnergyGrid::initDrawableConnections() {
   m_config.parent->addChild(connections);
 }
 
-void EnergyGrid::initDrawables() {
+void EnergyGrid::initDrawable() {
   switch (m_config.connectionType) {
     case EnergyGridConnectionType::Index:
       initDrawableConnections();
@@ -255,7 +255,7 @@ void EnergyGrid::updateColor(const osg::Vec4 &color) {
     utils::color::overrideGeodeColor(point->getGeode(), color);
 }
 
-void EnergyGrid::updateDrawables() {
+void EnergyGrid::updateDrawable() {
   for (auto &infoboard : m_infoboards) {
     infoboard->updateDrawable();
   }

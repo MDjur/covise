@@ -11,15 +11,15 @@
 #include <osg/Geometry>
 
 CityGMLDeviceSensor::CityGMLDeviceSensor(
-    osg::ref_ptr<osg::Group> parent, std::unique_ptr<Infoboard> &&infoBoard,
-    std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
+    osg::ref_ptr<osg::Group> parent, std::unique_ptr<InfoboardImpl> &&infoBoard,
+    std::unique_ptr<BuildingImpl> &&drawableBuilding,
     const std::vector<std::string> &textBoxTxt)
     : coPickSensor(parent),
       m_cityGMLBuilding(std::move(drawableBuilding)),
       m_infoBoard(std::move(infoBoard)),
       m_textBoxTxt(textBoxTxt),
       m_colors({}) {
-  m_cityGMLBuilding->initDrawables();
+  m_cityGMLBuilding->initDrawable();
 
   // infoboard
   m_infoBoard->initInfoboard();
@@ -33,7 +33,7 @@ CityGMLDeviceSensor::~CityGMLDeviceSensor() {
 }
 
 void CityGMLDeviceSensor::update() {
-  m_cityGMLBuilding->updateDrawables();
+  m_cityGMLBuilding->updateDrawable();
   m_infoBoard->updateDrawable();
   coPickSensor::update();
 }
