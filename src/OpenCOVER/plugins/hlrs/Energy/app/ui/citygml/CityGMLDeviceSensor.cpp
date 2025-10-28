@@ -4,14 +4,14 @@
 #include <PluginUtil/coShaderUtil.h>
 #include <PluginUtil/colors/coColorMap.h>
 #include <app/presentation/CityGMLBuilding.h>
-#include <app/presentation/TxtInfoboard.h>
+#include <app/presentation/OsgTxtInfoboard.h>
 
 #include <algorithm>
 #include <memory>
 #include <osg/Geometry>
 
 CityGMLDeviceSensor::CityGMLDeviceSensor(
-    osg::ref_ptr<osg::Group> parent, std::unique_ptr<Infoboard> &&infoBoard,
+    osg::ref_ptr<osg::Group> parent, std::unique_ptr<OsgInfoboard> &&infoBoard,
     std::unique_ptr<core::interface::IBuilding> &&drawableBuilding,
     const std::vector<std::string> &textBoxTxt)
     : coPickSensor(parent),
@@ -65,7 +65,7 @@ void CityGMLDeviceSensor::updateTxtBoxTexts(const std::vector<std::string> &text
 }
 
 void CityGMLDeviceSensor::updateTitleOfInfoboard(const std::string &title) {
-  auto txtInfoboard = dynamic_cast<TxtInfoboard *>(m_infoBoard.get());
+  auto txtInfoboard = dynamic_cast<OsgTxtInfoboard *>(m_infoBoard.get());
   if (txtInfoboard) {
     txtInfoboard->setTitle(title);
   }

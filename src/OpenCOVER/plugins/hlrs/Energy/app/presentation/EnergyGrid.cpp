@@ -32,10 +32,9 @@ auto get_string = [](const auto &data) {
 
 }  // namespace
 
-InfoboardSensor::InfoboardSensor(
-    osg::ref_ptr<osg::Group> parent,
-    std::unique_ptr<interface::IInfoboard<std::string>> &&infoboard,
-    const std::string &content)
+InfoboardSensor::InfoboardSensor(osg::ref_ptr<osg::Group> parent,
+                                 std::unique_ptr<OsgInfoboard> &&infoboard,
+                                 const std::string &content)
     : coPickSensor(parent), m_enabled(false), m_infoBoard(std::move(infoboard)) {
   m_infoBoard->initInfoboard();
   m_infoBoard->initDrawable();
@@ -277,7 +276,8 @@ void EnergyGrid::updateTime(int timestep) {
       conn->updateTimestepInShader(timestep);
 }
 
-void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap, const opencover::ColorMap &vm_pu_colormap) {
+void EnergyGrid::setColorMap(const opencover::ColorMap &colorMap,
+                             const opencover::ColorMap &vm_pu_colormap) {
   for (auto &point : m_config.points) point->updateColorMapInShader(colorMap);
 
   for (auto &[_, point] : m_config.pointsMap)
