@@ -111,7 +111,7 @@ class InfoboardSensor : public coPickSensor {
 
  public:
   InfoboardSensor(osg::ref_ptr<osg::Group> parent,
-                  std::unique_ptr<OsgInfoboard> &&infoboard,
+                  std::unique_ptr<Infoboard> &&infoboard,
                   const std::string &content = "");
 
   void updateDrawable() { m_infoBoard->updateDrawable(); }
@@ -120,7 +120,7 @@ class InfoboardSensor : public coPickSensor {
 
  private:
   bool m_enabled = false;
-  std::unique_ptr<OsgInfoboard> m_infoBoard;
+  std::unique_ptr<Infoboard> m_infoBoard;
 };
 
 /**
