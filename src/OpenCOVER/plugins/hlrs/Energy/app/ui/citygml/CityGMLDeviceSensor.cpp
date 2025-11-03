@@ -33,8 +33,6 @@ CityGMLDeviceSensor::~CityGMLDeviceSensor() {
 }
 
 void CityGMLDeviceSensor::update() {
-  m_cityGMLBuilding->updateDrawable();
-  m_infoBoard->updateDrawable();
   coPickSensor::update();
 }
 

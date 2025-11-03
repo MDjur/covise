@@ -114,7 +114,6 @@ class InfoboardSensor : public coPickSensor {
                   std::unique_ptr<InfoboardImpl> &&infoboard,
                   const std::string &content = "");
 
-  void updateDrawable() { m_infoBoard->updateDrawable(); }
   void activate() override;
   void update() override;
 
@@ -139,7 +138,6 @@ class EnergyGrid : public interface::IEnergyGrid {
     for (auto &infoboard : m_infoboards) infoboard->update();
   }
   void updateColor(const osg::Vec4 &color) override;
-  void updateDrawable() override;
   void updateTime(int timestep) override;
 
   void setColorMap(const opencover::ColorMap &colorMap,
