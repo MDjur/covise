@@ -117,8 +117,10 @@ class BaseSimulationUI {
         return;
       }
 
-      minKeyVal = simulation->getMin(colorMap.species());
-      maxKeyVal = simulation->getMax(colorMap.species());
+      const auto &properties = simulation->getScalarProperties();
+
+      minKeyVal = properties.getMin(colorMap.species());
+      maxKeyVal = properties.getMax(colorMap.species());
     } catch (const std::out_of_range &e) {
       std::cerr << "Key not found in minMaxValues: " << colorMap.species()
                 << std::endl;
