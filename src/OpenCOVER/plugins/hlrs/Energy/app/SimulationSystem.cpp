@@ -1237,7 +1237,7 @@ void SimulationSystem::readSimulationDataStream(CSVStream &heatingSimStream) {
         addDataToMap(core::simulation::ObjectType::Producer, name, valName, val);
       } else {
         if (val == 0) continue;
-        sim->addData(col, val);
+        sim->getDataStorage().addData(col, val);
       }
     }
   }
