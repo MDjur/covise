@@ -174,14 +174,14 @@ class SimulationSystem final : public core::interface::ISystem {
                                 std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void applySimulationDataToHeatingGrid();
   void readHeatingGridStream(CSVStream &heatingStream);
-  std::vector<osg::ref_ptr<grid::Point>> getNodesToInterpolateData(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
+  std::vector<osg::ref_ptr<grid::Point>> getNodesToInterpolateDataFor(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes, std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void interpolateDataForNode(int nodeId,
                               std::map<int, std::vector<int>> &nodeLists,
                               std::vector<std::string> &dataKeys,
                               std::map<int, std::map<std::string, std::vector<double> *>> &nodeData,
                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
-  void interpolateMissingDataInHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
+  void interpolateMissingDataHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,
                                  std::map<int, std::vector<int>> &nodeLists,
