@@ -1467,7 +1467,7 @@ void SimulationSystem::getDataOfToNode(int toId,
   }
 }
 
-void SimulationSystem::interpolateMissingDataHeatingGrid(
+void SimulationSystem::interpolateDataHeatingGrid(
   std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
   auto nodesToInterpolateDataFor = getNodesToInterpolateDataFor(sim);
 
@@ -1595,7 +1595,7 @@ void SimulationSystem::applySimulationDataToHeatingGrid() {
 
   readSimulationDataStream(stream, sim);
   
-  interpolateMissingDataHeatingGrid(sim);
+  interpolateDataHeatingGrid(sim);
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   auto &heatingGrid = m_energyGrids[idx];

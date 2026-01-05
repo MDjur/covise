@@ -181,7 +181,7 @@ class SimulationSystem final : public core::interface::ISystem {
                               std::vector<std::string> &dataKeys,
                               std::map<int, std::map<std::string, std::vector<double> *>> &nodeData,
                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
-  void interpolateMissingDataHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
+  void interpolateDataHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,
                                  std::map<int, std::vector<int>> &nodeLists,
