@@ -170,17 +170,18 @@ class SimulationSystem final : public core::interface::ISystem {
   void initHeatingGridStreams();
   void initHeatingGrid();
   void buildHeatingGrid();
-  void readSimulationDataStream(CSVStream &heatingSimStream);
+  void readSimulationDataStream(CSVStream &heatingSimStream,
+                                std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void applySimulationDataToHeatingGrid();
   void readHeatingGridStream(CSVStream &heatingStream);
-  std::vector<osg::ref_ptr<grid::Point>> getNodesToInterpolateData();
-  void interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes);
+  std::vector<osg::ref_ptr<grid::Point>> getNodesToInterpolateData(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
+  void interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes, std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void interpolateDataForNode(int nodeId,
                               std::map<int, std::vector<int>> &nodeLists,
                               std::vector<std::string> &dataKeys,
                               std::map<int, std::map<std::string, std::vector<double> *>> &nodeData,
                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
-  void interpolateMissingDataInHeatingGrid();
+  void interpolateMissingDataInHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   void getDataOfNeighboringNodes(grid::Lines &connections,
                                  int &id,
                                  std::map<int, std::vector<int>> &nodeLists,

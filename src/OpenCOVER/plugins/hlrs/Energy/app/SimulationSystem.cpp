@@ -1143,20 +1143,19 @@ void addDataToMap(core::simulation::ObjectType type, const std::string &name,
   objPtr->addData(valName, value);
 };
 
-std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateData() {
+std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateData(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+
   std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor;
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   if (m_energyGrids[idx].grid == nullptr) return nodesToInterpolateDataFor;
 
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
-  auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
-  if (!heatingGrid || !heatingSim) return nodesToInterpolateDataFor;
 
   const auto& points = heatingGrid->getPoints();
   const auto& connections = heatingGrid->getLines();
-  const auto& consumers = heatingSim->Consumers();
-  const auto& producers = heatingSim->Producers();
+  const auto& consumers = sim->Consumers();
+  const auto& producers = sim->Producers();
 
   for (const auto& point: points) {
     auto id = point->getName();
@@ -1189,7 +1188,7 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
   return nodesToInterpolateDataFor;
 }
 
-void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes) {
+void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes, std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   if (m_energyGrids[idx].grid == nullptr) {
     cout << "No heating grid available for interpolation" << endl;
@@ -1197,14 +1196,11 @@ void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &n
   }
 
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
-  auto heatingSim = dynamic_cast<heating::HeatingSimulation *>(m_energyGrids[idx].sim.get());
-
-  auto sim = std::make_shared<heating::HeatingSimulation>();
 
   auto connections = heatingGrid->getLines();
 
-  const auto& consumers = heatingSim->Consumers();
-  const auto& producers = heatingSim->Producers();
+  const auto& consumers = sim->Consumers();
+  const auto& producers = sim->Producers();
 
   for (const auto& [id, consumer] : consumers) {
     sim->Consumers().emplace(id, std::move(std::make_unique<Object>(*consumer)));
@@ -1470,10 +1466,10 @@ void SimulationSystem::getDataOfToNode(int toId,
   }
 }
 
-void SimulationSystem::interpolateMissingDataInHeatingGrid() {
-  std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor = getNodesToInterpolateData();
+void SimulationSystem::interpolateMissingDataInHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor = getNodesToInterpolateData(sim);
 
-  interpolateData(nodesToInterpolateDataFor);
+  interpolateData(nodesToInterpolateDataFor, sim);
 }
 
 void SimulationSystem::initHeatingGrid() {
@@ -1481,8 +1477,6 @@ void SimulationSystem::initHeatingGrid() {
   buildHeatingGrid();
   applySimulationDataToHeatingGrid();
   m_heatingGridStreams.clear();
-
-  interpolateMissingDataInHeatingGrid();
 }
 
 std::vector<int> SimulationSystem::createHeatingGridIndices(
@@ -1554,7 +1548,9 @@ osg::ref_ptr<grid::Line> SimulationSystem::createHeatingGridLine(
   return new grid::Line(lineName, gridConnections);
 }
 
-void SimulationSystem::readSimulationDataStream(CSVStream &heatingSimStream) {
+void SimulationSystem::readSimulationDataStream(
+  CSVStream &heatingSimStream,
+  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   if (m_energyGrids[idx].grid == nullptr) return;
   std::regex consumer_value_split_regex("Consumer_(\\d+)_(.+)");
@@ -1562,7 +1558,6 @@ void SimulationSystem::readSimulationDataStream(CSVStream &heatingSimStream) {
   std::smatch match;
 
   CSVStream::CSVRow row;
-  auto sim = std::make_shared<heating::HeatingSimulation>();
   const auto &header = heatingSimStream.getHeader();
   double val = 0.0f;
   std::string name(""), valName("");
@@ -1584,6 +1579,23 @@ void SimulationSystem::readSimulationDataStream(CSVStream &heatingSimStream) {
       }
     }
   }
+}
+
+void SimulationSystem::applySimulationDataToHeatingGrid() {
+  if (m_heatingGridStreams.empty()) return;
+  auto simulationData = m_heatingGridStreams.find("results");
+  if (simulationData == m_heatingGridStreams.end()) return;
+
+
+  auto &[_, stream] = *simulationData;
+
+  auto sim = std::make_shared<heating::HeatingSimulation>();
+
+  readSimulationDataStream(stream, sim);
+  
+  interpolateMissingDataInHeatingGrid(sim);
+
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   auto &heatingGrid = m_energyGrids[idx];
 
   heatingGrid.simUI =
@@ -1593,15 +1605,6 @@ void SimulationSystem::readSimulationDataStream(CSVStream &heatingSimStream) {
   auto timesteps = heatingGrid.sim->getTimesteps("mass_flow");
   std::cout << "Number of timesteps: " << timesteps << std::endl;
   setAnimationTimesteps(timesteps, heatingGrid.group);
-}
-
-void SimulationSystem::applySimulationDataToHeatingGrid() {
-  if (m_heatingGridStreams.empty()) return;
-  auto simulationData = m_heatingGridStreams.find("results");
-  if (simulationData == m_heatingGridStreams.end()) return;
-
-  auto &[_, stream] = *simulationData;
-  readSimulationDataStream(stream);
 }
 
 grid::Lines SimulationSystem::createHeatingGridLines(
