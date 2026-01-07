@@ -1143,7 +1143,7 @@ void addDataToMap(core::simulation::ObjectType type, const std::string &name,
   objPtr->addData(valName, value);
 };
 
-std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDataFor(
+std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getHeatingGridNodesToInterpolateDataFor(
   std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
 
   std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor;
@@ -1189,7 +1189,10 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getNodesToInterpolateDa
   return nodesToInterpolateDataFor;
 }
 
-void SimulationSystem::interpolateData(std::vector<osg::ref_ptr<grid::Point>> &nodes, std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+void SimulationSystem::interpolateDataForHeatingGridNodes(
+  std::vector<osg::ref_ptr<grid::Point>> &nodes,
+  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   if (m_energyGrids[idx].grid == nullptr) {
     cout << "No heating grid available for interpolation" << endl;
@@ -1469,9 +1472,9 @@ void SimulationSystem::getDataOfToNode(int toId,
 
 void SimulationSystem::interpolateDataHeatingGrid(
   std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
-  auto nodesToInterpolateDataFor = getNodesToInterpolateDataFor(sim);
+  auto nodesToInterpolateDataFor = getHeatingGridNodesToInterpolateDataFor(sim);
 
-  interpolateData(nodesToInterpolateDataFor, sim);
+  interpolateDataForHeatingGridNodes(nodesToInterpolateDataFor, sim);
 }
 
 void SimulationSystem::initHeatingGrid() {
