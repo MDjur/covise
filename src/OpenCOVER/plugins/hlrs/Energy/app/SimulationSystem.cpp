@@ -1194,11 +1194,6 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
   std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  if (m_energyGrids[idx].grid == nullptr) {
-    cout << "No heating grid available for interpolation" << endl;
-    return;
-  }
-
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
 
   auto connections = heatingGrid->getLines();
@@ -1206,36 +1201,30 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
   const auto& consumers = sim->Consumers();
   const auto& producers = sim->Producers();
 
-  for (const auto& [id, consumer] : consumers) {
-    sim->Consumers().emplace(id, std::move(std::make_unique<Object>(*consumer)));
-  }
-
-  for (const auto& [id, producer] : producers) {
-    sim->Producers().emplace(id, std::move(std::make_unique<Object>(*producer)));
-  }
-
   std::map<int, std::map<std::string, std::vector<double> *>> nodeData;
   std::map<int, std::vector<int>> nodeLists;
 
   auto getDataKeys = [&]() -> vector<string> {
-    int testId = -1;
-    for (int id = 0; id < connections.size(); ++id) {
-      auto node = searchHeatingGridPointById(nodes, id);
-      if (node == nullptr){
-        testId = id;
-        break;
+    auto randomNode = consumers.begin();
+
+    if (randomNode != consumers.end()) {
+      cout << randomNode->first << endl;
+    }
+
+    if (randomNode == consumers.end()) {
+      auto randomNode = producers.begin();
+      if (randomNode == producers.end()) {
+        return {};
       }
     }
 
-    auto consumerIt = consumers.find(std::to_string(testId));
-    if (consumerIt == consumers.end()) {
-      return {};
-    }
-    auto consumerData = consumerIt->second->getData();
+    auto randomNodeData = randomNode->second->getData();
     vector<string> dataKeys;
-    for (const auto& dataEntry : consumerData) {
-      dataKeys.push_back(dataEntry.first);
-    }
+
+    std::transform(randomNodeData.begin(), randomNodeData.end(),
+                 std::back_inserter(dataKeys),
+                 [](const auto& dataEntry) { return dataEntry.first; });
+
     return dataKeys;
   };
 
@@ -1260,12 +1249,12 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
       continue;
     }
 
-    nodeLists.clear();
-    nodeData.clear();
-
     getDataOfNeighboringNodes(connections, id, nodeLists, nodes, consumers, producers, dataKeys, nodeData);
 
     interpolateDataForNode(id, nodeLists, dataKeys, nodeData, sim);
+
+    nodeLists.clear();
+    nodeData.clear();
   }
 
   auto &heatingGridSim = m_energyGrids[idx];
@@ -1472,6 +1461,13 @@ void SimulationSystem::getDataOfToNode(int toId,
 
 void SimulationSystem::interpolateDataHeatingGrid(
   std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  
+  auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
+  if (m_energyGrids[idx].grid == nullptr) {
+    cout << "No heating grid available for interpolation" << endl;
+    return;
+  }
+
   auto nodesToInterpolateDataFor = getHeatingGridNodesToInterpolateDataFor(sim);
 
   interpolateDataForHeatingGridNodes(nodesToInterpolateDataFor, sim);
