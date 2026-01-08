@@ -1144,13 +1144,11 @@ void addDataToMap(core::simulation::ObjectType type, const std::string &name,
 };
 
 std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getHeatingGridNodesToInterpolateDataFor(
-  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim) {
 
   std::vector<osg::ref_ptr<grid::Point>> nodesToInterpolateDataFor;
-
+  
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
-  if (m_energyGrids[idx].grid == nullptr) return nodesToInterpolateDataFor;
-
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
 
   const auto& points = heatingGrid->getPoints();
@@ -1158,21 +1156,22 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getHeatingGridNodesToIn
   const auto& consumers = sim->Consumers();
   const auto& producers = sim->Producers();
 
-  for (const auto& point: points) {
-    auto id = point->getName();
+  const string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
 
-    bool hasData = consumers.find(id) != consumers.end() ||
-                   producers.find(id) != producers.end();
+  for (const auto& point: points) {
+    const auto id = point->getName();
+
+    const bool hasData = consumers.find(id) != consumers.end() ||
+                         producers.find(id) != producers.end();
 
     bool hasConnections = false;
     for (const auto& connection: connections) {
-      auto connectionName = connection->getName();
-      string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
+      const auto connectionName = connection->getName();
       
-      auto delimiterPos = connectionName.find(delimiter);
+      const auto delimiterPos = connectionName.find(delimiter);
       if (delimiterPos != std::string::npos) {
-        auto fromIdStr = connectionName.substr(0, delimiterPos);
-        auto toIdStr = connectionName.substr(delimiterPos + delimiter.length());
+        const auto fromIdStr = connectionName.substr(0, delimiterPos);
+        const auto toIdStr = connectionName.substr(delimiterPos + delimiter.length());
 
         if (id == fromIdStr || id == toIdStr) {
           hasConnections = true;
