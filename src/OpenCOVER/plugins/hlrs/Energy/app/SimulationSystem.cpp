@@ -1190,7 +1190,7 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getHeatingGridNodesToIn
 
 void SimulationSystem::interpolateDataForHeatingGridNodes(
   std::vector<osg::ref_ptr<grid::Point>> &nodes,
-  std::shared_ptr<core::simulation::heating::HeatingSimulation> sim) {
+  std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim) {
 
   auto idx = getEnergyGridTypeIndex(EnergyGridType::HeatingGrid);
   auto heatingGrid = dynamic_cast<EnergyGrid *>(m_energyGrids[idx].grid.get());
