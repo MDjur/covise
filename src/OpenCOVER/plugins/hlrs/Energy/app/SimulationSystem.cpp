@@ -1352,8 +1352,6 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
 
     vecFromNodeData.push_back(*fromNodeDataPtr);
 
-    return vecFromNodeData;
-
   } else {
     int id = fromId;
     string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
@@ -1368,14 +1366,13 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
         vecFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         counter++;
       } else if (id == toId && counter > 0) {
-        std::cout << "Got in second round searching fromNodeData" << std::endl;
         auto additionalFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         vecFromNodeData.insert(vecFromNodeData.end(), additionalFromNodeData.begin(), additionalFromNodeData.end());
       }
     }
-
-    return vecFromNodeData;
   }
+
+  return vecFromNodeData;
 }
 
 std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int toId,
@@ -1404,17 +1401,12 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
     auto consumerIt = consumers.find(std::to_string(toId));
     auto producerIt = producers.find(std::to_string(toId));
 
-    if (consumerIt != consumers.end())
-    {
-      for (auto& [dataKey, dataValues] : consumerIt->second->getData())
-      {
+    if (consumerIt != consumers.end()) {
+      for (auto& [dataKey, dataValues] : consumerIt->second->getData()) {
         toNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
       }
-    }
-    else if (producerIt != producers.end())
-    {
-      for (auto& [dataKey, dataValues] : producerIt->second->getData())
-      {
+    } else if (producerIt != producers.end()) {
+      for (auto& [dataKey, dataValues] : producerIt->second->getData()) {
         toNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
       }
     }
@@ -1424,15 +1416,12 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
 
     vecToNodeData.push_back(*toNodeDataPtr);
 
-    return vecToNodeData;
-
   } else {
     int id = toId;
     string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
     int counter = 0;
 
-    for (const auto &connection : connections)
-    {
+    for (const auto &connection : connections) {
       string connectionString = connection->getName();
       int fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
       toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
@@ -1441,14 +1430,13 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
         vecToNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         counter++;
       } else if (id == fromId && counter > 0) {
-        std::cout << "Got in second round searching toNodeData" << std::endl;
         auto additionalFromNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         vecToNodeData.insert(vecToNodeData.end(), additionalFromNodeData.begin(), additionalFromNodeData.end());
       }
     }
-
-    return vecToNodeData;
   }
+
+  return vecToNodeData;
 }
 
 void SimulationSystem::interpolateDataHeatingGrid(
