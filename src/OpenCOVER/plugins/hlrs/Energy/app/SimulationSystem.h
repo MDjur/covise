@@ -184,25 +184,21 @@ class SimulationSystem final : public core::interface::ISystem {
   void interpolateDataForHeatingGridNodes(std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                           std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   void interpolateDataForNode(int nodeId,
-                              std::vector<std::string> &dataKeys,
                               std::vector<SimulationSystem::NodeData*> nodeDataPtrs,
                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   void interpolateDataHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   std::vector<SimulationSystem::NodeData> getDataOfNeighboringNodes(int &id,
                                                                     std::vector<osg::ref_ptr<grid::Point>> &nodes,
-                                                                    std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
-                                                                    std::vector<std::string> &dataKeys);
+                                                                    std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   std::vector<SimulationSystem::NodeData> getDataOfFromNode(int fromId,
                                                             std::vector<int> tempNodeList,
                                                             grid::Points &nodesToInterpolateDataFor,
                                                             std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
-                                                            osg::Node::DescriptionList &dataKeys,
                                                             grid::Lines &connections);
   std::vector<SimulationSystem::NodeData> getDataOfToNode(int toId,
                                                           std::vector<int> tempNodeList,
                                                           grid::Points &nodesToInterpolateDataFor,
                                                           std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
-                                                          osg::Node::DescriptionList &dataKeys,
                                                           grid::Lines &connections);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,

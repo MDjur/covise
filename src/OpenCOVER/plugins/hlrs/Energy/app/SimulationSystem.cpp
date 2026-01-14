@@ -1197,36 +1197,7 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
 
   auto connections = heatingGrid->getLines();
 
-  const auto& consumers = sim->Consumers();
-  const auto& producers = sim->Producers();
-
   std::vector<SimulationSystem::NodeData> nodeData;
-
-  auto getDataKeys = [&]() -> vector<string> {
-    auto randomNode = consumers.begin();
-
-    if (randomNode != consumers.end()) {
-      cout << randomNode->first << endl;
-    }
-
-    if (randomNode == consumers.end()) {
-      auto randomNode = producers.begin();
-      if (randomNode == producers.end()) {
-        return {};
-      }
-    }
-
-    auto randomNodeData = randomNode->second->getData();
-    vector<string> dataKeys;
-
-    std::transform(randomNodeData.begin(), randomNodeData.end(),
-                 std::back_inserter(dataKeys),
-                 [](const auto& dataEntry) { return dataEntry.first; });
-
-    return dataKeys;
-  };
-
-  vector<string> dataKeys = getDataKeys();
 
   string connectionString;
 
@@ -1247,14 +1218,14 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
       continue;
     }
 
-    nodeData = getDataOfNeighboringNodes(id, nodesToInterpolateDataFor, sim, dataKeys);
+    nodeData = getDataOfNeighboringNodes(id, nodesToInterpolateDataFor, sim);
 
     std::vector<SimulationSystem::NodeData*> nodeDataPtrs;
     for (auto& nd : nodeData) {
       nodeDataPtrs.push_back(&nd);
     }
 
-    interpolateDataForNode(id, dataKeys, nodeDataPtrs, sim);
+    interpolateDataForNode(id, nodeDataPtrs, sim);
   }
 
   auto &heatingGridSim = m_energyGrids[idx];
@@ -1265,7 +1236,6 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
 }
 
 void SimulationSystem::interpolateDataForNode(int nodeId,
-                                              std::vector<std::string> &dataKeys,
                                               std::vector<SimulationSystem::NodeData*> nodeDataPtrs,
                                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim)
 {
@@ -1291,19 +1261,17 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
 
   string name = std::to_string(nodeId);
 
-  for (const auto& key : dataKeys) {
-    int numTimesteps = nodeDataPtrs[0]->neighboringNodesDataMap.at(key)->size();
+  for (const auto& [dataKey, dataValues] : nodeDataPtrs[0]->neighboringNodesDataMap) {
 
+    int numTimesteps = dataValues->size();
     for (size_t i = 0; i < numTimesteps; ++i) {
       double interpolatedValue = 0.0;
 
-      for (const auto& nd: nodeDataPtrs) {
-        auto it = nd->neighboringNodesDataMap.find(key);
-        if (it == nd->neighboringNodesDataMap.end()) continue;
-        interpolatedValue += (*(it->second))[i] * weightFactors[nd->neighboringNodesIds.back()];
+      for (const auto& nd : nodeDataPtrs) {
+        interpolatedValue += (*(dataValues))[i] * weightFactors[nd->neighboringNodesIds.back()];
       }
 
-      addDataToMap(core::simulation::ObjectType::Consumer, name, key, interpolatedValue, sim);
+      addDataToMap(core::simulation::ObjectType::Consumer, name, dataKey, interpolatedValue, sim);
     }
   }
 }
@@ -1311,8 +1279,7 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
 
 std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfNeighboringNodes(int &id,
                                                                                     std::vector<osg::ref_ptr<grid::Point>> &nodesToInterpolateDataFor,
-                                                                                    std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
-                                                                                    std::vector<std::string> &dataKeys)
+                                                                                    std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim)
 {
   std::vector<SimulationSystem::NodeData> nodeData;
   string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
@@ -1332,12 +1299,12 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfNeighboringNo
 
     if (id == fromId)
     {
-      auto toNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, dataKeys, connections);
+      auto toNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
       nodeData.insert(nodeData.end(), toNodeData.begin(), toNodeData.end());
     }
     else if (id == toId)
     {
-      auto fromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, dataKeys, connections);
+      auto fromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
       nodeData.insert(nodeData.end(), fromNodeData.begin(), fromNodeData.end());
     }
   }
@@ -1349,7 +1316,6 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
                                                                             std::vector<int> tempNodeList,
                                                                             std::vector<osg::ref_ptr<grid::Point>> &nodesToInterpolateDataFor,
                                                                             std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
-                                                                            std::vector<std::string> &dataKeys,
                                                                             grid::Lines &connections)
 {
   auto fromNodeDataPtr = std::make_shared<SimulationSystem::NodeData>();
@@ -1372,18 +1338,12 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
     auto producerIt = producers.find(std::to_string(fromId));
     
     if (consumerIt != consumers.end()) {
-      for (const auto &key : dataKeys) {
-        auto dataIt = consumerIt->second->getData().find(key);
-        if (dataIt != consumerIt->second->getData().end()) {
-          fromNodeDataPtr->neighboringNodesDataMap[key] = &(dataIt->second);
-        }
+      for (auto& [dataKey, dataValues] : consumerIt->second->getData()) {
+        fromNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
       }
     } else if (producerIt != producers.end()) {
-      for (const auto &key : dataKeys) {
-        auto dataIt = producerIt->second->getData().find(key);
-        if (dataIt != producerIt->second->getData().end()) {
-          fromNodeDataPtr->neighboringNodesDataMap[key] = &(dataIt->second);
-        }
+      for (auto& [dataKey, dataValues] : producerIt->second->getData()) {
+        fromNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
       }
     }
 
@@ -1405,11 +1365,11 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
       int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
 
       if (id == toId && counter == 0) {
-        vecFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, dataKeys, connections);
+        vecFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         counter++;
       } else if (id == toId && counter > 0) {
         std::cout << "Got in second round searching fromNodeData" << std::endl;
-        auto additionalFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, dataKeys, connections);
+        auto additionalFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         vecFromNodeData.insert(vecFromNodeData.end(), additionalFromNodeData.begin(), additionalFromNodeData.end());
       }
     }
@@ -1422,7 +1382,6 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
                                                                           std::vector<int> tempNodeList,
                                                                           std::vector<osg::ref_ptr<grid::Point>> &nodesToInterpolateDataFor,
                                                                           std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
-                                                                          std::vector<std::string> &dataKeys,
                                                                           grid::Lines &connections)
 {
 
@@ -1447,24 +1406,16 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
 
     if (consumerIt != consumers.end())
     {
-      for (const auto &key : dataKeys)
+      for (auto& [dataKey, dataValues] : consumerIt->second->getData())
       {
-        auto dataIt = consumerIt->second->getData().find(key);
-        if (dataIt != consumerIt->second->getData().end())
-        {
-          toNodeDataPtr->neighboringNodesDataMap[key] = &(dataIt->second);
-        }
+        toNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
       }
     }
     else if (producerIt != producers.end())
     {
-      for (const auto &key : dataKeys)
+      for (auto& [dataKey, dataValues] : producerIt->second->getData())
       {
-        auto dataIt = producerIt->second->getData().find(key);
-        if (dataIt != producerIt->second->getData().end())
-        {
-          toNodeDataPtr->neighboringNodesDataMap[key] = &(dataIt->second);
-        }
+        toNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
       }
     }
 
@@ -1487,11 +1438,11 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
       toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
 
       if (id == fromId && counter == 0) {
-        vecToNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, dataKeys, connections);
+        vecToNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         counter++;
       } else if (id == fromId && counter > 0) {
         std::cout << "Got in second round searching toNodeData" << std::endl;
-        auto additionalFromNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, dataKeys, connections);
+        auto additionalFromNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
         vecToNodeData.insert(vecToNodeData.end(), additionalFromNodeData.begin(), additionalFromNodeData.end());
       }
     }
