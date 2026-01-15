@@ -190,6 +190,8 @@ class SimulationSystem final : public core::interface::ISystem {
   std::vector<SimulationSystem::NodeData> getDataOfNeighboringNodes(int &id,
                                                                     std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                                                     std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
+  std::pair<int, int> getFromAndToIdsFromConnectionName(const std::string &connectionName,
+                                                        const std::string &delimiter);
   std::vector<SimulationSystem::NodeData> getDataOfFromNode(int fromId,
                                                             std::vector<int> tempNodeList,
                                                             grid::Points &nodesToInterpolateDataFor,

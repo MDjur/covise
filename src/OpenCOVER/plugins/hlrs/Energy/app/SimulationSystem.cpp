@@ -1159,24 +1159,18 @@ std::vector<osg::ref_ptr<grid::Point>> SimulationSystem::getHeatingGridNodesToIn
   const string delimiter = std::string(" ") + UIConstants::RIGHT_ARROW_UNICODE_HEX + " ";
 
   for (const auto& point: points) {
-    const auto id = point->getName();
+    const auto id = std::stoi(point->getName());
 
-    const bool hasData = consumers.find(id) != consumers.end() ||
-                         producers.find(id) != producers.end();
+    const bool hasData = consumers.find(std::to_string(id)) != consumers.end() ||
+                         producers.find(std::to_string(id)) != producers.end();
 
     bool hasConnections = false;
     for (const auto& connection: connections) {
-      const auto connectionName = connection->getName();
-      
-      const auto delimiterPos = connectionName.find(delimiter);
-      if (delimiterPos != std::string::npos) {
-        const auto fromIdStr = connectionName.substr(0, delimiterPos);
-        const auto toIdStr = connectionName.substr(delimiterPos + delimiter.length());
+      auto [fromId, toId] = getFromAndToIdsFromConnectionName(connection->getName(), delimiter);
 
-        if (id == fromIdStr || id == toIdStr) {
-          hasConnections = true;
-          break;
-        }
+      if (id == fromId || id == toId) {
+        hasConnections = true;
+        break;
       }
     }
 
@@ -1291,10 +1285,8 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfNeighboringNo
 
   for (const auto &connection : connections)
   {
-    string connectionString = connection->getName();
-    int fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
-    int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
-
+    auto [fromId, toId] = getFromAndToIdsFromConnectionName(connection->getName(), delimiter);
+    
     std::vector<int> tempNodeList;
 
     if (id == fromId)
@@ -1310,6 +1302,14 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfNeighboringNo
   }
 
   return nodeData;
+}
+
+std::pair<int, int> SimulationSystem::getFromAndToIdsFromConnectionName(const std::string &connectionName,
+                                                                        const std::string &delimiter)
+{
+  int fromId = std::stoi(connectionName.substr(0, connectionName.find(delimiter)));
+  int toId = std::stoi(connectionName.substr(connectionName.find(delimiter) + delimiter.length()));
+  return {fromId, toId};
 }
 
 std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int fromId,
@@ -1358,9 +1358,7 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
     int counter = 0;
 
     for (const auto &connection : connections) {
-      string connectionString = connection->getName();
-      fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
-      int toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
+      auto [fromId, toId] = getFromAndToIdsFromConnectionName(connection->getName(), delimiter);
 
       if (id == toId && counter == 0) {
         vecFromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
@@ -1422,9 +1420,7 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
     int counter = 0;
 
     for (const auto &connection : connections) {
-      string connectionString = connection->getName();
-      int fromId = std::stoi(connectionString.substr(0, connectionString.find(delimiter)));
-      toId = std::stoi(connectionString.substr(connectionString.find(delimiter) + delimiter.length()));
+      auto [fromId, toId] = getFromAndToIdsFromConnectionName(connection->getName(), delimiter);
 
       if (id == fromId && counter == 0) {
         vecToNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
