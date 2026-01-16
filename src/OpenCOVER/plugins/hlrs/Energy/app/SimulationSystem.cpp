@@ -1214,6 +1214,19 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
 
     nodeData = getDataOfNeighboringNodes(id, nodesToInterpolateDataFor, sim);
 
+    std::cout << "nodeData obtained for node " << id << std::endl;
+
+    for (auto& nd: nodeData) {
+      std::cout << "Neighboring nodes for node " << id << ": ";
+      for (const auto& neighborId : nd.neighboringNodesIds) {
+        std::cout << neighborId << " ";
+      }
+      for (const auto& [dataKey, dataValues] : nd.neighboringNodesDataMap) {
+        std::cout << "\nData key: " << dataKey << ", Values size: " << dataValues.size() << " ";
+      }
+      std::cout << std::endl;
+    }
+
     std::vector<SimulationSystem::NodeData*> nodeDataPtrs;
     for (auto& nd : nodeData) {
       nodeDataPtrs.push_back(&nd);
@@ -1257,12 +1270,12 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
 
   for (const auto& [dataKey, dataValues] : nodeDataPtrs[0]->neighboringNodesDataMap) {
 
-    int numTimesteps = dataValues->size();
+    int numTimesteps = dataValues.size();
     for (size_t i = 0; i < numTimesteps; ++i) {
       double interpolatedValue = 0.0;
 
       for (const auto& nd : nodeDataPtrs) {
-        interpolatedValue += (*(dataValues))[i] * weightFactors[nd->neighboringNodesIds.back()];
+        interpolatedValue += dataValues[i] * weightFactors[nd->neighboringNodesIds.back()];
       }
 
       addDataToMap(core::simulation::ObjectType::Consumer, name, dataKey, interpolatedValue, sim);
@@ -1293,11 +1306,35 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfNeighboringNo
     {
       auto toNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
       nodeData.insert(nodeData.end(), toNodeData.begin(), toNodeData.end());
+
+      std::cout << "toNodeData for node " << id << " obtained." << std::endl;
+      for (const auto& nd: toNodeData) {
+        std::cout << "Neighboring nodes for node " << id << ": ";
+        for (const auto& neighborId : nd.neighboringNodesIds) {
+          std::cout << neighborId << " ";
+        }
+        for (const auto& [dataKey, dataValues] : nd.neighboringNodesDataMap) {
+          std::cout << "\nData key: " << dataKey << ", Values size: " << dataValues.size() << " ";
+        }
+        std::cout << std::endl;
+      }
     }
     else if (id == toId)
     {
       auto fromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
       nodeData.insert(nodeData.end(), fromNodeData.begin(), fromNodeData.end());
+
+      std::cout << "fromNodeData for node " << id << " obtained." << std::endl;
+      for (const auto& nd: fromNodeData) {
+        std::cout << "Neighboring nodes for node " << id << ": ";
+        for (const auto& neighborId : nd.neighboringNodesIds) {
+          std::cout << neighborId << " ";
+        }
+        for (const auto& [dataKey, dataValues] : nd.neighboringNodesDataMap) {
+          std::cout << "\nData key: " << dataKey << ", Values size: " << dataValues.size() << " ";
+        }
+        std::cout << std::endl;
+      }
     }
   }
 
@@ -1310,6 +1347,24 @@ std::pair<int, int> SimulationSystem::getFromAndToIdsFromConnectionName(const st
   int fromId = std::stoi(connectionName.substr(0, connectionName.find(delimiter)));
   int toId = std::stoi(connectionName.substr(connectionName.find(delimiter) + delimiter.length()));
   return {fromId, toId};
+}
+
+core::simulation::Data SimulationSystem::getNodeDataFromSimulation(int nodeId,
+                                                 std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim) {
+  const auto& consumers = sim->Consumers();
+  const auto& producers = sim->Producers();
+
+  auto consumerIt = consumers.find(std::to_string(nodeId));
+  auto producerIt = producers.find(std::to_string(nodeId));
+
+  if (consumerIt != consumers.end()) {
+    return consumerIt->second->getData();
+  } else if (producerIt != producers.end()) {
+    return producerIt->second->getData();
+  }
+
+  std::cout << "No data found for node ID: " << nodeId << std::endl;
+  return core::simulation::Data();
 }
 
 std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int fromId,
@@ -1329,22 +1384,12 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfFromNode(int 
 
   auto fromNode = searchHeatingGridPointById(nodesToInterpolateDataFor, fromId);
 
-  const auto& consumers = sim->Consumers();
-  const auto& producers = sim->Producers();
-
   if (fromNode == nullptr)
   {
-    auto consumerIt = consumers.find(std::to_string(fromId));
-    auto producerIt = producers.find(std::to_string(fromId));
-    
-    if (consumerIt != consumers.end()) {
-      for (auto& [dataKey, dataValues] : consumerIt->second->getData()) {
-        fromNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
-      }
-    } else if (producerIt != producers.end()) {
-      for (auto& [dataKey, dataValues] : producerIt->second->getData()) {
-        fromNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
-      }
+    core::simulation::Data nodeData = getNodeDataFromSimulation(fromId, sim);
+
+    for (auto& [key, values] : nodeData) {
+      fromNodeDataPtr->neighboringNodesDataMap[key] = values;
     }
 
     fromNodeDataPtr->id = fromId;
@@ -1391,22 +1436,12 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfToNode(int to
 
   auto toNode = searchHeatingGridPointById(nodesToInterpolateDataFor, toId);
 
-  const auto& consumers = sim->Consumers();
-  const auto& producers = sim->Producers();
-
   if (toNode == nullptr)
-  {    
-    auto consumerIt = consumers.find(std::to_string(toId));
-    auto producerIt = producers.find(std::to_string(toId));
+  {
+   core::simulation::Data nodeData = getNodeDataFromSimulation(toId, sim);
 
-    if (consumerIt != consumers.end()) {
-      for (auto& [dataKey, dataValues] : consumerIt->second->getData()) {
-        toNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
-      }
-    } else if (producerIt != producers.end()) {
-      for (auto& [dataKey, dataValues] : producerIt->second->getData()) {
-        toNodeDataPtr->neighboringNodesDataMap[dataKey] = &dataValues;
-      }
+    for (auto& [key, values] : nodeData) {
+      toNodeDataPtr->neighboringNodesDataMap[key] = values;
     }
 
     toNodeDataPtr->id = toId;

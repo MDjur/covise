@@ -105,7 +105,7 @@ class SimulationSystem final : public core::interface::ISystem {
   struct NodeData{
     int id;
     std::vector<int> neighboringNodesIds;
-    std::map<std::string, std::vector<double> *> neighboringNodesDataMap;
+    std::map<std::string, std::vector<double>> neighboringNodesDataMap;
   };
 
   static constexpr int const getEnergyGridTypeIndex(EnergyGridType type) {
@@ -202,6 +202,8 @@ class SimulationSystem final : public core::interface::ISystem {
                                                           grid::Points &nodesToInterpolateDataFor,
                                                           std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim,
                                                           grid::Lines &connections);
+  core::simulation::Data getNodeDataFromSimulation(int nodeId,
+                                                   std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   std::vector<int> createHeatingGridIndices(
       const std::string &pointName,
       const std::string &connectionsStrWithCommaDelimiter,
