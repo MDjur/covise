@@ -1214,25 +1214,12 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
 
     nodeData = getDataOfNeighboringNodes(id, nodesToInterpolateDataFor, sim);
 
-    std::cout << "nodeData obtained for node " << id << std::endl;
-
-    for (auto& nd: nodeData) {
-      std::cout << "Neighboring nodes for node " << id << ": ";
-      for (const auto& neighborId : nd.neighboringNodesIds) {
-        std::cout << neighborId << " ";
-      }
-      for (const auto& [dataKey, dataValues] : nd.neighboringNodesDataMap) {
-        std::cout << "\nData key: " << dataKey << ", Values size: " << dataValues.size() << " ";
-      }
-      std::cout << std::endl;
-    }
-
-    std::vector<SimulationSystem::NodeData*> nodeDataPtrs;
+    std::vector<std::reference_wrapper<SimulationSystem::NodeData>> nodeDataRefs;
     for (auto& nd : nodeData) {
-      nodeDataPtrs.push_back(&nd);
+      nodeDataRefs.push_back(std::ref(nd));
     }
 
-    interpolateDataForNode(id, nodeDataPtrs, sim);
+    interpolateDataForNode(id, nodeDataRefs, sim);
   }
 
   auto &heatingGridSim = m_energyGrids[idx];
@@ -1243,39 +1230,39 @@ void SimulationSystem::interpolateDataForHeatingGridNodes(
 }
 
 void SimulationSystem::interpolateDataForNode(int nodeId,
-                                              std::vector<SimulationSystem::NodeData*> nodeDataPtrs,
+                                              std::vector<std::reference_wrapper<SimulationSystem::NodeData>> nodeDataRefs,
                                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim)
 {
-  for (const auto& nd : nodeDataPtrs) {
-    if (nd->neighboringNodesDataMap.empty()) {
+  for (const auto& nd : nodeDataRefs) {
+    if (nd.get().neighboringNodesDataMap.empty()) {
       std::cerr << "No neighboring node data available for interpolation of node " << nodeId << std::endl;
       return;
     }
   }
 
-  int numNodes = std::accumulate(nodeDataPtrs.begin(), nodeDataPtrs.end(), 0,
+  int numNodes = std::accumulate(nodeDataRefs.begin(), nodeDataRefs.end(), 0,
                                  [](int sum, const auto& nd) {
-                                   return sum + nd->neighboringNodesIds.size();
+                                   return sum + nd.get().neighboringNodesIds.size();
                                  });
   
   std::map<int, double> weightFactors;
 
-  for (const auto& nd : nodeDataPtrs) {
-    double weight = static_cast<double>(nd->neighboringNodesIds.size()) / numNodes;
-    int neighborId = nd->neighboringNodesIds.back();
+  for (const auto& nd : nodeDataRefs) {
+    double weight = static_cast<double>(nd.get().neighboringNodesIds.size()) / numNodes;
+    int neighborId = nd.get().neighboringNodesIds.back();
     weightFactors[neighborId] = weight;
   }
 
   string name = std::to_string(nodeId);
 
-  for (const auto& [dataKey, dataValues] : nodeDataPtrs[0]->neighboringNodesDataMap) {
+  for (const auto& [dataKey, dataValues] : nodeDataRefs[0].get().neighboringNodesDataMap) {
 
     int numTimesteps = dataValues.size();
     for (size_t i = 0; i < numTimesteps; ++i) {
       double interpolatedValue = 0.0;
 
-      for (const auto& nd : nodeDataPtrs) {
-        interpolatedValue += dataValues[i] * weightFactors[nd->neighboringNodesIds.back()];
+      for (const auto& nd : nodeDataRefs) {
+        interpolatedValue += dataValues[i] * weightFactors[nd.get().neighboringNodesIds.back()];
       }
 
       addDataToMap(core::simulation::ObjectType::Consumer, name, dataKey, interpolatedValue, sim);
@@ -1306,35 +1293,11 @@ std::vector<SimulationSystem::NodeData> SimulationSystem::getDataOfNeighboringNo
     {
       auto toNodeData = getDataOfToNode(toId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
       nodeData.insert(nodeData.end(), toNodeData.begin(), toNodeData.end());
-
-      std::cout << "toNodeData for node " << id << " obtained." << std::endl;
-      for (const auto& nd: toNodeData) {
-        std::cout << "Neighboring nodes for node " << id << ": ";
-        for (const auto& neighborId : nd.neighboringNodesIds) {
-          std::cout << neighborId << " ";
-        }
-        for (const auto& [dataKey, dataValues] : nd.neighboringNodesDataMap) {
-          std::cout << "\nData key: " << dataKey << ", Values size: " << dataValues.size() << " ";
-        }
-        std::cout << std::endl;
-      }
     }
     else if (id == toId)
     {
       auto fromNodeData = getDataOfFromNode(fromId, tempNodeList, nodesToInterpolateDataFor, sim, connections);
       nodeData.insert(nodeData.end(), fromNodeData.begin(), fromNodeData.end());
-
-      std::cout << "fromNodeData for node " << id << " obtained." << std::endl;
-      for (const auto& nd: fromNodeData) {
-        std::cout << "Neighboring nodes for node " << id << ": ";
-        for (const auto& neighborId : nd.neighboringNodesIds) {
-          std::cout << neighborId << " ";
-        }
-        for (const auto& [dataKey, dataValues] : nd.neighboringNodesDataMap) {
-          std::cout << "\nData key: " << dataKey << ", Values size: " << dataValues.size() << " ";
-        }
-        std::cout << std::endl;
-      }
     }
   }
 

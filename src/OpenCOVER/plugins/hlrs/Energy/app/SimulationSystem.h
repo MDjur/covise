@@ -184,7 +184,7 @@ class SimulationSystem final : public core::interface::ISystem {
   void interpolateDataForHeatingGridNodes(std::vector<osg::ref_ptr<grid::Point>> &nodes,
                                           std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   void interpolateDataForNode(int nodeId,
-                              std::vector<SimulationSystem::NodeData*> nodeDataPtrs,
+                              std::vector<std::reference_wrapper<SimulationSystem::NodeData>> nodeDataRefs,
                               std::shared_ptr<core::simulation::heating::HeatingSimulation> &sim);
   void interpolateDataHeatingGrid(std::shared_ptr<core::simulation::heating::HeatingSimulation> sim);
   std::vector<SimulationSystem::NodeData> getDataOfNeighboringNodes(int &id,
