@@ -1248,7 +1248,7 @@ void SimulationSystem::interpolateDataForNode(int nodeId,
   std::map<int, double> weightFactors;
 
   for (const auto& nd : nodeDataRefs) {
-    double weight = static_cast<double>(nd.get().neighboringNodesIds.size()) / numNodes;
+    double weight = 1 - (static_cast<double>(nd.get().neighboringNodesIds.size()) / numNodes);
     int neighborId = nd.get().neighboringNodesIds.back();
     weightFactors[neighborId] = weight;
   }
