@@ -79,7 +79,7 @@ class CityGMLSystem final : public core::interface::ISystem {
   std::pair<std::map<std::string, core::simulation::power::PVData>, float>
   loadPVData(opencover::utils::read::CSVStream &pvStream);
 
-  SolarPanel createSolarPanel(
+  std::unique_ptr<SolarPanel> createSolarPanel(
       const std::string &name, osg::ref_ptr<osg::Group> parent,
       const std::vector<core::utils::osgUtils::instancing::GeometryData>
           &masterGeometryData,
