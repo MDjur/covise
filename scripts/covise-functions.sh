@@ -10,7 +10,7 @@
 #
 guess_archsuffix() {
 
-   if [ "$ARCHSUFFIX" != "" ]; then
+   if [ ! -z ${ARCHSUFFIX+x} ]; then
       check_readme_archsuffix
       return
    fi
@@ -30,6 +30,7 @@ guess_archsuffix() {
    fi
 
     if [ "$basedir" != "" ]; then
+    if [ ! -z ${ARCHSUFFIX+x} ]; then
        case "$ARCHSUFFIX" in
            spack*)
               check_readme_archsuffix
@@ -47,6 +48,7 @@ guess_archsuffix() {
                fi
               ;;
       esac
+    fi
     fi
 
    case "$ARCH" in

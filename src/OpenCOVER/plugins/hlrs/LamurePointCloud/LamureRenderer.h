@@ -8,6 +8,9 @@
 
 // Platform-specific headers
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
@@ -20,13 +23,20 @@
 #include <mutex>
 #include <condition_variable>
 #include <memory>
+#include <unordered_set>
+#include <chrono>
+#include <limits>
+#include <atomic>
 
 #include <scm/core/math.h>
 #include <osg/Geometry>
 #include <osg/StateSet>
 #include <osg/Geode>
+#include <osg/MatrixTransform>
 #include <osg/Camera>
 #include <osg/State>
+#include <osg/Matrix>
+#include <osg/Group>
 #include <osgViewer/Viewer>
 #include <osgViewer/Renderer>
 #include <osgText/Text>
@@ -34,279 +44,385 @@
 #include <lamure/ren/bvh.h>
 #include <lamure/ren/camera.h>
 
-class Lamure;
-class LamureRenderer {
+#include <lamure/types.h>
+#include <osg/NodeCallback>
 
+#include "LamureEditTool.h"
+
+class Lamure;
+class LamureEditTool;
+class LamureRenderer;
+struct InitDrawCallback;
+
+class DispatchDrawCallback : public osg::Drawable::DrawCallback {
+public:
+    explicit DispatchDrawCallback(Lamure* plugin);
+    void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override;
 
 private:
+    Lamure* _plugin{ nullptr };
+    LamureRenderer* _renderer{ nullptr };
+};
+
+class CutsDrawCallback : public osg::Drawable::DrawCallback {
+public:
+    CutsDrawCallback(LamureRenderer* renderer) : m_renderer(renderer) {}
+    void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override;
+private:
+    LamureRenderer* m_renderer;
+};
+
+// Data attached to each model node (Geode) to identify it
+class LamureModelData : public osg::Referenced {
+public:
+    lamure::model_t modelId;
+    LamureModelData(lamure::model_t id) : modelId(id) {}
+};
+
+// Callback to handle drawing per model
+class PointsDrawCallback : public osg::Drawable::DrawCallback {
+public:
+    PointsDrawCallback(LamureRenderer* renderer) : m_renderer(renderer) {}
+    virtual void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const;
+private:
+    LamureRenderer* m_renderer;
+};
+
+class InitDrawCallback : public osg::Drawable::DrawCallback {
+public:
+    explicit InitDrawCallback(Lamure* plugin);
+    void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override;
+
+private:
+    Lamure* _plugin{nullptr};
+    LamureRenderer* _renderer{nullptr};
+};
+
+class TextDrawCallback : public osg::Drawable::DrawCallback
+{
+public:
+    TextDrawCallback(Lamure* plugin, osgText::Text* values);
+    void drawImplementation(osg::RenderInfo &renderInfo, const osg::Drawable *drawable) const override;
+
+private:
+    Lamure *_plugin{nullptr};
+    osg::ref_ptr<osgText::Text> _values;
+    LamureRenderer *_renderer{nullptr};
+    mutable std::chrono::steady_clock::time_point _lastUpdateTime;
+    std::chrono::milliseconds _minInterval;
+};
+
+class FrustumDrawCallback : public osg::Drawable::DrawCallback
+{
+public:
+    explicit FrustumDrawCallback(Lamure* plugin);
+    void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override;
+
+private:
+    Lamure* _plugin{nullptr};
+    LamureRenderer* _renderer{nullptr};
+};
+
+// Callback to draw BVH bounding boxes (culling/drawing logic aligned with _ref_LamureRenderer.cpp).
+class BoundingBoxDrawCallback : public osg::Drawable::DrawCallback {
+public:
+    BoundingBoxDrawCallback(LamureRenderer* renderer) : m_renderer(renderer) {}
+    void drawImplementation(osg::RenderInfo& renderInfo, const osg::Drawable* drawable) const override;
+
+private:
+    LamureRenderer* m_renderer;
+};
+
+class LamureRenderer {
+ 
+ 
+private:
+    friend struct InitDrawCallback;
+    friend class DispatchDrawCallback;
+    friend class CutsDrawCallback;
+    friend class PointsDrawCallback;
     Lamure* m_plugin{nullptr};
-    LamureRenderer* m_renderer{nullptr};
 
     //osg::ref_ptr<osg::Group> m_group;
 
-    void flushGlCommands();
-    void releaseSceneGraph();
+    void syncEditBrushGeometry();
 
-    struct CameraBinding;
-    CameraBinding& ensureCameraBinding(const osg::Camera* osgCamera);
-    void releaseCameraBindings();
-    bool isHudCamera(const osg::Camera* camera) const;
-
-    bool m_rendering{false};
     mutable std::mutex m_renderMutex;
     std::condition_variable m_renderCondition;
-    bool m_renderingAllowed{true};
     bool m_pauseRequested{false};
-    uint32_t m_framesPendingDrain{0};
     mutable std::mutex m_sceneMutex;
+    mutable std::mutex m_shader_mutex;
 
     // Private methods
     bool readShader(const std::string& pathString, std::string& shaderString, bool keepOptionalShaderCode);
-    void initCamera();
 
-    GLuint compileAndLinkShaders(std::string vsSource, std::string fsSource);
-    GLuint compileAndLinkShaders(std::string vsSource, std::string gsSource, std::string fsSource);
-    unsigned int createShader(const std::string& vertexShader, const std::string& fragmentShader, uint8_t ctxId);
-    unsigned int compileShader(unsigned int type, const std::string& source, uint8_t ctxId);
+    GLuint compileAndLinkShaders(std::string vsSource, std::string fsSource, uint8_t ctxId, std::string desc = "");
+    GLuint compileAndLinkShaders(std::string vsSource, std::string gsSource, std::string fsSource, uint8_t ctxId, std::string desc = "");
+    unsigned int compileShader(unsigned int type, const std::string &source, uint8_t ctxId, std::string desc = "");
+    void uploadClipPlanes(GLint countLocation, GLint dataLocation) const;
 
-    // Resource structs
-    struct pcl_resource;
-    struct box_resource;
-    struct plane_resource;
-    struct sphere_resource;
-    struct coord_recourse;
-    struct frustum_resource;
-    struct text_resource;
+    // --- OpenGL helper structs for context-local resources ---
+    struct GLGeo {
+        GLuint vao{0};
+        GLuint vbo{0};
+        GLuint ibo{0};
+        void destroy() {
+            if (ibo) { glDeleteBuffers(1, &ibo); ibo = 0; }
+            if (vbo) { glDeleteBuffers(1, &vbo); vbo = 0; }
+            if (vao) { glDeleteVertexArrays(1, &vao); vao = 0; }
+        }
+    };
 
-    struct PointShader {
+    struct GLShader {
         GLuint program{0};
+        void destroy() {
+            if (program) {
+                glDeleteProgram(program);
+                program = 0;
+            }
+        }
+    };
+
+    struct PointShader : GLShader {
         GLint  mvp_matrix_loc{-1};
+        GLint  model_matrix_loc{-1};
+        GLint  clip_plane_count_loc{-1};
+        GLint  clip_plane_data_loc{-1};
         GLint  max_radius_loc{-1};
         GLint  min_radius_loc{-1};
         GLint  max_screen_size_loc{-1};
         GLint  min_screen_size_loc{-1};
         GLint  scale_radius_loc{-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
+        GLint  scale_radius_gamma_loc{-1};
+        GLint  max_radius_cut_loc{-1};
         GLint  scale_projection_loc{-1};
+        GLint  proj_col0_loc{-1};
+        GLint  proj_col1_loc{-1};
+        GLint  viewport_half_y_loc{-1};
+        GLint  use_aniso_loc{-1};
+        GLint  aniso_normalize_loc{-1};
     };
-    PointShader m_point_shader;
 
-    struct PointColorShader {
-        GLuint program{0};
-        GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
-        GLint view_matrix_loc           {-1}; // mat4  view_matrix
-        GLint normal_matrix_loc         {-1}; // mat3  normal_matrix
-        GLint max_radius_loc            {-1}; // float max_radius
-        GLint min_radius_loc            {-1}; // float min_radius
-        GLint max_screen_size_loc       {-1};
-        GLint min_screen_size_loc       {-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
-        GLint scale_radius_loc          {-1}; // float scale_radius
-        GLint scale_projection_loc      {-1}; // float scale_projection
-        GLint show_normals_loc          {-1}; // bool  show_normals
-        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
-        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
-        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
-        GLint accuracy_loc              {-1}; // float accuracy
-        GLint average_radius_loc        {-1}; // float average_radius
-    };
-    PointColorShader m_point_color_shader;
-
-    struct PointColorLightingShader {
-        GLuint program{0};
-        GLint mvp_matrix_loc            {-1};
-        GLint view_matrix_loc           {-1};
-        GLint normal_matrix_loc         {-1};
-        GLint max_radius_loc            {-1};
-        GLint min_radius_loc            {-1};
+    struct PointColorShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint view_matrix_loc{-1};
+        GLint normal_matrix_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint min_radius_loc{-1};
         GLint max_screen_size_loc{-1};
         GLint min_screen_size_loc{-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
-        GLint scale_radius_loc          {-1};
-        GLint scale_projection_loc      {-1};
-        // --- Unified float-based lighting uniforms ---
-        GLint use_tone_mapping_loc      {-1};
-        GLint ambient_intensity_loc     {-1};
-        GLint specular_intensity_loc    {-1};
-        GLint shininess_loc             {-1};
-        GLint point_light_intensity_loc {-1};
-        GLint point_light_pos_vs_loc    {-1};
-        GLint gamma_loc                 {-1};
-        GLint show_normals_loc          {-1};
-        GLint show_accuracy_loc         {-1};
-        GLint show_radius_dev_loc       {-1};
-        GLint show_output_sens_loc      {-1};
-        GLint accuracy_loc              {-1};
-        GLint average_radius_loc        {-1};
-    };
-    PointColorLightingShader m_point_color_lighting_shader;
-
-    struct PointProvShader {
-        GLuint program{0};
-        GLint mvp_matrix_loc            {-1};
-        GLint max_radius_loc            {-1};
-        GLint min_radius_loc            {-1};
-        GLint max_screen_size_loc       {-1};
-        GLint min_screen_size_loc       {-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
-        GLint scale_radius_loc          {-1};
-        GLint scale_projection_loc      {-1};
-        GLint show_normals_loc          {-1}; // bool  show_normals
-        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
-        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
-        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
-        GLint accuracy_loc              {-1}; // float accuracy
-        GLint average_radius_loc        {-1}; // float average_radius
-        GLint channel_loc;
-        GLint heatmap_loc;
-        GLint heatmap_min_loc;
-        GLint heatmap_max_loc;
-        GLint heatmap_min_color_loc;
-        GLint heatmap_max_color_loc;
-    };
-    PointProvShader m_point_prov_shader;
-
-
-    struct SurfelShader {
-        GLuint program{0};
-        GLint  mvp_matrix_loc{-1};
-        GLint  model_view_matrix_loc {-1};
-        GLint  max_radius_loc{-1};
-        GLint  min_radius_loc{-1};
-        GLint max_screen_size_loc{-1};
-        GLint min_screen_size_loc{-1};
-        GLint  scale_radius_loc{-1};
-        GLint scale_projection_loc      {-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
-        GLint viewport_loc              {-1};
-        GLint use_aniso_loc             {-1};
-    };
-    SurfelShader m_surfel_shader;
-
-    struct SurfelColorShader {
-        GLuint program                   {0};
-        GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
-        GLint view_matrix_loc           {-1}; // mat4 view_matrix
-        GLint model_view_matrix_loc     {-1};
-        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
-        GLint min_radius_loc            {-1}; // float min_radius
-        GLint max_radius_loc            {-1}; // float max_radius
-        GLint max_screen_size_loc       {-1};
-        GLint min_screen_size_loc       {-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
-        GLint scale_radius_loc          {-1}; // float scale_radius
-        GLint viewport_loc              {-1};
-        GLint show_normals_loc          {-1}; // bool  show_normals
-        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
-        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
-        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
-        GLint accuracy_loc              {-1}; // float accuracy
-        GLint average_radius_loc        {-1}; // float average_radius
-        GLint scale_projection_loc      {-1};
-        GLint use_aniso_loc             {-1};
-    };
-    SurfelColorShader m_surfel_color_shader;
-
-    struct SurfelColorLightingShader {
-        GLuint program{0};
-        GLint mvp_matrix_loc            {-1}; // mat4 mvp_matrix
-        GLint view_matrix_loc           {-1}; // mat4 view_matrix
-        GLint model_view_matrix_loc     {-1};
-        GLint normal_matrix_loc         {-1}; // mat3 normal_matrix
-        GLint max_radius_loc            {-1}; // float max_radius
-        GLint max_screen_size_loc       {-1};
-        GLint min_screen_size_loc       {-1};
-        GLint min_radius_loc            {-1}; // float min_radius
-        GLint scale_radius_loc          {-1}; // float scale_radius
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
-        GLint viewport_loc              {-1}; // vec2 viewport
-        GLint scale_projection_loc      {-1};
-        GLint show_normals_loc          {-1}; // bool  show_normals
-        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
-        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
-        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
-        GLint accuracy_loc              {-1}; // float accuracy
-        GLint average_radius_loc        {-1}; // float average_radius
-        // --- Unified float-based lighting uniforms ---
-        GLint use_tone_mapping_loc      {-1};
-        GLint ambient_intensity_loc     {-1};
-        GLint specular_intensity_loc    {-1};
-        GLint shininess_loc             {-1};
-        GLint point_light_intensity_loc {-1};
-        GLint point_light_pos_vs_loc    {-1};
-        GLint gamma_loc                 {-1};
-        GLint use_aniso_loc             {-1};
-    };
-    SurfelColorLightingShader m_surfel_color_lighting_shader;
-
-    struct SurfelProvShader {
-        GLuint program{0};
-        GLint mvp_matrix_loc            {-1}; // mat4  mvp_matrix
-        GLint min_radius_loc            {-1}; // float min_radius
-        GLint max_radius_loc            {-1}; // float max_radius
-        GLint min_screen_size_loc       {-1};
-        GLint max_screen_size_loc       {-1};
-        GLint scale_radius_loc          {-1}; // float scale_radius
-        GLint scale_radius_gamma_loc    {-1}; // float scale_radius_gamma
-        GLint max_radius_cut_loc        {-1}; // float max_radius_cut
-        GLint viewport_loc              {-1}; // vec2 viewport
-        GLint scale_projection_loc      {-1};
-        GLint show_normals_loc          {-1}; // bool  show_normals
-        GLint show_accuracy_loc         {-1}; // bool  show_accuracy
-        GLint show_radius_dev_loc       {-1}; // bool  show_radius_deviation
-        GLint show_output_sens_loc      {-1}; // bool  show_output_sensitivity
-        GLint accuracy_loc              {-1}; // float accuracy
-        GLint average_radius_loc        {-1}; // float average_radius
-        GLint channel_loc               {-1}; // int   channel
-        GLint heatmap_loc               {-1};
-        GLint heatmap_min_loc           {-1};
-        GLint heatmap_max_loc           {-1};
-        GLint heatmap_min_color_loc     {-1};
-        GLint heatmap_max_color_loc     {-1};
-    };
-    SurfelProvShader m_surfel_prov_shader;
-
-    // Pass 1: Depth-only pass to establish a clean depth buffer and prevent Z-fighting.
-    struct SurfelPass1Shader {
-        GLuint program{0};
-        GLint mvp_matrix_loc{-1};           // mat4 mvp_matrix
-        GLint projection_matrix_loc{-1};    
-        GLint model_view_matrix_loc{-1};
-        GLint model_matrix_loc{-1};         // mat4 model_matrix
-        GLint viewport_loc {-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint proj_col0_loc{-1};
+        GLint proj_col1_loc{-1};
+        GLint viewport_half_y_loc{-1};
         GLint use_aniso_loc{-1};
-        GLint scale_projection_loc      {-1};
-        GLint scale_radius_gamma_loc    {-1};
-        GLint max_radius_cut_loc        {-1};
+        GLint aniso_normalize_loc{-1};
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+    };
 
-        GLint max_radius_loc{-1};           // float max_radius
-        GLint min_radius_loc{-1};           // float min_radius
+    struct PointColorLightingShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint view_matrix_loc{-1};
+        GLint normal_matrix_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint min_radius_loc{-1};
         GLint max_screen_size_loc{-1};
         GLint min_screen_size_loc{-1};
-        GLint scale_radius_loc{-1};         // float scale_radius
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint proj_col0_loc{-1};
+        GLint proj_col1_loc{-1};
+        GLint viewport_half_y_loc{-1};
+        GLint use_aniso_loc{-1};
+        GLint aniso_normalize_loc{-1};
+        GLint use_tone_mapping_loc{-1};
+        GLint ambient_intensity_loc{-1};
+        GLint specular_intensity_loc{-1};
+        GLint shininess_loc{-1};
+        GLint point_light_intensity_loc{-1};
+        GLint point_light_pos_vs_loc{-1};
+        GLint gamma_loc{-1};
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
     };
-    SurfelPass1Shader m_surfel_pass1_shader;
 
-    // Pass 2: Accumulation pass to gather color, normal, and position data in off-screen buffers.
-    struct SurfelPass2Shader {
-        GLuint program{0};
-        // Matrix uniforms used in pass 2
+    struct PointProvShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+        GLint channel_loc{-1};
+        GLint heatmap_loc{-1};
+        GLint heatmap_min_loc{-1};
+        GLint heatmap_max_loc{-1};
+        GLint heatmap_min_color_loc{-1};
+        GLint heatmap_max_color_loc{-1};
+    };
+
+    struct SurfelShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint model_view_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint viewport_loc{-1};
+        GLint use_aniso_loc{-1};
+    };
+
+    struct SurfelColorShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint view_matrix_loc{-1};
+        GLint model_view_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint normal_matrix_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint viewport_loc{-1};
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint use_aniso_loc{-1};
+    };
+
+    struct SurfelColorLightingShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint view_matrix_loc{-1};
+        GLint model_view_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint normal_matrix_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint viewport_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+        GLint use_tone_mapping_loc{-1};
+        GLint ambient_intensity_loc{-1};
+        GLint specular_intensity_loc{-1};
+        GLint shininess_loc{-1};
+        GLint point_light_intensity_loc{-1};
+        GLint point_light_pos_vs_loc{-1};
+        GLint gamma_loc{-1};
+        GLint use_aniso_loc{-1};
+    };
+
+    struct SurfelProvShader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint clip_plane_count_loc{-1};
+        GLint clip_plane_data_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint scale_radius_loc{-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint viewport_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint show_normals_loc{-1};
+        GLint show_accuracy_loc{-1};
+        GLint show_radius_dev_loc{-1};
+        GLint show_output_sens_loc{-1};
+        GLint accuracy_loc{-1};
+        GLint average_radius_loc{-1};
+        GLint channel_loc{-1};
+        GLint heatmap_loc{-1};
+        GLint heatmap_min_loc{-1};
+        GLint heatmap_max_loc{-1};
+        GLint heatmap_min_color_loc{-1};
+        GLint heatmap_max_color_loc{-1};
+    };
+
+    struct SurfelPass1Shader : GLShader {
+        GLint mvp_matrix_loc{-1};
+        GLint projection_matrix_loc{-1};
+        GLint model_view_matrix_loc{-1};
+        GLint model_matrix_loc{-1};
+        GLint viewport_loc{-1};
+        GLint use_aniso_loc{-1};
+        GLint scale_projection_loc{-1};
+        GLint scale_radius_gamma_loc{-1};
+        GLint max_radius_cut_loc{-1};
+        GLint max_radius_loc{-1};
+        GLint min_radius_loc{-1};
+        GLint max_screen_size_loc{-1};
+        GLint min_screen_size_loc{-1};
+        GLint scale_radius_loc{-1};
+    };
+
+    struct SurfelPass2Shader : GLShader {
         GLint model_view_matrix_loc{-1};
         GLint projection_matrix_loc{-1};
         GLint normal_matrix_loc{-1};
-        // Samplers / viewport
         GLint depth_texture_loc{-1};
         GLint viewport_loc{-1};
         GLint use_aniso_loc{-1};
         GLint scale_projection_loc{-1};
-        // Scaling uniforms (from VS)
         GLint max_radius_loc{-1};
         GLint min_radius_loc{-1};
         GLint min_screen_size_loc{-1};
@@ -314,62 +430,41 @@ private:
         GLint scale_radius_loc{-1};
         GLint scale_radius_gamma_loc{-1};
         GLint max_radius_cut_loc{-1};
-        // Visualization uniforms (from vis_color.glsl)
         GLint show_normals_loc{-1};
         GLint show_accuracy_loc{-1};
         GLint show_radius_dev_loc{-1};
         GLint show_output_sens_loc{-1};
         GLint accuracy_loc{-1};
         GLint average_radius_loc{-1};
-        // Blending uniforms
         GLint depth_range_loc{-1};
         GLint flank_lift_loc{-1};
-        // Misc
         GLint coloring_loc{-1};
     };
-    SurfelPass2Shader m_surfel_pass2_shader;
 
-    // Pass 3: Resolve pass to combine accumulated data, apply lighting, and render the final image.
-    struct SurfelPass3Shader {
-        GLuint program{0};
-        // Input textures from FBO
+    struct SurfelPass3Shader : GLShader {
         GLint in_color_texture_loc{-1};
         GLint in_normal_texture_loc{-1};
         GLint in_vs_position_texture_loc{-1};
         GLint in_depth_texture_loc{-1};
-        // Lighting uniforms (for Blinn-Phong shading)
-        GLint point_light_pos_vs_loc    {-1};
-        GLint point_light_intensity_loc {-1};
-        GLint ambient_intensity_loc     {-1};
-        GLint specular_intensity_loc    {-1};
-        GLint shininess_loc             {-1};
-        GLint use_tone_mapping_loc      {-1};
-        GLint gamma_loc                 {-1};
-        GLint lighting_loc {-1};
-
+        GLint point_light_pos_vs_loc{-1};
+        GLint point_light_intensity_loc{-1};
+        GLint ambient_intensity_loc{-1};
+        GLint specular_intensity_loc{-1};
+        GLint shininess_loc{-1};
+        GLint use_tone_mapping_loc{-1};
+        GLint gamma_loc{-1};
+        GLint lighting_loc{-1};
     };
-    SurfelPass3Shader m_surfel_pass3_shader;
 
-    struct LineShader {
-        GLuint program{0};
+    struct LineShader : GLShader {
         GLint in_color_location{-1};
         GLint mvp_matrix_location{-1};
     };
-    LineShader m_line_shader;
 
-
-    struct PclResource {
-        GLuint screen_quad_vao = 0;
-        GLuint screen_quad_vbo = 0;
-        std::array<float, 18> screen_quad_vertex = {
-            -1.0f,  1.0f, 0.0f,   -1.0f, -1.0f, 0.0f,    1.0f, -1.0f, 0.0f,
-            -1.0f,  1.0f, 0.0f,    1.0f, -1.0f, 0.0f,    1.0f,  1.0f, 0.0f
-        };
-
-        GLuint vao = 0;
-    };
-
-    PclResource m_pcl_resource;
+    static constexpr int kMaxClipPlanes = 6;
+    std::array<scm::math::vec4f, kMaxClipPlanes> m_clip_planes;
+    int m_clip_plane_count{0};
+    int m_enabled_clip_distances{0};
 
     struct MultipassTarget {
         GLuint fbo = 0;
@@ -397,100 +492,107 @@ private:
         }
     };
 
-    std::unordered_map<MultipassTargetKey, MultipassTarget, MultipassTargetKeyHash> m_multipass_targets;
+    struct ContextResources {
+        uint8_t ctx = -1;
+        int view_id = -1;
+        bool rendering = false;
+        bool rendering_allowed = true;
+        uint32_t frames_pending_drain = 0;
+        // Initialization flags
+        bool resources_initialized{false}; // VBOs, VAOs (Volatile: reset on model change)
+        bool shaders_initialized{false};   // Programs (Persistent: keep across model change)
+        bool initialized{false};           // Base context (Schism, Camera)
 
-
-    struct BoxResource {
-        GLuint vbo = 0;
-        GLuint ibo = 0;
-        GLuint vao = 0;
-        GLuint program = 0;
-        std::array<unsigned short, 24> idx = { 
+        // Geometry
+        GLGeo geo_box;
+        GLGeo geo_frustum;
+        GLGeo geo_screen_quad;
+        GLGeo geo_text;
+        GLuint vao_pointcloud{0};
+        bool vao_initialized{false};
+        std::array<unsigned short, 24> box_idx = {{
             0, 1, 2, 3, 4, 5, 6, 7,
             0, 2, 1, 3, 4, 6, 5, 7,
             0, 4, 1, 5, 2, 6, 3, 7,
-        };
-    };
-    BoxResource m_box_resource;
-
-    //struct PlaneResource {
-    //    GLuint vbo{ 0 };
-    //    GLuint ibo{ 0 };
-    //    GLuint vao{ 0 };
-    //    GLuint program{ 0 };
-    //    std::array<unsigned short, 6> idx = {
-    //        1,3,7,5,1,7
-    //    };
-    //};
-    //PlaneResource m_plane_resource;
-
-
-    struct FrustumResource {
-        GLuint vao = 0;
-        GLuint vbo = 0;
-        GLuint ibo = 0;
-        GLuint program = 0;
-        std::array<float, 24> vertices;
-        std::array<unsigned short, 24> idx = {
+        }};
+        std::array<unsigned short, 24> frustum_idx = {{
             0, 1, 2, 3, 4, 5, 6, 7,
             0, 2, 1, 3, 4, 6, 5, 7,
             0, 4, 1, 5, 2, 6, 3, 7,
-        };
-    };
-    FrustumResource m_frustum_resource;
-
-    struct TextResource {
-        GLuint vao{ 0 };
-        GLuint vbo{ 0 };
-        GLuint program{ 0 };
-        GLuint atlas_texture{ 0 };
+        }};
+        std::array<float, 24> frustum_vertices{{}};
+        std::array<float, 18> screen_quad_vertex = {{
+            -1.0f,  1.0f, 0.0f,   -1.0f, -1.0f, 0.0f,    1.0f, -1.0f, 0.0f,
+            -1.0f,  1.0f, 0.0f,    1.0f, -1.0f, 0.0f,    1.0f,  1.0f, 0.0f
+        }};
         std::string text;
-        size_t num_vertices{ 0 };
-    };
-    TextResource m_text_resource;
+        size_t num_text_vertices{0};
+        GLuint text_atlas_texture{0};
 
-    struct CameraBinding {
-        const osg::Camera* osgCamera{nullptr};
-        std::unique_ptr<lamure::ren::camera> lamureCamera;
-        lamure::view_t viewDescriptor{0};
-        scm::math::mat4d modelview{scm::math::mat4d::identity()};
-        scm::math::mat4d projection{scm::math::mat4d::identity()};
+        // Shaders
+        PointShader sh_point;
+        PointColorShader sh_point_color;
+        PointColorLightingShader sh_point_color_lighting;
+        PointProvShader sh_point_prov;
+        SurfelShader sh_surfel;
+        SurfelColorShader sh_surfel_color;
+        SurfelColorLightingShader sh_surfel_color_lighting;
+        SurfelProvShader sh_surfel_prov;
+        SurfelPass1Shader sh_surfel_pass1;
+        SurfelPass2Shader sh_surfel_pass2;
+        SurfelPass3Shader sh_surfel_pass3;
+        LineShader sh_line;
+
+        // FBOs
+        std::unordered_map<MultipassTargetKey, MultipassTarget, MultipassTargetKeyHash> multipass_targets;
+        scm::gl::render_device_ptr  scm_device;
+        scm::gl::render_context_ptr scm_context;
+
+        std::unique_ptr<lamure::ren::camera> scm_camera;
+        bool dump_done = false;
+        uint64_t last_camera_frame{std::numeric_limits<uint64_t>::max()};
+        bool gpu_info_logged{false};
+        bool gpu_consistency_checked{false};
+        std::string gpu_uuid;
+        std::string driver_uuid;
+        std::string gpu_vendor;
+        std::string gpu_renderer;
+        std::string gpu_version;
+        std::string gpu_key;
     };
 
-    // Matrices
-    scm::math::mat4d m_modelview_matrix{scm::math::mat4d::identity()};
-    scm::math::mat4d m_projection_matrix{scm::math::mat4d::identity()};
+
+    std::map<int, ContextResources> m_ctx_res;
+    std::mutex m_ctx_mutex;
+    std::atomic<bool> m_gpu_org_ready{false};
 
     // Schism objects
-    scm::gl::render_device_ptr      m_device;
-    scm::gl::render_context_ptr     m_context;
+    std::unordered_set<int> m_initialized_context_ids;
+    std::unordered_set<const void*> m_initialized_context_ptrs;
 
-    // Cameras
-    lamure::ren::camera* m_scm_camera{nullptr};
-    const osg::Camera* m_active_osg_camera{nullptr};
-    std::unordered_map<const osg::Camera*, CameraBinding> m_camera_bindings;
-    lamure::view_t m_next_view_descriptor{0};
     osg::ref_ptr<osg::Camera>   m_osg_camera;
     osg::ref_ptr<osg::Camera>   m_hud_camera;
 
+
+    osg::ref_ptr<osg::Group> m_frustum_group;
+
     // Geodes
     osg::ref_ptr<osg::Geode> m_init_geode;
-    osg::ref_ptr<osg::Geode> m_pointcloud_geode;
-    osg::ref_ptr<osg::Geode> m_boundingbox_geode;
-    osg::ref_ptr<osg::Geode> m_frustum_geode;
+    osg::ref_ptr<osg::Geode> m_dispatch_geode;
     osg::ref_ptr<osg::Geode> m_text_geode;
+    osg::ref_ptr<osg::Geode> m_frustum_geode;
+    osg::ref_ptr<osg::Geode> m_edit_brush_geode;
+    osg::ref_ptr<osg::MatrixTransform> m_edit_brush_transform;
 
     // Stateset
     osg::ref_ptr<osg::StateSet> m_init_stateset;
-    osg::ref_ptr<osg::StateSet> m_pointcloud_stateset;
-    osg::ref_ptr<osg::StateSet> m_boundingbox_stateset;
-    osg::ref_ptr<osg::StateSet> m_frustum_stateset;
+    osg::ref_ptr<osg::StateSet> m_dispatch_stateset;
     osg::ref_ptr<osg::StateSet> m_text_stateset;
+    osg::ref_ptr<osg::StateSet> m_frustum_stateset;
 
     // Geometry
     osg::ref_ptr<osg::Geometry> m_init_geometry;
-    osg::ref_ptr<osg::Geometry> m_pointcloud_geometry;
-    osg::ref_ptr<osg::Geometry> m_boundingbox_geometry;
+    osg::ref_ptr<osg::Geometry> m_dispatch_geometry;
     osg::ref_ptr<osg::Geometry> m_frustum_geometry;
 
     // Framebuffers
@@ -585,59 +687,55 @@ private:
     bool m_last_sync_state{false};
 
 public:
+    Lamure* getPlugin() const noexcept { return m_plugin; }
     LamureRenderer(Lamure* lamure_plugin);
     ~LamureRenderer();
+    bool notifyOn() const;
+    bool gpuOrganizationReady() const { return m_gpu_org_ready.load(std::memory_order_acquire); }
 
     void init();
     void shutdown();
     void detachCallbacks();
 
-    bool beginFrame();
-    void endFrame();
-    bool pauseAndWaitForIdle(uint32_t extraDrainFrames);
+    bool beginFrame(int ctxId);
+    void endFrame(int ctxId);
+    bool pauseAndDrainFrames(uint32_t extraDrainFrames);
     void resumeRendering();
     bool isRendering() const;
+    bool getModelMatrix(const osg::Node* node, osg::Matrixd& out) const;
+    bool getModelViewProjectionFromRenderInfo(osg::RenderInfo& renderInfo, const osg::Node* node, osg::Matrixd& outModel, osg::Matrixd& outView, osg::Matrixd& outProj) const;
+    void updateScmCameraFromRenderInfo(osg::RenderInfo& renderInfo, int ctxId);
 
-    void initFrustumResources();
-    void initLamureShader();
-    void initSchismObjects();
-    void initUniforms();
-    void initBoxResources();
-    void initPclResources();
+    void initCamera(ContextResources& res);
+    void initFrustumResources(ContextResources& res);
+    void initLamureShader(ContextResources& res);
+    void initSchismObjects(ContextResources& res);
+    bool initGpus(ContextResources& res);
+    void initUniforms(ContextResources& res);
+    void initBoxResources(ContextResources& res);
+    void initPclResources(ContextResources& res);
     void releaseMultipassTargets();
     void initializeMultipassTarget(MultipassTarget& target, int width, int height);
     void destroyMultipassTarget(MultipassTarget& target);
 
-    bool getRendering() { return m_rendering; };
-    void setRendering(bool rendering) { m_rendering = rendering; };
+    lamure::ren::camera* getScmCamera(int ctxId) {
+        return getResources(ctxId).scm_camera.get();
+    }
 
-    // Getters for private members
-    lamure::ren::camera* getScmCamera() { return m_scm_camera; }
-    osg::ref_ptr<osg::Camera> getOsgCamera() { return m_osg_camera; }
+    const lamure::ren::camera* getScmCamera(int ctxId) const { return getResources(ctxId).scm_camera.get(); }
 
-    scm::math::mat4d getModelViewMatrix() { return m_modelview_matrix; }
-    scm::math::mat4d getProjectionMatrix() { return m_projection_matrix; }
-    lamure::ren::camera* activateCameraForDraw(const osg::Camera* osgCamera,
-                                               const scm::math::mat4d& modelview,
-                                               const scm::math::mat4d& projection,
-                                               bool syncActive);
     MultipassTarget& acquireMultipassTarget(lamure::context_t contextID, const osg::Camera* camera, int width, int height);
-
-    void setModelViewMatrix(scm::math::mat4d model_view_matrix) { m_modelview_matrix = model_view_matrix; }
-    void setProjectionMatrix(scm::math::mat4d projection_matrix) { m_projection_matrix = projection_matrix; }
-    void updateSyncCameraState(const osg::Camera* sourceCamera,
-                               const scm::math::mat4d& modelview,
-                               const scm::math::mat4d& projection,
-                               bool syncActive,
-                               bool haveState);
-
-    osg::ref_ptr<osg::Geode> getPointcloudGeode() { return m_pointcloud_geode; }
-    osg::ref_ptr<osg::Geode> getBoundingboxGeode() { return m_boundingbox_geode; }
-    osg::ref_ptr<osg::Geode> getFrustumGeode() { return m_frustum_geode; }
     osg::ref_ptr<osg::Geode> getTextGeode() { return m_text_geode; }
+    osg::ref_ptr<osg::Geode> getFrustumGeode() { return m_frustum_geode; }
+    osg::ref_ptr<osg::MatrixTransform> getEditBrushTransform() { return m_edit_brush_transform; }
+    osg::MatrixTransform* ensureEditBrushNode(osg::Group* parent);
+    osg::Matrixd composeEditBrushMatrix(const osg::Matrixd& interactorMat, const osg::Matrixd& parentWorld, const osg::Matrixd& invRoot, double hullScale) const;
+    osg::Matrixd updateEditBrushFromInteractor(const osg::Matrixd& interactorMat, const osg::Matrixd& invRoot, double hullScale);
+    void setEditBrushTransform(const osg::Matrixd& brushMat);
+    void destroyEditBrushNode(osg::Group* parent);
 
-    scm::gl::render_device_ptr getDevice() { return m_device; }
-    scm::gl::render_context_ptr getContext() { return m_context; }
+    scm::gl::render_device_ptr getDevice(int ctxId) { return getResources(ctxId).scm_device; }
+    scm::gl::render_context_ptr getSchismContext(int ctxId) { return getResources(ctxId).scm_context; }
 
     enum class ShaderType {
         Point,
@@ -671,38 +769,49 @@ public:
     ShaderType m_active_shader_type = ShaderType::Point;
 
     const std::vector<ShaderInfo>& getPclShader() const { return pcl_shader; }
+    
+    // Shared CPU data (prepared once, read by all contexts)
     std::map<uint32_t, std::vector<uint32_t>> m_bvh_node_vertex_offsets;
+    std::vector<float> m_shared_box_vertices;
+
+    // Call this from main thread when models change, before rendering resumes
+    void updateSharedBoxData();
 
     void setActiveShaderType(ShaderType t) { m_active_shader_type = t; }
-    void setFrameUniforms(const scm::math::mat4& projection_matrix, const scm::math::vec2& viewport);
-    void setModelUniforms(const scm::math::mat4& mvp_matrix);
-    void setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_id);
+    ShaderType getActiveShaderType() const { return m_active_shader_type; }
+    void setFrameUniforms(const scm::math::mat4& projection_matrix, const scm::math::mat4& view_matrix, const scm::math::vec2& viewport, ContextResources& ctx);
+    void setModelUniforms(const scm::math::mat4& mvp_matrix, const scm::math::mat4& model_matrix, ContextResources& ctx);
+    void setNodeUniforms(const lamure::ren::bvh* bvh, uint32_t node_id, ContextResources& ctx);
     bool isModelVisible(std::size_t modelIndex) const;
+    
+    void getMatricesFromRenderInfo(osg::RenderInfo& renderInfo, osg::Matrixd& outView, osg::Matrixd& outProj);
 
+    void updateActiveClipPlanes();
+    void enableClipDistances();
+    void disableClipDistances();
+    int clipPlaneCount() const { return m_clip_plane_count; }
+    bool supportsClipPlanes(ShaderType type) const;
 
-    std::string glTypeToString(GLenum type);
-    void print_active_uniforms(GLuint programID, const std::string& shaderName);
+    ContextResources& getResources(int ctxId);
+    const ContextResources& getResources(int id) const {
+        return const_cast<LamureRenderer*>(this)->getResources(id);
+    }
 
-    const PointShader&                  getPointShader()                const { return m_point_shader; }
-    const PointColorShader&             getPointColorShader()           const { return m_point_color_shader; }
-    const PointColorLightingShader&     getPointColorLightingShader()   const { return m_point_color_lighting_shader; }
-    const PointProvShader&              getPointProvShader()            const { return m_point_prov_shader; }
+    const PointShader&                  getPointShader(int ctxId)                const { return getResources(ctxId).sh_point; }
+    const PointColorShader&             getPointColorShader(int ctxId)           const { return getResources(ctxId).sh_point_color; }
+    const PointColorLightingShader&     getPointColorLightingShader(int ctxId)   const { return getResources(ctxId).sh_point_color_lighting; }
+    const PointProvShader&              getPointProvShader(int ctxId)            const { return getResources(ctxId).sh_point_prov; }
 
-    const SurfelShader&                 getSurfelShader()               const { return m_surfel_shader; }
-    const SurfelColorShader&            getSurfelColorShader()          const { return m_surfel_color_shader; }
-    const SurfelColorLightingShader&    getSurfelColorLightingShader()  const { return m_surfel_color_lighting_shader; }
-    const SurfelProvShader&             getSurfelProvShader()           const { return m_surfel_prov_shader; }
+    const SurfelShader&                 getSurfelShader(int ctxId)               const { return getResources(ctxId).sh_surfel; }
+    const SurfelColorShader&            getSurfelColorShader(int ctxId)          const { return getResources(ctxId).sh_surfel_color; }
+    const SurfelColorLightingShader&    getSurfelColorLightingShader(int ctxId)  const { return getResources(ctxId).sh_surfel_color_lighting; }
+    const SurfelProvShader&             getSurfelProvShader(int ctxId)           const { return getResources(ctxId).sh_surfel_prov; }
 
-    const SurfelPass1Shader&            getSurfelPass1Shader()          const { return m_surfel_pass1_shader; }
-    const SurfelPass2Shader&            getSurfelPass2Shader()          const { return m_surfel_pass2_shader; }
-    const SurfelPass3Shader&            getSurfelPass3Shader()          const { return m_surfel_pass3_shader; }
+    const SurfelPass1Shader&            getSurfelPass1Shader(int ctxId)          const { return getResources(ctxId).sh_surfel_pass1; }
+    const SurfelPass2Shader&            getSurfelPass2Shader(int ctxId)          const { return getResources(ctxId).sh_surfel_pass2; }
+    const SurfelPass3Shader&            getSurfelPass3Shader(int ctxId)          const { return getResources(ctxId).sh_surfel_pass3; }
 
-    const LineShader&                   getLineShader()                 const { return m_line_shader; }
-
-    PclResource&      getPclResource()      { return m_pcl_resource; }
-    BoxResource&      getBoxResource()      { return m_box_resource; }
-    FrustumResource&  getFrustumResource()  { return m_frustum_resource; }
-    TextResource&     getTextResource()     { return m_text_resource; }
+    const LineShader&                   getLineShader(int ctxId)                 const { return getResources(ctxId).sh_line; }
 
 };
 

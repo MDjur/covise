@@ -45,6 +45,8 @@
 #include "ui/SelectionList.h"
 #include "ui/View.h"
 
+#include <limits>
+
 using namespace vsg;
 using namespace vive;
 using covise::coCoviseConfig;
@@ -140,6 +142,7 @@ void vvSceneGraph::init()
         if (m_pointerVisible)
         {
             //m_scene->removeChild(m_handTransform);
+            vvPluginSupport::removeChild(m_scene, m_handTransform);
             m_pointerVisible = false;
         }
     }
@@ -229,14 +232,14 @@ void vvSceneGraph::init()
     tm->setText("Toggle VR menu");
     tm->addShortcut("m");
     tm->setCallback([this]() { toggleMenu(); });
-    tm->setVisible(false);
+    tm->setVisible(true);
 
     auto sm = new ui::Button(vv->viewOptionsMenu, "ShowMenu");
     vv->viewOptionsMenu->add(sm);
     sm->setText("Show VR menu");
     sm->setState(m_showMenu);
     sm->setCallback([this](bool state) { setMenu(state ? MenuAndObjects : MenuHidden); });
-    sm->setVisible(false);
+    sm->setVisible(/*false*/ true);
     m_showMenuButton = sm;
 
     auto fc = new ui::Action(vv->viewOptionsMenu, "ForceCompile");
@@ -377,7 +380,7 @@ void vvSceneGraph::initSceneGraph()
     m_handAxisScaleTransform->matrix = (vsg::scale(scale, scale, scale));
 
     // read icons size from covise.config, default is sceneSize/10
-    m_handIconSize = coCoviseConfig::getFloat("VIVE.IconSize", vv->getSceneSize() / 25.0f);
+    m_handIconSize = coCoviseConfig::getFloat("VIVE.IconSize", 1.0f);
     m_handIconOffset = coCoviseConfig::getFloat("VIVE.IconOffset", 0.0);
 
     // read icon displacement
@@ -1404,16 +1407,8 @@ vvSceneGraph::getBoundingSphere()
 void vvSceneGraph::scaleAllObjects(bool resetView, bool simple)
 {
 
-
-    // create view
-    // compute the bounds of the scene graph to help position camera
     vsg::ComputeBounds computeBounds;
     m_objectsRoot->accept(computeBounds);
-    vsg::dvec3 centre = (computeBounds.bounds.min + computeBounds.bounds.max) * 0.5;
-    double radius = vsg::length(computeBounds.bounds.max - computeBounds.bounds.min) * 0.5;
-
-    if (radius <= 0.f)
-        radius = 1.f;
 
     // scale and translate but keep current orientation
     double scaleFactor = 1.f, masterScale = 1.f;
@@ -1475,7 +1470,10 @@ void vvSceneGraph::boundingBoxToMatrices(const vsg::dbox &boundingBox,
     vsg::dvec3 center = (boundingBox.min + boundingBox.max) * 0.5;
     double radius = vsg::length(boundingBox.max - boundingBox.min) * 0.5;
 
-    scaleFactor = std::abs(vv->getSceneSize() * radius);
+    if (radius <= 0.f || radius == std::numeric_limits<double>::infinity()) //if object roots has no children, double radius takes value inf
+        radius = 1.f;
+
+    scaleFactor = std::abs(vv->getSceneSize() / 2.f / radius);
     currentMatrix=translate(center * -scaleFactor);
     if (!resetView)
     {
@@ -1483,8 +1481,8 @@ void vvSceneGraph::boundingBoxToMatrices(const vsg::dbox &boundingBox,
         vsg::dquat rotation;
         vsg::decompose(m_objectsTransform->matrix, t, rotation, s);
         vsg::dmat4 rotMat;
-        rotMat=rotate(rotation);
-        currentMatrix=currentMatrix*rotMat;
+        rotMat = rotate(rotation);
+        currentMatrix = rotMat * currentMatrix;
     }
 }
 

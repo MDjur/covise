@@ -13,7 +13,7 @@
  ** Description: GeoDataLoader Plugin                                        **
  **                                                                          **
  **                                                                          **
- ** Author: Uwe W�ssner 		                                             **
+ ** Author: Uwe Wössner 		                                             **
  **                                                                          **
  ** History:  								                                 **
  **                                                                          **
@@ -23,6 +23,7 @@
 #include <vector>
 #include <osg/PositionAttitudeTransform>
 #include <osgTerrain/Terrain>
+#include <osg/TexMat>
 #include <cover/coVRPlugin.h>
 #include "CutGeometry.h"
 #include <proj.h>
@@ -34,6 +35,7 @@
 #include <cover/ui/Button.h>
 #include <cover/ui/SelectionList.h>
 #include <filesystem>
+#include <optional>
 
 namespace fs = std::filesystem;
 
@@ -44,12 +46,15 @@ namespace fs = std::filesystem;
 class skyEntry
 {
 public:
+    enum skyType {texture=0,geometry};
     skyEntry(const std::string& n, const std::string& fn);
     ~skyEntry();
     skyEntry(const skyEntry &se);
     std::string name;
     std::string fileName;
     osg::ref_ptr<osg::Node> skyNode;
+    osg::ref_ptr<osg::Texture2D> skyTexture;
+    skyType type = geometry;
 };
 
 class  GeoDataLoader: public opencover::coVRPlugin, public opencover::ui::Owner
@@ -59,19 +64,33 @@ public:
     bool init();
     ~GeoDataLoader();
 
-    osg::ref_ptr<osg::Node> loadTerrain(std::string filename, osg::Vec3d offset);
+    osg::ref_ptr<osg::Node> loadTerrain(std::string filename, osg::Vec3d localOffset);
     bool addLayer(std::string filename);
 
     static GeoDataLoader *instance();
-    osg::Vec3 offset;
+    osg::Vec3 rootOffset{0.0, 0.0, 0.0};
+    float trueNorthDegree = 0.0f;
     float NorthAngle;
-    void parseCoordinates(const std::string& jsonData);
+    osg::ref_ptr<osg::Geode> TexturedSphere;
+    osg::TexMat* texMat;
+
+    struct geoLocation
+    {
+        double latitude;
+        double longitude;
+        double easting;
+        double northing;
+        double height;
+        std::string displayName;
+    };
+
     virtual bool update();
     virtual void message(int toWhom, int type, int length, const void* data);
     void setSky(int num);
     void setSky(std::string fileName);
-    void setOffset(osg::Vec3 off);
-
+    void setRootTransform(const osg::Vec3& offset, float trueNorthDeg);
+    std::optional<geoLocation> parseCoordinates(const std::string& jsonData);
+    void jumpToLocation(const osg::Vec3d &worldPos);
 
 private:
     static GeoDataLoader *s_instance;
@@ -81,20 +100,47 @@ private:
     osg::ref_ptr<osg::MatrixTransform> rootNode;
     osg::ref_ptr<osg::MatrixTransform> skyRootNode;
     osg::ref_ptr<osg::Node> currentSkyNode;
+    osg::ref_ptr<osg::Node> skyNode;
+    osg::ref_ptr<osg::Node> terrainNode = nullptr;
     std::map<std::string, osg::ref_ptr<osg::Node>> loadedTerrains;
     std::map<std::string, osg::ref_ptr<osg::Node>> loadedBuildings;
+
     opencover::ui::Menu* geoDataMenu;
     opencover::ui::Menu* terrainMenu;
     opencover::ui::Menu* buildingMenu;
+    opencover::ui::Group* skyGroup;
+    opencover::ui::Group* originGroup;
+    opencover::ui::Group* locationGroup;
+
     opencover::ui::Button* skyButton;
+    opencover::ui::Button* applyOffset;
     opencover::ui::EditField* location;
+    opencover::ui::EditField* easting;
+    opencover::ui::EditField* northing;
+    opencover::ui::EditField* height;
+    opencover::ui::EditField* trueNorth;
+    opencover::ui::SelectionList* datasetList;
     opencover::ui::SelectionList* skys;
     std::list<skyEntry> skyEntries;
+
+    struct DatasetInfo
+    {
+        std::string name;
+        double easting;
+        double northing;
+        double height;
+        double trueNorth;
+    };
+    std::vector<DatasetInfo> datasets;
+
     float northAngle;
     std::string terrainFile;
     std::string skyPath;
     int defaultSky;
 
-
+    std::string tempEastingText;
+    std::string tempNorthingText;
+    std::string tempHeightText;
+    std::string tempTrueNorthText;
 };
 #endif

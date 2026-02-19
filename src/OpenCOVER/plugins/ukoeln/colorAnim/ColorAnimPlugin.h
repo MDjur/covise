@@ -13,6 +13,7 @@
 #include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/MatrixTransform>
+#include <osg/Group>
 #include <vector>
 #include <string>
  
@@ -68,6 +69,11 @@ private:
     osg::ref_ptr<osg::MatrixTransform> brainTransform;
     osg::ref_ptr<osg::Geode> brainGeode;
     osg::ref_ptr<osg::Geometry> brainGeometry;
+    osg::ref_ptr<osg::Group> brainGroup;
+
+    osg::ref_ptr<osg::MatrixTransform> electrodeTransform;
+
+    
 
     // Animation data
     std::vector<osg::ref_ptr<osg::Vec4Array>> colorFrames;
@@ -87,6 +93,7 @@ private:
     void flipNormals();
     float applyInterpolationCurve(float t);
     void setInterpolationMode(InterpolationMode mode);
+    void setupVertexColorMaterial(osg::Node *node);
 };
 
 #endif

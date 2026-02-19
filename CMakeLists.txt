@@ -204,9 +204,6 @@ else()
 endif()
 
 set(COVISE_CPU_ARCH "native" CACHE STRING "CPU architecture to optimize for (native, core-avx2, atom, ...)")
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 60) # be compatible with P6000/GP100
-endif()
 
 option(COVISE_SANITIZE_UNDEFINED "Build with -fsanitize=undefined" OFF)
 option(COVISE_SANITIZE_ADDRESS "Build with -fsanitize=address" OFF)
@@ -305,6 +302,8 @@ COVISE_FIND_PACKAGE(Python COMPONENTS Interpreter Development)
 
 if (NOT COVISE_BUILD_ONLY_FILE)
     # find important covise dependencies
+    set(OpenGL_GL_PREFERENCE LEGACY)
+    COVISE_FIND_PACKAGE(OpenGL)
     COVISE_FIND_PACKAGE(nlohmann_json 3.10.0 QUIET)
 
     IF(APPLE)
@@ -323,8 +322,6 @@ if (NOT COVISE_BUILD_ONLY_FILE)
     COVISE_FIND_PACKAGE(PTHREAD)
     #COVISE_FIND_PACKAGE(Pthreads)
     COVISE_FIND_PACKAGE(OpenSSL)
-    set(OpenGL_GL_PREFERENCE LEGACY)
-    COVISE_FIND_PACKAGE(OpenGL)
     COVISE_FIND_PACKAGE(OpenXR CONFIG)
     COVISE_FIND_PACKAGE(GLEW) # virvo depends on it
     if (NOT GLEW_FOUND)
@@ -343,11 +340,13 @@ if (NOT COVISE_BUILD_ONLY_FILE)
 	
 	covise_find_package(Freetype)
 	covise_find_package(CURL)
+    if (NOT COVISE_BUILD_ONLY_ODDLOT AND NOT COVISE_BUILD_ONLY_COVER)
         covise_find_package(glslang 15 CONFIG)
-	covise_find_package(Vulkan 1.1.70)
+        covise_find_package(Vulkan 1.1.70)
         covise_find_package(vsg 1.1.4 CONFIG)
         covise_find_package(vsgXchange 1.0.5 CONFIG)
         covise_find_package(vsgPoints 0.6.0 CONFIG)
+    endif()
     COVISE_FIND_PACKAGE(PNG REQUIRED)
     COVISE_FIND_PACKAGE(TIFF REQUIRED)
     if (NOT COVISE_BUILD_ONLY_ODDLOT)
@@ -413,7 +412,7 @@ INSTALL(FILES .covise .covise.sh
 INSTALL(FILES
     config/config.xml
     config/config-colormaps.xml
-    config/config-filetypes.xml
+    config/filetypes.toml
     config/config-ar.xml
     config/config-spray.xml
     config/config-midi.xml

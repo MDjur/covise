@@ -7,6 +7,8 @@
 
 #include "ColorAnimPlugin.h"
 #include <cover/coVRPluginSupport.h>
+#include <cover/coVRFileManager.h>
+#include <cover/VRSceneGraph.h>
 #include <cover/ui/Button.h>
 #include <cover/ui/Slider.h>
 #include <cover/ui/Menu.h>
@@ -29,7 +31,7 @@ ColorAnimPlugin::ColorAnimPlugin()
 , ui::Owner("ColorAnimPlugin", cover->ui)
 , numFrames(275)
 , currentFrame(0.0f)
-, animationSpeed(1.0f)
+, animationSpeed(0.02f)
 , isPlaying(false)
 , isPingPong(false)
 , animationDirection(1.0f)
@@ -44,6 +46,26 @@ ColorAnimPlugin::~ColorAnimPlugin()
     {
         cover->getObjectsRoot()->removeChild(brainTransform.get());
     }
+}
+
+// Rekursive Hilfsfunktion
+osg::Geode* findFirstGeode(osg::Node* node)
+{
+    if (!node) return nullptr;
+    
+    osg::Geode* geode = dynamic_cast<osg::Geode*>(node);
+    if (geode) return geode;
+    
+    osg::Group* group = dynamic_cast<osg::Group*>(node);
+    if (group)
+    {
+        for (unsigned int i = 0; i < group->getNumChildren(); ++i)
+        {
+            osg::Geode* foundGeode = findFirstGeode(group->getChild(i));
+            if (foundGeode) return foundGeode;
+        }
+    }
+    return nullptr;
 }
 
 bool ColorAnimPlugin::init()
@@ -79,7 +101,7 @@ bool ColorAnimPlugin::init()
     // Speed slider
     speedSlider = new ui::Slider(animMenu, "Speed");
     speedSlider->setBounds(0.001, 0.1);
-    speedSlider->setValue(1.0);
+    speedSlider->setValue(0.02);
     speedSlider->setCallback([this](double value, bool released) {
         animationSpeed = (float)value;
     });
@@ -136,14 +158,22 @@ bool ColorAnimPlugin::init()
         if (state) setInterpolationMode(CUBIC);
     });
 
-    // Load brain models
-    std::string firstFilePath = coCoviseConfig::getEntry("value", "COVER.Plugin.ColorAnim.FirstModel", "");
-    if (firstFilePath.empty())
+    // Load brain models    
+    std::string projectDir = coCoviseConfig::getEntry("value", "COVER.Plugin.ColorAnim.ProjectDir", "");
+    bool highRes = coCoviseConfig::isOn("COVER.Plugin.ColorAnim.high_res", false);
+    
+    if (projectDir.empty())
     {
-        fprintf(stderr, "ColorAnimPlugin: No first model path configured. Please set COVER.Plugin.ColorAnim.FirstModel in config\n");
-        fprintf(stderr, "ColorAnimPlugin: Example: /path/to/data/highres_cortex_001.ply\n");
+        fprintf(stderr, "ColorAnimPlugin: No project directory configured. Please set COVER.Plugin.ColorAnim.ProjectDir in config\n");
+        fprintf(stderr, "ColorAnimPlugin: Example: /path/to/data/Horn/\n");
         return false;
     }
+
+    std::string firstFilePath = "";
+    if (highRes)
+        firstFilePath = projectDir + "surfaces/dynamic/cortex_high_res/highres_cortex_001.ply";
+    else
+        firstFilePath = projectDir + "surfaces/dynamic/cortex/cortex_001.ply";
 
     if (!loadBrainModels(firstFilePath))
     {
@@ -153,7 +183,9 @@ bool ColorAnimPlugin::init()
 
     // Create scene graph structure
     brainTransform = new osg::MatrixTransform();
+    brainTransform->setName("BrainTransform");
     brainGeode = new osg::Geode();
+    brainGeode->setName("BrainGeode");
 
     if (brainGeometry.valid())
     {
@@ -165,6 +197,66 @@ bool ColorAnimPlugin::init()
 
         // Set initial colors
         updateColors();
+    }
+
+    // Load additional static models with transparency settings
+    struct AnatomyModel {
+        std::string filename;
+        float transparency;
+    };
+    
+    
+    electrodeTransform = new osg::MatrixTransform();
+    electrodeTransform->setName("ElectrodeTransform"); 
+
+    brainGroup = new osg::Group();
+    brainTransform->addChild(brainGroup.get());
+
+    brainGroup->addChild(electrodeTransform.get());
+
+    std::vector<AnatomyModel> anatomyModels = {
+        {"surfaces/static/anatomy_halb.wrl", 1.0f},
+        {"surfaces/static/left_electrode.wrl", 1.0f}
+    };
+
+    
+
+    for (const auto& model : anatomyModels)
+    {       
+        std::string fn = projectDir + model.filename;
+        std::cout << "Loading Anatomy file: " << fn.c_str() << std::endl << std::flush;
+        osg::Node* loadedNode = coVRFileManager::instance()->loadFile(
+            fn.c_str(),
+            nullptr,
+            electrodeTransform.get(),
+            nullptr
+        );
+
+        
+        if(loadedNode){
+            //electrodeTransform->addChild(loadedNode);
+        } else {
+            std::cout << "Failed to load: " << fn.c_str() << std::endl << std::flush;
+        }
+
+
+
+
+        /*
+        osg::Geode* geode = findFirstGeode(loadedNode);
+        if (geode)
+        {
+            VRSceneGraph::instance()->setTransparency(geode, model.transparency);
+            osg::StateSet* ss = geode->getOrCreateStateSet();
+            ss->setMode(GL_BLEND, osg::StateAttribute::ON);
+            ss->setRenderingHint(osg::StateSet::TRANSPARENT_BIN);
+            ss->setNestRenderBins(false);
+
+            //osg::StateSet* stateTransp = VRSceneGraph::instance()->loadTransparentGeostate(osg::Material::ColorMode::AMBIENT_AND_DIFFUSE);
+            //geode->setStateSet(stateTransp);        
+            
+        }
+        */
     }
 
     fprintf(stderr, "ColorAnimPlugin: Initialization complete\n");
@@ -520,6 +612,45 @@ void ColorAnimPlugin::flipNormals()
         else
         {
             cullFace->setMode(osg::CullFace::FRONT);
+        }
+    }
+}
+
+void ColorAnimPlugin::setupVertexColorMaterial(osg::Node *node)
+{
+    if (!node)
+        return;
+
+    // Set up material to use vertex colors
+    osg::StateSet *stateSet = node->getOrCreateStateSet();
+    osg::Material *material = new osg::Material();
+    material->setColorMode(osg::Material::AMBIENT_AND_DIFFUSE);
+    stateSet->setAttributeAndModes(material, osg::StateAttribute::ON);
+
+    // If this is a geode, also set the material on each drawable
+    osg::Geode *geode = dynamic_cast<osg::Geode*>(node);
+    if (geode)
+    {
+        for (unsigned int i = 0; i < geode->getNumDrawables(); ++i)
+        {
+            osg::Drawable *drawable = geode->getDrawable(i);
+            if (drawable)
+            {
+                osg::StateSet *drawableStateSet = drawable->getOrCreateStateSet();
+                osg::Material *drawableMaterial = new osg::Material();
+                drawableMaterial->setColorMode(osg::Material::AMBIENT_AND_DIFFUSE);
+                drawableStateSet->setAttributeAndModes(drawableMaterial, osg::StateAttribute::ON);
+            }
+        }
+    }
+
+    // Recursively process child nodes
+    osg::Group *group = node->asGroup();
+    if (group)
+    {
+        for (unsigned int i = 0; i < group->getNumChildren(); ++i)
+        {
+            setupVertexColorMaterial(group->getChild(i));
         }
     }
 }

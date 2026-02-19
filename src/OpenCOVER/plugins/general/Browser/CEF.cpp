@@ -36,18 +36,219 @@
 #include <cover/ui/Action.h>
 #include <PluginUtil/PluginMessageTypes.h>
 #include <algorithm>
-
+#include <chrono>
 
 boost::scoped_ptr<coCOIM> CEFCoim; // keep before other items (to be destroyed last)
 
+CefAppHandler::CefAppHandler(ImageBuffer& imageBuffer)
+    : m_imageBuffer(imageBuffer)
+{
+    AddRef(); // count our own reference as well.
+}
 
-void CEF::OnContextInitialized()
+void CefAppHandler::init(const std::string & frameworkDir, const std::string &browserSubprocessPath, const std::string &logfile, int loglevel)
+{
+    CefSettings settings;
+    CefSettingsTraits::init(&settings);
+
+    
+    CefString(&settings.browser_subprocess_path).FromASCII(browserSubprocessPath.c_str());
+
+    CefString(&settings.log_file)
+        //.FromASCII(covise::coCoviseConfig::getEntry("logFile", "COVER.Plugin.Browser", lfp).c_str());
+        .FromASCII(logfile.c_str());
+#ifdef __APPLE__
+
+    
+    CefString(&settings.framework_dir_path) = CefString::FromASCII(frameworkDir.c_str());
+#endif
+    settings.log_severity = (cef_log_severity_t)loglevel;
+    settings.no_sandbox = true;
+    settings.windowless_rendering_enabled = true;
+    settings.external_message_pump = true;
+#ifndef __APPLE__
+    settings.multi_threaded_message_loop = false;
+#endif
+#ifdef _WIN32
+    CefMainArgs args;
+#else
+    std::vector<const char *> cmdArgs;
+    cmdArgs.push_back("--enable-media-stream=1");
+    cmdArgs.push_back("--use-fake-ui-for-media-stream=1");
+    CefMainArgs args(cmdArgs.size(), (char**)cmdArgs.data());
+#endif
+    if (!CefInitialize(args, settings, this, nullptr))
+    {
+        std::cerr << "CefInitialize failed" << std::endl;
+        m_initFailed = true;
+        return;
+    }
+    auto path = getenv("COVISE_BROWSER_INIT_URL");
+    if(path)
+        open(path);
+}
+
+void CefAppHandler::queueInputEvent(const InputEvent &event)
+{
+    std::lock_guard<std::mutex> lock(m_eventMutex);
+    m_pendingInputs.push_back(event);
+}
+
+void handleEvents(const InputEvent &event, CefRefPtr<CefBrowser> browser)
+{
+    CefMouseEvent me;
+    me.x = event.x;
+    me.y = event.y;
+    auto host = browser->GetHost();
+    switch(event.type)
+    {
+    case InputEvent::GoBack:
+            browser->GoBack();
+        break;
+    case InputEvent::GoForward:
+            browser->GoForward();
+        break;
+    case InputEvent::Reload:
+            browser->Reload();
+        break;
+    case InputEvent::Text:
+    {
+        auto & cmd = event.text;
+        if (cmd.length() > 0)
+        {
+            for (int i = 0; i < cmd.length(); i++)
+            {
+                CefKeyEvent keyEvent;
+                keyEvent.character = cmd[i];
+                keyEvent.unmodified_character = keyEvent.character;
+                keyEvent.native_key_code = cmd[i];
+                keyEvent.windows_key_code = cmd[i];
+                keyEvent.focus_on_editable_field = true;
+                keyEvent.is_system_key = false;
+                keyEvent.modifiers = 0;
+
+                keyEvent.type = KEYEVENT_RAWKEYDOWN;
+                host->SendKeyEvent(keyEvent);
+                keyEvent.type = KEYEVENT_KEYUP;
+                host->SendKeyEvent(keyEvent);
+                keyEvent.type = KEYEVENT_CHAR;
+                host->SendKeyEvent(keyEvent);
+            }
+
+            CefKeyEvent keyEvent;
+            keyEvent.character = '\r';
+            keyEvent.unmodified_character = '\r';
+            keyEvent.native_key_code = osgGA::GUIEventAdapter::KEY_Return;
+            keyEvent.windows_key_code = osgGA::GUIEventAdapter::KEY_Return;
+            keyEvent.focus_on_editable_field = true;
+            keyEvent.is_system_key = false;
+            keyEvent.modifiers = 0;
+            keyEvent.type = KEYEVENT_RAWKEYDOWN;
+            host->SendKeyEvent(keyEvent);
+            keyEvent.type = KEYEVENT_KEYUP;
+            host->SendKeyEvent(keyEvent);
+            keyEvent.type = KEYEVENT_CHAR;
+            host->SendKeyEvent(keyEvent);
+        }
+    }
+    break;
+    case InputEvent::OpenURL:
+    {
+        auto url = event.text;
+        if (url.length() > 0)
+        {
+            browser->GetMainFrame()->LoadURL(url);
+#ifdef _WIN32
+            host->WasResized();
+#endif                    
+        }
+    }
+    break;
+    case InputEvent::SetFocus:
+        host->SetFocus(event.on);
+    break;
+    case InputEvent::LeftClick:
+        host->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_LEFT, !event.on, 1);
+    break;
+    case InputEvent::RightClick:
+        host->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_RIGHT, !event.on, 1);
+    break;
+    case InputEvent::MiddleClick:
+        host->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_MIDDLE, !event.on, 1);
+    break;
+    case InputEvent::MouseWheel:
+        host->SendMouseWheelEvent(me, 0, event.wheelDelta);
+    break;
+    case InputEvent::MouseMove:
+        host->SendMouseMoveEvent(me, false);
+    break;
+    case InputEvent::CloseBrowser:
+    {
+        if(event.browser->IsSame(browser))
+            browser = nullptr;
+    }
+    break;
+    case InputEvent::SelectAll:
+        browser->GetFocusedFrame()->SelectAll();
+        break;
+    case InputEvent::Copy:
+        browser->GetFocusedFrame()->Copy();
+        break;
+    case InputEvent::Paste:
+        browser->GetFocusedFrame()->Paste();
+        break;
+    case InputEvent::KeyEvent:
+        host->SendKeyEvent(event.keyEvent);
+        break;
+    default:
+        break;
+    }
+}
+
+void CefAppHandler::loop()
+{
+    while(!m_terminate)
+    {
+        bool workToDo = false;
+        {
+            std::lock_guard<std::mutex> lock(m_eventMutex);
+            workToDo = m_pendingInputs.size() > 0;
+            for(const auto & event : m_pendingInputs)
+            {
+                handleEvents(event, browser);
+            }
+            m_pendingInputs.clear();
+        }
+        
+        CefDoMessageLoopWork();
+        // if(!workToDo)
+        //     usleep(1000); // sleep for 1ms if no events to process
+    }
+    std::cout << "CEF destroyed " << cef_client->HasOneRef() << " " << browser->HasOneRef() << std::endl;
+    browser->GetHost()->CloseBrowser(false);
+
+    for (int attempts = 0; browser->IsValid() && attempts < 1000; ++attempts)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        CefDoMessageLoopWork();
+    }
+    browser = nullptr;
+    cef_client = nullptr;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    for(int i=0; i<100; ++i)
+        CefDoMessageLoopWork();
+     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    CefShutdown();
+}
+
+void CefAppHandler::OnContextInitialized()
 {
     //CEF_REQUIRE_UI_THREAD();
 
-
-    client = new CEF_client(this);
-
+    if(!coVRMSController::instance()->isMaster())
+        return;
+    cef_client = new CEF_client(this);
+    cef_client->setImageBuffer(m_imageBuffer);
     CefWindowInfo win;
     CefBrowserSettings browser_settings;
     win.SetAsWindowless(0);
@@ -56,7 +257,7 @@ void CEF::OnContextInitialized()
 #endif
 
 
-    browser = CefBrowserHost::CreateBrowserSync(win, client, "www.google.de", browser_settings, nullptr, nullptr);
+    browser = CefBrowserHost::CreateBrowserSync(win, cef_client, "www.google.de", browser_settings, nullptr, nullptr);
     browser->GetHost()->WasResized();
     browser->GetHost()->WasHidden(false);
 
@@ -64,44 +265,33 @@ void CEF::OnContextInitialized()
     browser->GetHost()->Invalidate(PET_VIEW);
 }
 
-CefRefPtr<CefClient> CEF::GetDefaultClient()
+CefRefPtr<CefClient> CefAppHandler::GetDefaultClient()
 {
     // Called when a new browser window is created via the Chrome runtime UI.
-    return client;
+    return cef_client;
 }
 
 void CEF::message(int toWhom, int type, int length, const void *data)
 {
     if (type == opencover::PluginMessageTypes::Browser)
     {
-        std::string url(static_cast<const char *>(data), length);
-        open(url.c_str());
+        url = (static_cast<const char *>(data), length);
+        if(m_cefAppHandler)
+            m_cefAppHandler->open(url);
     }
 }
 
+void CEF_client::OnBeforeClose(CefRefPtr<CefBrowser> browser)
+{
+    std::cout << "OnBeforeClose called - browser is fully closed" << std::endl;
+}
 
 bool CEF_client::DoClose(CefRefPtr<CefBrowser> browser)
 {
-    if (cef->browser == nullptr)
-    {
-        // done already
-        return false;
-    }
-    if (browser->IsSame(cef->browser))
-    {
-        LOG(INFO) << "CEF::DoClose: Closing the browser";
-        cef->browser = nullptr;
-        //HWND hwnd = getHwnd();
-        //::DestroyWindow(hwnd);
-        // we have to return false, otherwise this browser will not be removed before destruction
-        return false;
-        // true=we've handled the event ourselves; do not send WM_CLOSE
-    }
-    else
-    {
-        LOG(INFO) << "CEF::DoClose: Closing a sub-browser (may be dev tools)";
-        return false; // false=close the window; WM_CLOSE will bubble up to the parent window
-    }
+    InputEvent e{InputEvent::CloseBrowser};
+    e.browser = browser;
+    cef->queueInputEvent(e);
+    return false;
 }
 
 void CEF_client::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect &rect)
@@ -136,9 +326,17 @@ void CEF_client::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, c
     if (img) {
         img->set(Image::OSG_BGRA_PF, width, height, 1, 0, 1, 0.0, (const uint8_t*)buffer, Image::OSG_UINT8_IMAGEDATA, true, 1);
     }*/
-    memcpy(imageBuffer, buffer, (size_t)width * height * 4);
-    bufferChanged = true;
+    std::lock_guard<std::mutex> lock(imageBuffer->mutex);
+    memcpy(imageBuffer->buffer.data(), buffer, (size_t)width * height * 4);
+    imageBuffer->bufferChanged = true;
     //std::cerr << "Render" << std::endl;
+}
+
+void VRUI_client::resize(int resolution, float aspect)
+{
+    width = resolution;
+    height = width / aspect;
+    imageBuffer.buffer.resize((size_t)width * height * 4);
 }
 
 void CEF_client::resize(int resolution, float aspect)
@@ -148,49 +346,44 @@ void CEF_client::resize(int resolution, float aspect)
 }
 
 
-CEF_client::CEF_client(CEF *c): vruiCollabInterface(CEFCoim.get(), "CEFBrowser", vruiCollabInterface::PinEditor)
+CEF_client::CEF_client(CefAppHandler *c)
 {
     cef = c;
+}
 
-
-    interactionA = new coCombinedButtonInteraction(coInteraction::ButtonA, "CEFBrowser", coInteraction::Menu);
-    interactionB = new coCombinedButtonInteraction(coInteraction::ButtonB, "CEFBrowser", coInteraction::Menu);
-    interactionC = new coCombinedButtonInteraction(coInteraction::ButtonC, "CEFBrowser", coInteraction::Menu);
-
-    imageBuffer = new unsigned char[(size_t)width * height * 4];
-    videoTexture = new vrui::coTexturedBackground((uint *)imageBuffer, NULL, NULL, 4, width, height, 0);
-
+VRUI_client::VRUI_client(CEF *c)
+: vruiCollabInterface(CEFCoim.get(), "CEFBrowser", vruiCollabInterface::PinEditor)
+, cefPlugin(c)
+, popupHandle(new coPopupHandle("BrowserHeadline"))
+, interactionA(new coCombinedButtonInteraction(coInteraction::ButtonA, "CEFBrowser", coInteraction::Menu))
+, interactionB(new coCombinedButtonInteraction(coInteraction::ButtonB, "CEFBrowser", coInteraction::Menu))
+, interactionC(new coCombinedButtonInteraction(coInteraction::ButtonC, "CEFBrowser", coInteraction::Menu))
+, imageBuffer(std::vector<unsigned char>((size_t)width * height * 4))
+, videoTexture(new vrui::coTexturedBackground((uint *)imageBuffer.buffer.data(), NULL, NULL, 4, width, height, 0))
+, interactionWheel(new coCombinedButtonInteraction(coInteraction::WheelVertical, "CEFBrowser", coInteraction::Menu))
+{
     coIntersection::getIntersectorForAction("coAction")->add(videoTexture->getDCS(), this);
-
-    fprintf(stderr, "Set size!\n");
     videoTexture->setSize(width, height, 0);
-
-    fprintf(stderr, "Set Textsize!\n");
     videoTexture->setTexSize(width, -height);
-
-    fprintf(stderr, "Min width!\n");
     videoTexture->setMinWidth(width);
-
-    fprintf(stderr, "Minheight!\n");
     videoTexture->setMinHeight(height);
-    fprintf(stderr, "Texture creation  finished!\n");
 
-    popupHandle = new coPopupHandle("BrowserHeadline");
     popupHandle->setScale(2 * cover->getSceneSize() / 2500);
     popupHandle->setPos(-width * cover->getSceneSize() / 2500, 0, -height * cover->getSceneSize() / 2500);
     popupHandle->addElement(videoTexture);
     show();
 }
 
-CEF_client::~CEF_client()
+VRUI_client::~VRUI_client()
 {
     delete interactionA;
     delete interactionB;
     delete interactionC;
+    delete interactionWheel;
     delete popupHandle;
 }
 
-void CEF_client::update()
+void VRUI_client::update()
 {
     if (unregister)
     {
@@ -206,62 +399,36 @@ void CEF_client::update()
         {
             coInteractionManager::the()->unregisterInteraction(interactionC);
         }
-        if ((!interactionA->isRegistered()) && (!interactionB->isRegistered()) && (!interactionC->isRegistered()))
+        if (interactionWheel->isRegistered() && (interactionWheel->getState() != coInteraction::Active))
+        {
+            coInteractionManager::the()->unregisterInteraction(interactionWheel);
+        }
+        if (!interactionA->isRegistered() && !interactionB->isRegistered() && !interactionC->isRegistered() && !interactionWheel->isRegistered())
         {
             unregister = false;
         }
     }
-    if (videoTexture && popupHandle)
+    popupHandle->update();
+    std::lock_guard<std::mutex> lock(imageBuffer.mutex);
+    imageBuffer.bufferChanged = coVRMSController::instance()->syncBool(imageBuffer.bufferChanged);
+    if(imageBuffer.bufferChanged)
     {
-        char c = 1;
-        popupHandle->update();
-        if (coVRMSController::instance()->isCluster())
-        {
-            if (coVRMSController::instance()->isMaster())
-            {
-                if (bufferChanged)
-                {
-                    coVRMSController::instance()->sendSlaves(&c, 1);
-                    coVRMSController::instance()->sendSlaves((char *)imageBuffer, width * height * 4);
-                }
-                else
-                {
-                    c = 0;
-                    coVRMSController::instance()->sendSlaves(&c, 1);
-                }
-            }
-            else
-            {
-                coVRMSController::instance()->readMaster(&c, 1);
-                if (c)
-                {
-                    bufferChanged = true;
-                    videoTexture->setUpdated(true);
-                    coVRMSController::instance()->readMaster((char *)imageBuffer, width * height * 4);
-                    videoTexture->setImage((uint *)imageBuffer, NULL, NULL, 4, width, height, 0,
-                                           coTexturedBackground::TextureSet::PF_BGRA);
-                }
-            }
-        }
-        if (bufferChanged)
-        {
-            bufferChanged = false;
-
-            videoTexture->setUpdated(true);
-
-            videoTexture->setImage((uint *)imageBuffer, NULL, NULL, 4, width, height, 0,
-                                   coTexturedBackground::TextureSet::PF_BGRA);
-        }
+        // without mpi syncDate is quite slow and can cause fps drops
+        coVRMSController::instance()->syncData(imageBuffer.buffer.data(), width * height * 4);
+        imageBuffer.bufferChanged = false;
+        videoTexture->setUpdated(true);
+        videoTexture->setImage((uint *)imageBuffer.buffer.data(), NULL, NULL, 4, width, height, 0,
+                                coTexturedBackground::TextureSet::PF_BGRA);
     }
 }
 
-void CEF_client::show()
+void VRUI_client::show()
 {
     if (popupHandle)
         popupHandle->setVisible(true);
 }
 
-void CEF_client::hide()
+void VRUI_client::hide()
 {
     if (popupHandle)
         popupHandle->setVisible(false);
@@ -271,6 +438,13 @@ CefRefPtr<CefRenderHandler> CEF_client::GetRenderHandler()
 {
     return this;
 }
+
+CefRefPtr<CefLifeSpanHandler> CEF_client::GetLifeSpanHandler()
+{
+    return this;
+}
+
+
 CefRefPtr<CefContextMenuHandler> CEF_client::GetContextMenuHandler()
 {
     return this;
@@ -279,8 +453,8 @@ CefRefPtr<CefContextMenuHandler> CEF_client::GetContextMenuHandler()
 CEF::CEF()
 : coVRPlugin(COVER_PLUGIN_NAME)
 , ui::Owner("BrowserPlugin", cover->ui)
+, vrui_client(std::make_unique<VRUI_client>(this))
 {
-    
 }
 
 CEF::~CEF()
@@ -290,24 +464,16 @@ CEF::~CEF()
     delete reloadButton;
     delete urlLine;
     delete menu;
-    if(!m_initFailed)
-    {
-        std::cout << "CEF destroyed " << client->HasOneRef() << " " << browser->HasOneRef() << std::endl;
-        browser->GetHost()->CloseBrowser(true);
+    if(m_cefAppHandler)
+        m_cefAppHandler->terminate();
+    if(m_browserThread && m_browserThread->joinable())
+        m_browserThread->join();
 
-        for (int attempts = 0; browser != nullptr && attempts < 1000; ++attempts) // waiting for the Browser to close
-        {
-            usleep(100000);
-            CefDoMessageLoopWork();
-        }
-
-        CefShutdown();
-    }
 
 }
 
 
-int CEF_client::hit(vruiHit *hit)
+int VRUI_client::hit(vruiHit *hit)
 {
     if (coVRCollaboration::instance()->getCouplingMode() == coVRCollaboration::MasterSlaveCoupling &&
         !coVRCollaboration::instance()->isMaster())
@@ -328,10 +494,13 @@ int CEF_client::hit(vruiHit *hit)
         coInteractionManager::the()->registerInteraction(interactionC);
         interactionC->setHitByMouse(hit->isMouseHit());
     }
+    if (!interactionWheel->isRegistered())
+    {
+        coInteractionManager::the()->registerInteraction(interactionWheel);
+        interactionWheel->setHitByMouse(hit->isMouseHit());
+    }
 
     osgUtil::LineSegmentIntersector::Intersection osgHit = dynamic_cast<OSGVruiHit *>(hit)->getHit();
-
-    static char message[100];
 
     float x = 0.f, y = 0.f;
     if (osgHit.drawable.valid())
@@ -350,64 +519,81 @@ int CEF_client::hit(vruiHit *hit)
 
         if (!haveFocus)
         {
-            cover->grabKeyboard(cef);
+            cover->grabKeyboard(cefPlugin);
             haveFocus = true;
         }
-        CefMouseEvent me;
-        me.x = x * width;
-        me.y = y * height;
+        if(!cef)
+            return ACTION_CALL_ON_MISS;
+        InputEvent event;
+        event.x = x*width;
+        event.y = y*height;
         if ((interactionA->getState() == coInteraction::Idle) && (interactionB->getState() == coInteraction::Idle) &&
-            (interactionC->getState() == coInteraction::Idle))
+            (interactionC->getState() == coInteraction::Idle) && (interactionWheel->getState() == coInteraction::Idle))
         {
-            cef->browser->GetHost()->SetFocus(true);
+            event.type = InputEvent::SetFocus;
+            event.on = true;
         }
         if (interactionA->wasStarted())
         {
-            cef->browser->GetHost()->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_LEFT, false, 1);
-            cerr << "ADown" << endl;
+            event.type = InputEvent::LeftClick;
+            cef->queueInputEvent(event);
         }
         else if (interactionA->wasStopped())
         {
-            cef->browser->GetHost()->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_LEFT, true, 1);
-            cerr << "AUp" << endl;
+            event.type = InputEvent::LeftClick;
+            event.on = false;
         }
         else if (interactionB->wasStarted())
         {
-            cef->browser->GetHost()->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_MIDDLE, false, 1);
+            event.type = InputEvent::MiddleClick;
         }
         else if (interactionB->wasStopped())
         {
-            cef->browser->GetHost()->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_MIDDLE, true, 1);
+            event.type = InputEvent::MiddleClick;
+            event.on = false;
         }
         else if (interactionC->wasStarted())
         {
-            cef->browser->GetHost()->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_RIGHT, false, 1);
+            event.type = InputEvent::RightClick;
         }
         else if (interactionC->wasStopped())
         {
-            cef->browser->GetHost()->SendMouseClickEvent(me, CefBrowserHost::MouseButtonType::MBT_RIGHT, true, 1);
+            event.type = InputEvent::RightClick;
+            event.on = false;
+        }
+        else if (interactionWheel->wasStarted() || interactionWheel->isRunning())
+        {
+            event.type = InputEvent::MouseWheel;
+            event.wheelDelta = (int)(interactionWheel->getWheelCount() * 120.0f);
         }
         else
         {
-            cef->browser->GetHost()->SendMouseMoveEvent(me, false);
+            event.type = InputEvent::MouseMove;
         }
+        if(event.type != InputEvent::None)
+            cef->queueInputEvent(event);
+
+        return ACTION_CALL_ON_MISS;
+        
     }
 
-
-    if (interactionA->wasStarted() || interactionB->wasStarted() || interactionC->wasStarted())
-    {
-    }
     return ACTION_CALL_ON_MISS;
 }
 
-void CEF_client::miss()
+void VRUI_client::miss()
 {
-    cef->browser->GetHost()->SetFocus(false);
+    if(cef)
+    {
+        InputEvent e{InputEvent::SetFocus};
+        e.on = false;
+        cef->queueInputEvent(e);
+    }
+    
     unregister = true;
 
     if (haveFocus)
     {
-        cover->releaseKeyboard(cef);
+        cover->releaseKeyboard(cefPlugin);
         haveFocus = false;
     }
 }
@@ -415,15 +601,16 @@ const std::string &CEF::getURL()
 {
     return url;
 }
+
 void CEF::reload()
 {
-    if (browser)
-        browser->Reload();
+    if (m_cefAppHandler)
+        m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::Reload});
 }
 
 bool CEF::init()
 {
-    AddRef(); // count our own reference as well.
+    
 
     CEFCoim.reset(new coCOIM(this));
 
@@ -434,179 +621,126 @@ bool CEF::init()
 
     backButton = new ui::Action(menu, "back");
     backButton->setText("back");
-    backButton->setCallback([this]() { browser->GoBack(); });
     forwardButton = new ui::Action(menu, "forward");
     forwardButton->setText("forward");
-    forwardButton->setCallback([this]() { browser->GoForward(); });
     reloadButton = new ui::Action(menu, "reload");
     reloadButton->setText("reload");
-    reloadButton->setCallback([this]() { browser->Reload(); });
     urlLine = new ui::EditField(menu, "urlLine");
     urlLine->setText("URL");
-    urlLine->setCallback(
-        [this](const std::string &cmd)
-        {
-            if (cmd.length() > 0)
-            {
-                open(cmd);
-            }
-        });
-
+    
     commandLine = new ui::EditField(menu, "CommandLine");
     commandLine->setText("Command line");
-    commandLine->setCallback(
-        [this](const std::string &cmd)
-        {
-            if (cmd.length() > 0)
+    if(coVRMSController::instance()->isMaster())
+    {
+        backButton->setCallback([this]() {m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::GoBack}); });
+        forwardButton->setCallback([this]() {m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::GoForward}); });
+        reloadButton->setCallback([this]() { m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::Reload}); });
+        urlLine->setCallback([this](const std::string &cmd)
             {
-                for (int i = 0; i < cmd.length(); i++)
+                if (cmd.length() > 0)
                 {
-                    CefKeyEvent keyEvent;
-                    keyEvent.character = cmd[i];
-                    keyEvent.unmodified_character = keyEvent.character;
-                    keyEvent.native_key_code = cmd[i];
-                    keyEvent.windows_key_code = cmd[i];
-                    keyEvent.focus_on_editable_field = true;
-                    keyEvent.is_system_key = false;
-                    keyEvent.modifiers = 0;
-
-                    keyEvent.type = KEYEVENT_RAWKEYDOWN;
-                    browser->GetHost()->SendKeyEvent(keyEvent);
-                    keyEvent.type = KEYEVENT_KEYUP;
-                    browser->GetHost()->SendKeyEvent(keyEvent);
-                    keyEvent.type = KEYEVENT_CHAR;
-                    browser->GetHost()->SendKeyEvent(keyEvent);
+                    m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::OpenURL, cmd});
                 }
+            });
+        commandLine->setCallback([this](const std::string &cmd)
+            {
+                if (cmd.length() > 0)
+                {
+                    m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::Text, cmd});
+                    commandLine->setText("");
+                }
+            });
+            
+        char *cd;
+        char *as;
+        std::string coviseDir;
+        std::string archSuffix;
+        if ((cd = getenv("COVISEDIR")) == NULL)
+        {
+            cerr << "COVISEDIR variable not set !!" << endl;
+            coviseDir = "c:\\Program Files\\Covise";
+        }
+        else
+            coviseDir = cd;
+        if ((as = getenv("ARCHSUFFIX")) == NULL)
+        {
+            cerr << "ARCHSUFFIX variable not set !!" << endl;
+            archSuffix = "zebuopt";
+        }
+        else
+            archSuffix = as;
 
-                CefKeyEvent keyEvent;
-                keyEvent.character = '\r';
-                keyEvent.unmodified_character = '\r';
-                keyEvent.native_key_code = osgGA::GUIEventAdapter::KEY_Return;
-                keyEvent.windows_key_code = osgGA::GUIEventAdapter::KEY_Return;
-                keyEvent.focus_on_editable_field = true;
-                keyEvent.is_system_key = false;
-                keyEvent.modifiers = 0;
-                keyEvent.type = KEYEVENT_RAWKEYDOWN;
-                browser->GetHost()->SendKeyEvent(keyEvent);
-                keyEvent.type = KEYEVENT_KEYUP;
-                browser->GetHost()->SendKeyEvent(keyEvent);
-                keyEvent.type = KEYEVENT_CHAR;
-                browser->GetHost()->SendKeyEvent(keyEvent);
-                commandLine->setText("");
+        std::string bsp = coviseDir + "/" + archSuffix + "/bin/CEFBrowserHelper";
+    #ifdef _WIN32
+        bsp += ".exe";
+    #endif
+        std::string extlib;
+        if (auto el = getenv("EXTERNLIBS"))
+        {
+            extlib = el;
+        }
+        else
+        {
+            cerr << "EXTERNLIBS variable not set !!" << endl;
+            extlib = coviseDir + "/extern_libs/" + archSuffix;
+        }
+        std::string lfp = "/tmp/cef.log";
+        std::string fwpath = extlib + "/cef/Release/Chromium Embedded Framework.framework";
+        std::string logfile = *configString("log", "file", lfp);
+        int loglevel = *configInt("log", "level", LOGSEVERITY_VERBOSE);
+
+        std::unique_lock<std::mutex> lk(m_cefInitMutex);
+
+        m_browserThread = std::make_unique<std::thread>([this, frameworkDir=fwpath, browserSubprocessPath=bsp, logfile, loglevel]() {
+            auto handler = std::make_unique<CefAppHandler>(vrui_client->getImageBuffer());
+            {
+                std::lock_guard<std::mutex> g(m_cefInitMutex);
+                m_cefAppHandler = std::move(handler);
             }
+            m_cefInitCv.notify_one();
+
+            m_cefAppHandler->init(frameworkDir, browserSubprocessPath, logfile, loglevel);
+            m_cefAppHandler->loop();
         });
 
-    CefSettings settings;
-    CefSettingsTraits::init(&settings);
-
-    char *cd;
-    char *as;
-    std::string coviseDir;
-    std::string archSuffix;
-    if ((cd = getenv("COVISEDIR")) == NULL)
-    {
-        cerr << "COVISEDIR variable not set !!" << endl;
-        coviseDir = "c:\\Program Files\\Covise";
+        // wait until handler is created
+        m_cefInitCv.wait(lk, [this]{ return m_cefAppHandler != nullptr; });
+        vrui_client->cef = m_cefAppHandler.get();
+        
     }
-    else
-        coviseDir = cd;
-    if ((as = getenv("ARCHSUFFIX")) == NULL)
-    {
-        cerr << "ARCHSUFFIX variable not set !!" << endl;
-        archSuffix = "zebuopt";
-    }
-    else
-        archSuffix = as;
-
-    std::string bsp = coviseDir + "/" + archSuffix + "/bin/CEFBrowserHelper";
-#ifdef _WIN32
-    bsp += ".exe";
-#endif
-    CefString(&settings.browser_subprocess_path).FromASCII(bsp.c_str());
-
-    std::string lfp = "/tmp/cef.log";
-    std::string logfile = *configString("log", "file", lfp);
-    CefString(&settings.log_file)
-        //.FromASCII(covise::coCoviseConfig::getEntry("logFile", "COVER.Plugin.Browser", lfp).c_str());
-        .FromASCII(logfile.c_str());
-#ifdef __APPLE__
-    std::string extlib;
-    if (auto el = getenv("EXTERNLIBS"))
-    {
-        extlib = el;
-    }
-    else
-    {
-        cerr << "EXTERNLIBS variable not set !!" << endl;
-        extlib = coviseDir + "/extern_libs/" + archSuffix;
-    }
-    std::string fwpath = extlib + "/cef/Release/Chromium Embedded Framework.framework";
-    CefString(&settings.framework_dir_path) =
-        //covise::coCoviseConfig::getEntry("frameworkDirPath", "COVER.Plugin.Browser", fwpath);
-        *configString("Browser", "frameworkDirPath", fwpath);
-#endif
-    //settings.log_severity = (cef_log_severity_t)covise::coCoviseConfig::getInt("logLevel", "COVER.Plugin.Browser", 99);
-    settings.log_severity = (cef_log_severity_t)configInt("log", "level", 99)->value();
-    settings.no_sandbox = true;
-    settings.windowless_rendering_enabled = true;
-    settings.external_message_pump = true;
-#ifndef __APPLE__
-    settings.multi_threaded_message_loop = false;
-#endif
-#ifdef _WIN32
-    CefMainArgs args;
-#else
-    std::vector<const char *> cmdArgs;
-    cmdArgs.push_back("--enable-media-stream=1");
-    cmdArgs.push_back("--use-fake-ui-for-media-stream=1");
-    CefMainArgs args(cmdArgs.size(), (char**)cmdArgs.data());
-#endif
-    if (!CefInitialize(args, settings, this, nullptr))
-    {
-        std::cerr << "CefInitialize failed" << std::endl;
-        m_initFailed = true;
-        return false;
-    }
-    auto path = getenv("COVISE_BROWSER_INIT_URL");
-    if(path)
-        open(path);
     return true;
 }
 
 bool CEF::update()
 {
-    CefDoMessageLoopWork();
-    if (client)
+    if(vrui_client)
     {
-        client->update();
+        vrui_client->update();
     }
-
-
     return true;
 }
 
-void CEF::open(const std::string &url)
+void CefAppHandler::open(const std::string &url)
 {
-    this->url = url;
-    if (browser)
-    {
-        browser->GetMainFrame()->LoadURL(url);
-#ifdef _WIN32
-        browser->GetHost()->WasResized();
-#endif
-    }
+    queueInputEvent(InputEvent{InputEvent::OpenURL, url});
 }
 
-void CEF::resize()
-{
-    client->resize(resolution, aspect);
-    if (browser)
-        browser->GetHost()->WasResized();
-    reload();
-}
+// void CEF::resize()
+// {
+//     vrui_client->resize(resolution, aspect);
+//     if (m_cefAppHandler)
+//     {
+//         m_cefAppHandler->resize();
+//         cef_client->resize(resolution, aspect);
+//         browser->GetHost()->WasResized();
+//     }
+//     reload();
+// }
 
 void CEF::key(int type, int keySym, int mod)
 {
+    if(!coVRMSController::instance()->isMaster())
+        return;
     CefKeyEvent keyEvent;
     keyEvent.character = keySym;
     keyEvent.unmodified_character = keySym;
@@ -619,17 +753,11 @@ void CEF::key(int type, int keySym, int mod)
     if (mod & osgGA::GUIEventAdapter::MODKEY_CTRL && type == osgGA::GUIEventAdapter::KEYDOWN)
     {
         if (keySym == 'a')
-        {
-            browser->GetFocusedFrame()->SelectAll();
-        }
+            m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::SelectAll});
         if (keySym == 'c')
-        {
-            browser->GetFocusedFrame()->Copy();
-        }
+            m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::Copy}); 
         if (keySym == 'v')
-        {
-            browser->GetFocusedFrame()->Paste();
-        }
+            m_cefAppHandler->queueInputEvent(InputEvent{InputEvent::Paste});
         return;
     }
 
@@ -679,28 +807,33 @@ void CEF::key(int type, int keySym, int mod)
     if (type == osgGA::GUIEventAdapter::KEYDOWN)
     {
         keyEvent.type = KEYEVENT_RAWKEYDOWN;
-        browser->GetHost()->SendKeyEvent(keyEvent);
+        InputEvent e{InputEvent::KeyEvent};
+        e.keyEvent = keyEvent;
+        m_cefAppHandler->queueInputEvent(e);
     }
     else
     {
+        InputEvent e{InputEvent::KeyEvent};
         keyEvent.type = KEYEVENT_KEYUP;
-        browser->GetHost()->SendKeyEvent(keyEvent);
+        e.keyEvent = keyEvent;
+        m_cefAppHandler->queueInputEvent(e);
         keyEvent.type = KEYEVENT_CHAR;
-        browser->GetHost()->SendKeyEvent(keyEvent);
+        e.keyEvent = keyEvent;
+        m_cefAppHandler->queueInputEvent(e);
     }
 }
 
 
-void CEF::setResolution(float a)
-{
-    resolution = a;
-    resize();
-}
-void CEF::setAspectRatio(float a)
-{
-    aspect = a;
-    resize();
-}
+// void CEF::setResolution(float a)
+// {
+//     resolution = a;
+//     resize();
+// }
+// void CEF::setAspectRatio(float a)
+// {
+//     aspect = a;
+//     resize();
+// }
 
 
 bool init()

@@ -501,9 +501,11 @@ bool OpenCOVER::init()
 
 #ifndef _WIN32
 #ifdef USE_X11
+    bool forceX11 = getenv("DISPLAY") != nullptr;
     bool useDISPLAY = coCoviseConfig::isOn("COVER.HonourDisplay", false);
     if (useVirtualGL)
     {
+        forceX11 = true;
         useDISPLAY = true;
         cerr << "Apparently running with VirtualGL, using DISPLAY environment variable" << endl;
     }
@@ -512,10 +514,11 @@ bool OpenCOVER::init()
     if (useDISPLAY && getenv("DISPLAY") == NULL)
     {
         useDISPLAY = false;
-        cerr << "DISPLAY not set, defaulting to DISPLAY=:0" << endl;
+        cerr << "DISPLAY not set, using fallbacks" << endl;
     }
     else if (useDISPLAY)
     {
+        forceX11 = true;
         if (debugLevel > 1)
             cerr << "DISPLAY set to " << getenv("DISPLAY") << endl;
     }
@@ -530,6 +533,10 @@ bool OpenCOVER::init()
             if (firstPipe.empty())
             {
                 cerr << "No PipeConfig for Pipe 0 found, using " << envDisplay << endl;
+            }
+            else
+            {
+                forceX11 = true;
             }
 
             // do NOT use cover->debugLevel here : cover is not yet created!
@@ -546,6 +553,15 @@ bool OpenCOVER::init()
         }
     }
     coVRConfig::instance()->m_useDISPLAY = useDISPLAY;
+    if (forceX11 && !getenv("QT_QPA_PLATFORM"))
+    {
+        char *platform = strdup("QT_QPA_PLATFORM=xcb");
+        if (debugLevel > 0)
+        {
+            fprintf(stderr, "Setting '%s' in order to prefer X11/Xwayland over Wayland for Qt windows\n", platform);
+        }
+        putenv(platform);
+    }
 #endif
 #endif
 
@@ -685,9 +701,9 @@ bool OpenCOVER::init()
     cover->vruiView = new ui::VruiView;
     cover->ui->addView(cover->vruiView);
 
-    hud = coHud::instance();
-
+    
     VRViewer::instance()->config();
+    hud = coHud::instance();
     coVRShaderList::instance()->init(VRViewer::instance()->getExtensions());
 
     hud->setText2("loading plugins");
@@ -733,7 +749,7 @@ bool OpenCOVER::init()
     // initialize movable screen if there (IWR)
     hud->setText3("Tracking");
 
-    bool showHud = coCoviseConfig::isOn("COVER.SplashScreen", true);
+    bool showHud = coCoviseConfig::isOn("enabled", "COVER.SplashScreen", true);
     if (showHud)
     {
         hud->show();
@@ -796,6 +812,13 @@ bool OpenCOVER::init()
     {
         m_quit->setEnabled(false);
         m_quit->setVisible(false);
+    }
+    if(VRViewer::instance()->softwareRendering)
+    {
+        hud->setText2("Warning: llvmpipe detected!");
+        hud->setText3("COVER may run very slow and some shaders may not work.");
+        hud->redraw();
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
     hud->setText2("initialising plugins");

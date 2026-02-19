@@ -49,19 +49,19 @@ struct RenderTarget : render_target, opencover::MultiChannelDrawer
     ref_type ref()
     { return { color(), depth(), accum(), width(), height() }; }
 
-    VSNRAY_FUNC color_type* color()
+    color_type* color()
     { return (color_type *)rgba(channel); }
 
-    VSNRAY_FUNC depth_type* depth()
+    depth_type* depth()
     { return (depth_type *)opencover::MultiChannelDrawer::depth(channel); }
 
-    VSNRAY_FUNC const color_type* color() const
+    const color_type* color() const
     { return (color_type *)rgba(channel); }
 
-    VSNRAY_FUNC const depth_type* depth() const
+    const depth_type* depth() const
     { return (depth_type *)opencover::MultiChannelDrawer::depth(channel); }
 
-    VSNRAY_FUNC accum_type* accum()
+    accum_type* accum()
     { return nullptr; }
 
     unsigned channel{0};

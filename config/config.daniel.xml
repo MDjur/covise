@@ -15,37 +15,68 @@
       <!--FileType name="pts" plugin="PointRayTracer" /-->
       <!--FileType name="xyz" plugin="PointRayTracer" /-->
       <!--FileType name="ptsb" plugin="PointRayTracer" /-->
-      <FileType name="ply" plugin="ANARI" />
+      <FileType name="ply" plugin="AssimpPlugin" />
       <!--FileType name="ply" plugin="PointRayTracer" /-->
       <!--FileType name="e57" plugin="PointRayTracer" /-->
 
-      <FileType name="obj" plugin="ANARI" />
+      <!--FileType name="obj" plugin="ANARI" /-->
       <FileType name="pts" plugin="ANARI" />
-      <FileType name="glb" plugin="ANARI" />
-      <FileType name="gltf" plugin="ANARI" /> 
+      <FileType name="glb" plugin="AssimpPlugin" />
+      <FileType name="gltf" plugin="AssimpPlugin" /> 
       <FileType name="ctf" plugin="ANARI" /> 
       <FileType name="fits" plugin="Volume" /> 
     </FileManager>
 
-  
-  
-    <WelcomeMessage value="Welcome to Daniel" />
+    <WelcomeMessage value="Welcome to Daniel's Config" />
 
     <Plugin>
-      <MADIconnect value="on">
-        <DataPath value="/home/daniel/data/KeiIto/3neurons" />
-      </MADIconnect>
 
-      <ANARI>
-        <PointCloud radius="0.025" />        
+      <AssimpPlugin value="on">
+        <!-- Commonly used flags (enabled by default) -->
+        <Triangulate              value="on" />
+        <GenNormals               value="off" />
+        <GenSmoothNormals         value="on" />
+        <JoinIdenticalVertices    value="on" />
+        <ImproveCacheLocality     value="on" />
+        <RemoveRedundantMaterials value="on" />
+        <SortByPType              value="on" />
+        <FindInvalidData          value="on" />
+        <GenUVCoords              value="off" />
+        <OptimizeMeshes           value="on" />
+        <ValidateDataStructure    value="on" />
+        <FindDegenerates          value="on" />
+        <FindInstances            value="off" />
+        <OptimizeGraph            value="off" />
+
+        <!-- Advanced flags (disabled by default) -->
+        <CalcTangentSpace         value="off" />
+        <MakeLeftHanded           value="off" />
+        <RemoveComponent          value="off" />
+        <SplitLargeMeshes         value="off" />
+        <PreTransformVertices     value="off" />
+        <LimitBoneWeights         value="off" />
+        <FixInfacingNormals       value="off" />
+        <PopulateArmatureData     value="off" />
+        <TransformUVCoords        value="off" />
+        <FlipUVs                  value="off" />
+        <FlipWindingOrder         value="off" />
+        <SplitByBoneCount         value="off" />
+        <Debone                   value="off" />
+        <GlobalScale              value="off" />
+        <EmbedTextures            value="off" />
+        <DropNormals              value="off" />
+        <GenBoundingBoxes         value="off" />
+      </AssimpPlugin>
+
+      <ANARI value="off" menu="on">
+        <Library value="visrtx" />
+        <Renderer subtype="raycast" />
+        <!--PointCloud radius="0.006" Barbarastollen  /-->
+        <PointCloud radius="0.01" />
+        <loadPlyAsPointCloud value="off"/>
+        <AmbientRadiance value="1" />
       </ANARI>
 
-      <Vrml97>
-        <TransparencyMode value="sorted_blended_alphatest" />
-        <Headlight value="ON" />
-        <Lights value="ON" />
-      </Vrml97>
-      
       <OrientationIndicator value="off">
         <Position x="-700.0" y="0.0" z="-400.0" />
 	      <InvertX value="true" />
@@ -91,39 +122,32 @@
         <plane2 enabled="true" /-->
       </ClipPlane>
 			
-    </Plugin>
-  
-    <!--ViewportConfig>
-      <Viewport width="1200" height="900" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0"  />    
-    </ViewportConfig>
-    
-    <ChannelConfig>
-      <Channel stereoMode="LEFT" comment="FRONT" channel="0" width="1200" left="0" windowIndex="0" screenIndex="0" top="0" name="0" height="900" />  
-    </ChannelConfig>
+    </Plugin>  
+
+    <PipeConfig>
+      <Pipe name="0" useDISPLAY="true" />
+    </PipeConfig>
 
     <WindowConfig>
-      <Window type="None" width="1200" comment="FRONT" window="0" pipeIndex="0" height="900" left="0" top="0" name="0" decoration="false" stereo="false" />
+      <Window RANK="0" type="Qt" width="1600" comment="FRONT" window="0" pipeIndex="0" height="900" left="100" top="100" name="0" embedded="false" decoration="true" />
+      <Window width="1600" comment="FRONT" window="0" pipeIndex="0" height="900" left="100" top="100" name="0" embedded="false" decoration="true" />
     </WindowConfig>
-   
-    <PipeConfig>
-      <Pipe name="0" useDISPLAY="true" screen="0" />
-    </PipeConfig>
-   
-    <NumChannels value="1" />
-    <NumScreens value="1" />
-    <NumViewports value="1" />
-    <NumWindows value="1" />
-    <NumPipes value="1" /-->   
+
+    <ScreenConfig>
+      <Screen width="1920" comment="FRONT" h="0.0" originX="0" originY="0" originZ="0" height="1080" p="0.0" r="0.0" name="0" screen="0" />
+    </ScreenConfig>
+
+    <ViewportConfig>
+      <Viewport width="1" height="1" left="0" bottom="0" windowIndex="0" channelIndex="0" name="0"  />
+    </ViewportConfig>
    
     <SceneSize value="1500" />
     <FloorHeight value="-1000" />
     <Menu>
       <Orientation h="0" p="0" r="0" />
-      <Position x="500" y="0" z="600" />
+      <Position x="500" y="0" z="500" />
+      <Size value="0.7" />
     </Menu>
-
-    <MenuPosition value="600 0 600" />
-    <MenuSize value="0.7" />
   </COVER>	     
 </GLOBAL>
 <INCLUDE global="1" configname="general" >config.xml</INCLUDE>

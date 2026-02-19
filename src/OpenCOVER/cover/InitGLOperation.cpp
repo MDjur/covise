@@ -48,6 +48,7 @@
 #include "coVRPluginSupport.h"
 
 #include "InitGLOperation.h"
+#include "VRViewer.h"
 
 #ifndef GL_VERSION_4_3
 typedef void (GL_APIENTRY *GLDEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
@@ -105,20 +106,57 @@ InitGLOperation::InitGLOperation()
 
 void InitGLOperation::operator()(osg::GraphicsContext* gc)
 {
-    if (glewInit() != GLEW_OK)
+    const int contextId = gc->getState()->getContextID();
+    if (cover->debugLevel(2))
     {
-        std::cerr << "glewInit() failed" << std::endl;
+        std::cerr << "InitGLOperation() for context " << contextId << std::endl;
+    }
+
+    glewExperimental = GL_TRUE; // for ARB_vertex_array_object on macOS
+    auto glewResult = glewInit();
+    if (glewResult != GLEW_OK && glewResult != GLEW_ERROR_NO_GLX_DISPLAY)
+    {
+        std::string err;
+        switch(glewResult) {
+        case GLEW_ERROR_NO_GLX_DISPLAY: err="no GLX display"; break;
+        case GLEW_ERROR_NO_GL_VERSION: err="no GL version"; break;
+        case GLEW_ERROR_GL_VERSION_10_ONLY: err="only GL version 1.0"; break;
+        case GLEW_ERROR_GLX_VERSION_11_ONLY: err="only GLX version 1.1"; break;
+        default: err = std::string("unknown error ") + std::to_string(glewResult); break;
+        }
+        if (!err.empty())
+            err = std::string(": ") + err;
+        std::cerr << "glewInit() failed" << err << std::endl;
         return;
     }
 
-#if defined(USE_X11) && defined(glxewInit)
-    if (glxewInit() != GLEW_OK)
+    auto rend = glGetString(GL_RENDERER);
+    if (!rend)
     {
-        std::cerr << "glxewInit() failed" << std::endl;
+        std::cerr << "*****" << std::endl;
+        std::cerr << "InitGLOperation() for context " << contextId << ": could not retrieve value of GL_RENDERER - context not initialised?" << std::endl;
+        std::cerr << "*****" << std::endl;
     }
-#endif
+    else if (strncmp((const char *)rend, "llvmpipe", 8) == 0)
+    {
+        VRViewer::instance()->softwareRendering = true;
+    }
 
-#define PRINT_STRING(s) std::cerr << "GL_" #s << ": " << glGetString(GL_ ## s) << std::endl
+    auto print_string = [](GLenum tag, const char *desc){
+        std::string s("GL_");
+        s += desc;
+        auto val = glGetString(tag);
+        if (val)
+        {
+            std::cerr << s << ": " << val << std::endl;
+        }
+        else
+        {
+            std::cerr << s << " is NULL" << std::endl;
+        }
+    };
+
+#define PRINT_STRING(n) print_string(GL_ ## n, #n)
     if (cover->debugLevel(2))
     {
         PRINT_STRING(RENDERER);
@@ -141,8 +179,6 @@ void InitGLOperation::operator()(osg::GraphicsContext* gc)
         std::cerr << "VRViewer: enabling GL debugging" << std::endl;
 
         OpenThreads::ScopedLock<OpenThreads::Mutex> lock(m_mutex);
-
-        int contextId = gc->getState()->getContextID();
 
         //create the extensions
         GLDebugMessageControlPROC glDebugMessageControl = NULL;
@@ -238,7 +274,6 @@ void InitGLOperation::operator()(osg::GraphicsContext* gc)
 #endif
 
     OpenThreads::ScopedLock<OpenThreads::Mutex> lock(m_mutex);
-    int contextId = gc->getState()->getContextID();
     osg::GLExtensions *glext = gc->getState()->get<osg::GLExtensions>();
     if (m_extensions.size() <= contextId)
     {

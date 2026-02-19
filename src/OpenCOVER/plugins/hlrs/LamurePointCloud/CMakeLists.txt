@@ -7,10 +7,14 @@ include(${SRC_DIR}/pcl_makros.cmake)
 # Using the LamurePointCloud target
 MESSAGE("0")
 using(Lamure)
-MESSAGE("01")
+MESSAGE("got lamure")
 using(FREEIMAGE)
 MESSAGE("02")
+IF(WIN32)
+using(FREEGLUT)
+ELSE(WIN32)
 using(GLUT)
+ENDIF(WIN32)
 MESSAGE("1")
 using(GLFW)
 MESSAGE("2")
@@ -77,6 +81,7 @@ SET(HEADERS
   LamureUtil.h
   LamureMeasurement.h
   color_converter.h
+  LamureEditTool.h
 )
 
 SET(SOURCES 
@@ -89,10 +94,18 @@ SET(SOURCES
   LamureUtil.cpp
   LamureMeasurement.cpp
   color_converter.cpp
+  LamureEditTool.cpp
 )
 
 
 # Adding the LamurePointCloud plugin
 cover_add_plugin(LamurePointCloud)
+target_link_libraries(LamurePointCloud stb::stb)
+
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(LamurePointCloud OpenMP::OpenMP_CXX)
+endif()
+
 covise_wnoerror(LamurePointCloud)
 

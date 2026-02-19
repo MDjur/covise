@@ -444,6 +444,11 @@ vruiTexture *vvVruiRenderInterface::createTexture(const string &name)
     return new VSGVruiTexture(vvFileManager::instance()->loadTexture(name.c_str()));
 }
 
+vsg::ref_ptr<vsg::Image> vvVruiRenderInterface::createVsgTexture(const std::string &textureName)
+{
+    return vvFileManager::instance()->loadTexture(textureName.c_str());
+}
+
 coAction::Result vvVruiRenderInterface::hit(coAction *action, vruiHit *)
 {
 
@@ -624,6 +629,60 @@ bool vive::vvVruiRenderInterface::compileNode(vruiNode*n)
     if (!node)
         return false;
     return vvViewer::instance()->compileNode(node->node);
+}
+
+struct VSGNodeParentAssigner : public vsg::Inherit<vsg::Visitor, VSGNodeParentAssigner>
+{
+    vsg::observer_ptr<vsg::Node> currentParent;
+
+    void apply(vsg::Node& node) override
+    {
+        // overrideMask is for the vsg::Switch nodes children to be traversed
+        const uint64_t oldOverrideMask = this->overrideMask;
+        this->overrideMask = ~0ul;
+
+        auto auxi = node.getOrCreateAuxiliary();
+        auto parentInfo = ParentInfo::create();
+        parentInfo->parent = currentParent;
+        if (currentParent)
+        {
+            auxi->setObject("parentInfo", parentInfo);
+        }
+
+        auto old = currentParent;
+        currentParent = &node;
+        node.traverse(*this);
+        this->overrideMask = oldOverrideMask;
+        currentParent = old;
+    }
+
+    void apply(vsg::TextTechnique& tt) override
+    {
+        vsg::GpuLayoutTechnique* technique = tt.cast<vsg::GpuLayoutTechnique>();
+        auto auxi = (*technique).getOrCreateAuxiliary();
+        auto parentInfo = ParentInfo::create();
+        parentInfo->parent = currentParent;
+        auxi->setObject("parentInfo", parentInfo);
+
+        if (auto node = dynamic_cast<vsg::Node*>(technique))
+        {
+            auto old = currentParent;
+            currentParent = node;
+            technique->traverse(*this);
+            currentParent = old;
+        }
+        else
+        {
+            // fallback: traverse with existing currentParent
+            technique->traverse(*this);
+        }
+    }
+};
+
+void vvVruiRenderInterface::assignVsgNodeParent(vsg::Group* subGraph)
+{
+    vsg::ref_ptr<VSGNodeParentAssigner> pa = VSGNodeParentAssigner::create();
+    subGraph->accept(*pa);
 }
 
 double vvVruiRenderInterface::getFrameTime() const

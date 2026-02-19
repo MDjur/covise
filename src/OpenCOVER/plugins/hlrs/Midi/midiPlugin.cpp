@@ -571,13 +571,14 @@ MidiPlugin::MidiPlugin()
 	plugin = this;
 	player = NULL;
 	coVRPluginList::instance()->addPlugin("Vrml97");
-	
+
 	initOPCUA();
 
 	MIDITab = NULL;
 	startTime = 0;
 	//Initialize SDL
-	
+
+
     udp = new UDPComm("localhost", 51322, 51324);
 	if (coVRMSController::instance()->isMaster())
 	{
@@ -686,6 +687,45 @@ MidiPlugin::MidiPlugin()
 	lineStateSet->setAttributeAndModes(lineWidth, osg::StateAttribute::ON);
 
 }
+void MidiPlugin::processIncommingMidiEvent(MidiEvent& me)
+{
+	int channel = me.getChannel();
+	if (me.isNoteOn())
+	{
+		for (const auto& f : MidiPlugin::instance()->functions)
+		{
+			if (f->channel == me.getChannel() && f->keyNumber == me.getKeyNumber())
+			{
+				f->handleOn(me);
+			}
+		}
+	}
+	else if (me.isNoteOff())
+	{
+		for (const auto& f : MidiPlugin::instance()->functions)
+		{
+			if (f->channel == me.getChannel() && f->keyNumber == me.getKeyNumber())
+			{
+				f->handleOff(me);
+			}
+		}
+	}
+	else if (me.isController())
+	{
+		handleController(me);
+	}
+	loft->handleEvent(me);
+	if (lTrack[channel]->instrument != nullptr)
+	{
+		lTrack[channel]->handleEvent(me);
+	}
+	else
+	{
+		if (me.getKeyNumber() > 0)
+			fprintf(stderr, "unconfigured instrument channel: %d  key: %02d velo %03d \n", me.getChannel(), me.getKeyNumber(), me.getVelocity());
+
+	}
+}
 MidiPlugin * MidiPlugin::instance()
 {
 	return plugin;
@@ -721,11 +761,11 @@ void NoteInfo::createGeom()
 		colorMaterial->setShininess(osg::Material::FRONT_AND_BACK, 16.0f);
 
 	geoState->setAttributeAndModes(colorMaterial, osg::StateAttribute::ON);
-	
-	
-	
-	
-	
+
+
+
+
+
 		geometry = mt;
 	}
 	if (geometry == NULL)
@@ -833,7 +873,7 @@ MidiDevice::~MidiDevice()
 bool MidiPlugin::init()
 {
 	currentTrack = 0;
-	
+
 #ifdef HAVE_ALSA
 
 			if (coVRMSController::instance()->isMaster())
@@ -928,6 +968,19 @@ device_list();
 
 		ControllerInfo* controllerInfo = new ControllerInfo(configName);
 	}
+	coCoviseConfig::ScopeEntries FunctionEntries = coCoviseConfig::getScopeEntries("COVER.Plugin.Midi", "Function");
+	for (const auto& functionEntry : FunctionEntries)
+	{
+		const string& n = functionEntry.first;
+
+		std::string configName = "COVER.Plugin.Midi." + n;
+
+		FunctionInfo* functionInfo = new FunctionInfo(configName);
+		functions.push_back(functionInfo);
+	}
+
+	loft = new Loft(cover->getObjectsRoot());
+	
 
 	shaderUniforms.push_back(new osg::Uniform("Shader0", (float)(0.0)));
 	shaderUniforms.push_back(new osg::Uniform("Shader1", (float)(0.0)));
@@ -954,7 +1007,7 @@ device_list();
 	{
 		coVRFileManager::instance()->loadFile(objFileName.c_str(), 0, thereminTransform);
 	}
-	
+
         BBVisitor bbVisitor;
         thereminTransform->accept(bbVisitor);
 
@@ -994,9 +1047,9 @@ device_list();
 			    {
 			        OpenMidiDevice(DeviceName,hMidiDevice[streamNum],hMidiDeviceOut[streamNum]);
 			    }
-			    
+
 		            //snd_rawmidi_read(hMidiDevice[streamNum], NULL, 0); /* trigger reading */
-			    
+
 			    #endif
 			    }
 			    else
@@ -1019,7 +1072,7 @@ device_list();
 				streamNum++;
 				if (streamNum >= NUMMidiStreams)
 					break;
-					
+
 		}
 		int midiPortOut = coCoviseConfig::getInt("OutPort", "COVER.Plugin.Midi", 1);
 		fprintf(stderr, "OpenMidiOut %d\n", midiPortOut);
@@ -1032,6 +1085,90 @@ device_list();
 	return true;
 }
 
+FunctionInfo::FunctionInfo(std::string& cn)
+{
+	configName = cn;
+	keyNumber = coCoviseConfig::getInt("keyNumber", configName, 0);
+	channel = coCoviseConfig::getInt("channel", configName, 0);
+	triggerVelocity = coCoviseConfig::getInt("triggerVelocity", configName, 0);
+	actionName = coCoviseConfig::getEntry("action", configName, "NONE");
+	typeString = coCoviseConfig::getEntry("type", configName, "On");
+	if (typeString == "On")
+		isOn = true;
+
+	if (actionName == "LinePointViz")
+		faction = LinePointViz;
+	else if (actionName == "Store")
+		faction = Store;
+	else if (actionName == "ClearStore")
+		faction = ClearStore;
+	else if (actionName == "Reset")
+		faction = Reset;
+}
+FunctionInfo::~FunctionInfo()
+{
+}
+void FunctionInfo::handle(MidiEvent& me)
+{
+	if (faction == LinePointViz)
+    {
+        static int s = 0;
+        s++;
+        if (s == 5)
+            s = 0;
+        if (s == 0)
+        {
+
+            VRSceneGraph::instance()->setWireframe(VRSceneGraph::Disabled);
+            fprintf(stderr, "Points\n");
+        }
+        else if (s == 1)
+        {
+            VRSceneGraph::instance()->setWireframe(VRSceneGraph::Points);
+        }
+        else if (s == 2)
+        {
+            VRSceneGraph::instance()->setWireframe(VRSceneGraph::HiddenLineBlack);
+        }
+        else if (s == 3)
+        {
+            VRSceneGraph::instance()->setWireframe(VRSceneGraph::HiddenLineWhite);
+        }
+        else if (s == 4)
+        {
+            VRSceneGraph::instance()->setWireframe(VRSceneGraph::Enabled);
+        }
+        else
+        {
+            s = 0;
+        }
+    }
+	else if (faction == Reset)
+	{
+		MidiPlugin::instance()->Reset();
+	}
+	else if (faction == Store)
+	{
+		MidiPlugin::instance()->store();
+	}
+	else if (faction == ClearStore)
+	{
+		MidiPlugin::instance()->clearStore();
+	}
+
+}
+void FunctionInfo::handleOn(MidiEvent& me)
+{
+	if (isOn)
+		handle(me);
+
+}
+void FunctionInfo::handleOff(MidiEvent& me)
+{
+	if (!isOn)
+		handle(me);
+}
+
 ControllerInfo::ControllerInfo(std::string& cn)
 {
 	configName = cn;
@@ -1039,7 +1176,7 @@ ControllerInfo::ControllerInfo(std::string& cn)
 	min = coCoviseConfig::getFloat("min", configName, min);
 	max = coCoviseConfig::getFloat("max", configName, max);
 	minOut = coCoviseConfig::getFloat("minOut", configName, minOut);
-	maxOut = coCoviseConfig::getFloat("maxOut", configName, maxOut); 
+	maxOut = coCoviseConfig::getFloat("maxOut", configName, maxOut);
 	actionName = coCoviseConfig::getEntry("action", configName, "NONE");
 	if (actionName == "Shader0")
 		action = Shader0;
@@ -1053,6 +1190,8 @@ ControllerInfo::ControllerInfo(std::string& cn)
 		action = Shader4;
 	else if (actionName == "Shader5")
 		action = Shader5;
+	else if (actionName == "SpiralSpeed")
+		action = SpiralSpeed;
 	else if (actionName == "rAcceleration")
 		action = rAcceleration;
 	else if (actionName == "Acceleration")
@@ -1244,7 +1383,7 @@ bool MidiPlugin::update()
 	    do{
 		if (udp)
 		{
-		    status = udp->receive(&packet, sizeof(packet),0.001);
+		    status = udp->receive(&packet, sizeof(packet),0);
 		}
 		else
 		{
@@ -1320,12 +1459,32 @@ bool MidiPlugin::update()
 
 	     } while(me.getP0() != 0 || me.getP1() != 0);
 	}
-	
-	
-	
+
+
+
 	return true;
 }
 
+void MidiPlugin::Reset()
+{
+	for (int i = 0; i < NUMMidiStreams; i++)
+	{
+		lTrack[i]->reset();
+	}
+}
+void MidiPlugin::store()
+{
+
+	for (int i = 0; i < NUMMidiStreams; i++)
+	{
+		MidiInstrument* inst = lTrack[i]->instrument;
+		lTrack[i]->store();
+		lTrack[i] = new Track(tracks.size(), true);
+		lTrack[i]->reset();
+		lTrack[i]->instrument = inst;
+		lTrack[i]->setVisible(true);
+	}
+}
 //------------------------------------------------------------------------------
 void MidiPlugin::preFrame()
 {
@@ -1368,7 +1527,7 @@ void MidiPlugin::preFrame()
 				{
 					std::cerr << "Controller: " << me.getCommandByte() << std::endl;
 					fprintf(stderr, "Raw: p0 %d, p1 %d, p2 %d, p3 %d\n",  me.getP0(), me.getP1(), me.getP2(), me.getP3());
-			
+
 				}
 				else if (me.isEndOfTrack())
 				{
@@ -1423,22 +1582,11 @@ void MidiPlugin::preFrame()
 			{
 				if (me.getVelocity() < 50)
 				{
-					for (int i = 0; i < NUMMidiStreams; i++)
-					{
-						lTrack[i]->reset();
-					}
+					Reset();
 				}
 				else
 				{
-					for (int i = 0; i < NUMMidiStreams; i++)
-					{
-						MidiInstrument* inst = lTrack[i]->instrument;
-					lTrack[i]->store();
-					lTrack[i] = new Track(tracks.size(), true);
-					lTrack[i]->reset();
-					lTrack[i]->instrument = inst;
-					lTrack[i]->setVisible(true);
-					}
+					store();
 				}
 			}
 			else
@@ -1448,17 +1596,7 @@ void MidiPlugin::preFrame()
 
 				UA_Server_run_iterate(server, true);
 #endif
-
-				if (lTrack[channel]->instrument != nullptr)
-				{
-					lTrack[channel]->handleEvent(me);
-				}
-				else
-				{
-					if (me.getKeyNumber() > 0)
-					fprintf(stderr, "unconfigured instrument channel: %d  key: %02d velo %03d \n", me.getChannel(), me.getKeyNumber(), me.getVelocity());
-
-				}
+                processIncommingMidiEvent(me);
 			}
 		}
 		lTrack[i]->update();
@@ -1527,7 +1665,13 @@ void MidiPlugin::handleController(MidiEvent& me)
 			{
 				rAcceleration = val;
 				raccelSlider->setValue(val);
-			}
+            }
+            else if (ci->action == ControllerInfo::SpiralSpeed)
+            {
+                spiralSpeed = val;
+                spiralSpeedSlider->setValue(val);
+
+            }
 			else if (ci->action == ControllerInfo::Acceleration)
 			{
 				acceleration = val;
@@ -1555,7 +1699,7 @@ void MidiPlugin::handleController(MidiEvent& me)
 			lastThereminTime = cover->frameTime();
 			lastThereminScaleY = thereminScaleY;
 		}
-	}
+	}/*
 	if (controllerID == 5)
 	{
 		if (value < 10)
@@ -1580,8 +1724,8 @@ void MidiPlugin::handleController(MidiEvent& me)
 			VRSceneGraph::instance()->setWireframe(VRSceneGraph::Enabled);
 		}
 
-	}
-	if (controllerID == 63)
+	}*/
+	/*if (controllerID == 63) //Abstandssensor
 	{
 		if (value < 41)
 		{
@@ -1597,7 +1741,7 @@ void MidiPlugin::handleController(MidiEvent& me)
 			VRSceneGraph::instance()->setWireframe(VRSceneGraph::Enabled);
 		}
 
-	}
+	}*/
 	if (controllerID == 65)
 	{
 		if (value > 64)
@@ -1607,7 +1751,7 @@ void MidiPlugin::handleController(MidiEvent& me)
 			if (spiralSpeed > 5)
 				spiralSpeed = 5;
 			spiralSpeedSlider->setValue(spiralSpeed);
-			
+
 		}
 		else
 		{
@@ -1617,7 +1761,7 @@ void MidiPlugin::handleController(MidiEvent& me)
 			spiralSpeedSlider->setValue(spiralSpeed);
 		}
 	}
-	if (controllerID == 74)
+	/*if (controllerID == 74)
 	{
 		if (value > 64)
 		{
@@ -1635,7 +1779,7 @@ void MidiPlugin::handleController(MidiEvent& me)
 				spiralSpeed = -4;
 			spiralSpeedSlider->setValue(spiralSpeed);
 		}
-	}
+	}*/
 	if (controllerID == 55)
 	{
 		frequencySurface->radius1 = value;
@@ -1678,12 +1822,12 @@ void MidiPlugin::handleController(MidiEvent& me)
 			lTrack[i]->setRotation(rotSpeed);
 		}
 	}
-	if ((controllerID == 53)|| (controllerID == 32) || (controllerID == 71)) // slider right
+	/*if ((controllerID == 53) || (controllerID == 32) || (controllerID == 71)) // slider right
 	{
 		float sliderValue = ((float)(value - 64) / 64.0)*0.3;
 		rAcceleration = sliderValue;
 		raccelSlider->setValue(sliderValue);
-	}
+	}*/
 	if ((controllerID == 63) || (controllerID == 15) || (controllerID == 23)) // distance sensor
 	{
 		float sliderValue = value / 127.0;
@@ -1827,7 +1971,7 @@ void MidiPlugin::MIDItab_create(void)
 	sphereScaleSlider->setCallback([this](float value, bool) {
 		sphereScale = value;
 		});
-	
+
 	trackNumber = new  ui::EditField(MIDITab, "trackNumber");
 	trackNumber->setValue(0);
 	trackNumber->setCallback([this](std::string newVal) {
@@ -2021,7 +2165,7 @@ void Track::addNote(Note *n)
 	if (n->track->instrument->type == "keyboard")
 	{
 	// check if there is already a note on, then turn it off
-	
+
 	// find key press for this release
 	for (auto it = notes.end(); it != notes.begin(); )
 	{
@@ -2043,7 +2187,7 @@ void Track::addNote(Note *n)
 			break;
 		}
 	}
-	
+
 		notes.push_back(n);
 		n->setInactive(false);
 		n->vertNum = lineVert->size();
@@ -2131,12 +2275,12 @@ void Track::endNote(MidiEvent& me)
 	{
 	  // this is an end Note without a note On, treat it as noteOn if this is a keyboard or guitar
 	  addNote(new Note(me, this));
-	} 
+	}
 	if (note != NULL)
 	{
 
 	}
-	
+
 }
 
 void Track::setRotation(osg::Vec3& rotSpeed)
@@ -2184,7 +2328,6 @@ void Track::handleEvent(MidiEvent& me)
 	}
 	else if (me.isController())
 	{
-		MidiPlugin::instance()->handleController(me);
 	}
 }
 void Track::store()
@@ -2247,14 +2390,14 @@ void Track::update()
 		char buf[1000];
 		int numRead = 1;
 		while(numRead > 0)
-		{	
-		
+		{
+
 			me.setP0(0);
 			me.setP1(0);
 			me.setP2(0);
 			if (coVRMSController::instance()->isMaster())
 			{
-			
+
 			    #ifdef HAVE_ALSA
 				unsigned char buf[256];
 				int i, length=0;
@@ -2287,7 +2430,7 @@ void Track::update()
 						numRead=2;
 					        err = snd_rawmidi_read(MidiPlugin::instance()->hMidiDevice[trackNumber], buf+1, 2);
 					    }
-					
+
 					if(err > 0)
 				     fprintf(stderr,"length: %d trackNumber: %d buf0:%x\n",err,trackNumber,buf[0]);
 					if (err <= 0)
@@ -2396,7 +2539,7 @@ void Track::update()
 				buf[3] = numRead;
 				coVRMSController::instance()->sendSlaves((char*)buf, 4);
 //fprintf(stderr, "sent: %01d %02d velo %03d chan %d numRead %d streamnum %d\n", me.isNoteOn(), me.getKeyNumber(), me.getVelocity(), me.getChannel(), numRead, streamNum);*/
-			
+
 
 				if (numRead > 0)
 				{
@@ -2423,21 +2566,11 @@ void Track::update()
 				numRead = buf[3];
 	//fprintf(stderr,"received: %01d %02d velo %03d chan %d numRead %d\n", me.isNoteOn(),me.getKeyNumber(), me.getVelocity(), me.getChannel(),numRead);
 			}
-			
+
 			if(numRead > 0 &&  me.getP0()!=0)
 			{
+				MidiPlugin::instance()->processIncommingMidiEvent(me);
 
-				int channel = me.getChannel();
-				if (MidiPlugin::instance()->lTrack[channel]->instrument != nullptr)
-				{
-					MidiPlugin::instance()->lTrack[channel]->handleEvent(me);
-				}
-				else
-				{
-					if(me.getKeyNumber()>0)
-					fprintf(stderr, "unconfigured instrument channel: %d  key: %02d velo %03d \n", me.getChannel(), me.getKeyNumber(), me.getVelocity());
-
-				}
 			}
 		}
 	}
@@ -2501,7 +2634,7 @@ void Track::setVisible(bool state)
 	}
 }
 
-Note::Note(MidiEvent &me, Track *t)
+Note::Note(const MidiEvent &me, Track *t)
 {
 	event = me;
 	track = t;
@@ -2520,7 +2653,7 @@ Note::Note(MidiEvent &me, Track *t)
 				break;
 			}
 		}
-		
+
 		//event.setKeyNumber(0);
 	}
 	transform->setMatrix(osg::Matrix::scale(noteScale, noteScale, noteScale) * osg::Matrix::translate(ni->initialPosition));
@@ -2749,7 +2882,7 @@ WaveSurface::WaveSurface(osg::Group * p, AudioInStream *s, int w)
 	}
 
 	geoState->setAttributeAndModes(globalDefaultMaterial.get(), osg::StateAttribute::ON);
-	
+
 	osg::BoundingBox *boundingBox = new osg::BoundingBox(-radius1*2, -radius1*20, -radius1*2,radius1*2, radius1*20, radius1*2);
         geom->setInitialBound(*boundingBox);
 }
@@ -2802,6 +2935,7 @@ void WaveSurface::setType(surfaceType s)
 	}
 }
 osg::ref_ptr <osg::Material >WaveSurface::globalDefaultMaterial = NULL;
+osg::ref_ptr <osg::Material >Loft::globalDefaultMaterial = NULL;
 
 WaveSurface::~WaveSurface()
 {
@@ -2944,9 +3078,9 @@ int run(UA_String* transportProfile,
 
 
 int MidiPlugin::initOPCUA() {
-	
 
-	
+
+
 		/*if (strncmp(argv[1], "opc.udp://", 10) == 0) {
 			networkAddressUrl.url = UA_STRING(argv[1]);
 		}
@@ -3002,9 +3136,9 @@ int MidiPlugin::initOPCUA() {
 
 		UA_StatusCode retval = UA_Server_run_startup(server);
 
-		
+
 #endif
-		
+
 
 		return 1;
 
@@ -3101,7 +3235,7 @@ void TriplePlay::MIDItab_create(void)
         setParam(MIDIMode, ftpValue::Poly);
         setParam(MIDIMode, ftpValue::Poly);
         });
-	
+
    sensitivity = std::make_unique<opencover::ui::SliderConfigValue>(FTPGroup, "sensitivity", 50.0, *MidiPlugin::instance()->config(),"TriplePlay",config::Flag::Default);
    sensitivity->ui()->setBounds(MinDynamicsSensitivity,MaxDynamicsSensitivity);
    sensitivity->ui()->setIntegral(true);
@@ -3158,7 +3292,7 @@ void TriplePlay::MIDItab_create(void)
        setParam(ThreadSensitivity,(int)threadSensitivity6->getValue()+0x50);
        fprintf(stderr,"threadSensitivity1:%d\n",(int)threadSensitivity6->getValue()+0x50);
    });
-   
+
 }
 
 
@@ -3345,7 +3479,7 @@ void MidiPlugin::OpenMidiDevice(const std::string &DeviceName,snd_rawmidi_t *&in
 		return;
 	}
 	do {
-	
+
 	snd_ctl_t *ctl;
 	char devName[128];
 	int device;
@@ -3405,7 +3539,7 @@ void MidiPlugin::OpenMidiDevice(const std::string &DeviceName,snd_rawmidi_t *&in
 		sub_name = snd_rawmidi_info_get_subdevice_name(info);
 		if(DeviceName == name)
 		{
-		
+
 			sprintf(devName, "hw:%d,%d", card, device);
 			if ((err = snd_rawmidi_open(&inputp, &outputp, devName, SND_RAWMIDI_NONBLOCK)) < 0) {
 				error("cannot open port \"%s\": %s", devName, snd_strerror(err));
@@ -3424,7 +3558,7 @@ void MidiPlugin::OpenMidiDevice(const std::string &DeviceName,snd_rawmidi_t *&in
 			sprintf(devName, "hw:%d,%d,%d", card, device, sub);
 			if ((err = snd_rawmidi_open(&inputp, &outputp, devName, SND_RAWMIDI_NONBLOCK)) < 0) {
 				error("cannot open port \"%s\": %s", devName, snd_strerror(err));
-				
+
 			}
 			if ((err = snd_rawmidi_nonblock(inputp, 1)) < 0) {
 				error("cannot set nonblocking mode: %s", snd_strerror(err));
@@ -3437,7 +3571,7 @@ void MidiPlugin::OpenMidiDevice(const std::string &DeviceName,snd_rawmidi_t *&in
 	}
 	}
 	snd_ctl_close(ctl);
-	
+
 		if ((err = snd_card_next(&card)) < 0) {
 			error("cannot determine card number: %s", snd_strerror(err));
 			break;
@@ -3563,5 +3697,159 @@ void MidiPlugin::error(const char *format, ...)
 	putc('\n', stderr);
 }
 
-
 #endif
+
+Loft::Loft(osg::Group* parent)
+{
+	coCoviseConfig::ScopeEntries LoftEntries = coCoviseConfig::getScopeEntries("COVER.Plugin.Midi.Loft", "Instrument");
+	for (const auto& loftEntry : LoftEntries)
+	{
+		const string& n = loftEntry.first;
+
+		std::string configName = "COVER.Plugin.Midi.Loft" + n;
+
+		LoftInstrument* loftInstrument = new LoftInstrument(configName,this);
+		loftInstrument->instrumentNumber = instruments.size();
+		instruments.push_back(loftInstrument);
+	}
+	numSeconds = coCoviseConfig::getInt("COVER.Plugin.Midi.Loft","numSeconds", 30);
+	radius = coCoviseConfig::getFloat("COVER.Plugin.Midi.Loft", "radius", 1.0);
+	zSpacing = coCoviseConfig::getFloat("COVER.Plugin.Midi.Loft", "zSpacing", 1.0);
+
+	geode = new osg::Geode();
+	geode->setName("Loft");
+	parent->addChild(geode.get());
+	osg::Geometry* geom = new osg::Geometry();
+	geode->addDrawable(geom);
+
+	geom->setUseDisplayList(false);
+	geom->setUseVertexBufferObjects(true);
+
+	vert = new osg::Vec3Array;
+	normals = new osg::Vec3Array;
+	texCoord = new osg::Vec2Array;
+    int numInstruments = instruments.size();
+	int numSteps = 40 * numSeconds;
+    float radPerStep = 2.0 * M_PI / (float)numSteps;
+	vert->resize(numSteps * numInstruments);
+	normals->resize(numSteps * numInstruments);
+	texCoord->resize(numSteps * numInstruments);
+	for (int i = 0; i < numInstruments; i++)
+	{
+		for (int j = 0; j < numSteps; j++)
+		{
+			(*vert)[i * numSteps + j] = osg::Vec3(radius * sinf((float)j * radPerStep), instruments[i]->zPosition, radius * cosf((float)j * radPerStep));
+			(*normals)[i * numSteps + j] = osg::Vec3(cosf((float)j * radPerStep), 0, sinf((float)j * radPerStep));
+			(*texCoord)[i * numSteps + j] = osg::Vec2((float)j/(numSteps-1),(float)i/(numInstruments-1));
+		}
+	}
+	osg::DrawElementsUInt* primitives = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES);
+	if (instruments.size() > 0)
+	{
+		primitives->reserve(40 * numSeconds * (instruments.size() - 1));
+	}
+	geom->addPrimitiveSet(primitives);
+	geom->setVertexArray(vert);
+	geom->setNormalArray(normals);
+	geom->setTexCoordArray(0, texCoord);
+	geom->setNormalBinding(osg::Geometry::BIND_PER_VERTEX);
+
+	osg::StateSet* geoState = geode->getOrCreateStateSet();
+
+	if (globalDefaultMaterial.get() == NULL)
+	{
+		globalDefaultMaterial = new osg::Material;
+		globalDefaultMaterial->setColorMode(osg::Material::AMBIENT_AND_DIFFUSE);
+		globalDefaultMaterial->setAmbient(osg::Material::FRONT_AND_BACK, osg::Vec4(0.2f, 0.2f, 0.2f, 1.0));
+		globalDefaultMaterial->setDiffuse(osg::Material::FRONT_AND_BACK, osg::Vec4(1.0f, 1.0f, 1.0f, 1.0));
+		globalDefaultMaterial->setSpecular(osg::Material::FRONT_AND_BACK, osg::Vec4(0.4f, 0.4f, 0.4f, 1.0));
+		globalDefaultMaterial->setEmission(osg::Material::FRONT_AND_BACK, osg::Vec4(0.0f, 0.0f, 0.0f, 1.0));
+		globalDefaultMaterial->setShininess(osg::Material::FRONT_AND_BACK, 16.0f);
+	}
+
+	geoState->setAttributeAndModes(globalDefaultMaterial.get(), osg::StateAttribute::ON);
+
+	osg::BoundingBox* boundingBox = new osg::BoundingBox(-radius * 2, 0, -radius * 2, radius * 2, zSpacing*instruments.size(), radius * 2);
+	geom->setInitialBound(*boundingBox);
+	parent->addChild(geode);
+}
+
+Loft::~Loft()
+{
+
+}
+
+void Loft::handleEvent(MidiEvent& me)
+{
+    if (timeStamp == 0)
+    {
+        timeStamp = cover->frameTime();
+    }
+
+	for (const auto& i : instruments)
+	{
+		if (i->channel == me.getChannel() && i->keyNumber == me.getKeyNumber())
+		{
+			if (me.isNoteOn())
+			{
+				i->handleOn(me);
+			}
+			else
+			{
+				i->handleOff(me);
+			}
+		}
+	}
+}
+
+LoftInstrument::LoftInstrument(std::string& cn, Loft *l)
+{
+	loft = l;
+	configName = cn;
+	keyNumber = coCoviseConfig::getInt("keyNumber", configName, 0);
+	channel = coCoviseConfig::getInt("channel", configName, 0);
+    zPosition = coCoviseConfig::getFloat("zPosition", configName, -1.0f);
+	if (zPosition == -1.0)
+	{
+		zPosition = loft->zSpacing * loft->instruments.size();
+	}
+    for (auto& e : events)
+    {
+        e.timeStamp = 0.0;
+    }
+}
+
+LoftInstrument::~LoftInstrument()
+{
+
+}
+
+void LoftInstrument::handleOn(MidiEvent& me)
+{
+	double time = cover->frameTime() - loft->timeStamp;
+	int index = int(std::fmod(time, loft->numSeconds));
+	for (int i = lastIndex; i <= index; i++)
+	{
+		if (events[i].timeStamp != 0.0)
+		{
+			//remove triagbles with this vertex
+		}
+		events[i].timeStamp = 0.0;
+	}
+	events[index].timeStamp = time;
+	events[index].me = me;
+	events[index].index = index;
+	events[index].vertexNumber = (instrumentNumber * loft->numSeconds * 40) +index;
+
+	int numInstruments = loft->instruments.size();
+	int numSteps = 40 * loft->numSeconds;
+	float radPerStep = 2.0 * M_PI / (float)numSteps;
+	float radius = loft->radius * me.getVelocity();
+
+	(*(loft->vert))[events[index].vertexNumber] = osg::Vec3(radius * sinf((float)index * radPerStep), loft->instruments[instrumentNumber]->zPosition, radius * cosf((float)index * radPerStep));
+	(*loft->normals)[events[index].vertexNumber] = osg::Vec3(cosf((float)index * radPerStep), 0, sinf((float)index * radPerStep));
+	lastIndex = index;
+}
+void LoftInstrument::handleOff(MidiEvent& me)
+{
+}

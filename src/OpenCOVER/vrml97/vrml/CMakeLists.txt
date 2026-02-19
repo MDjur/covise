@@ -18,10 +18,16 @@ ADD_DEFINITIONS(-DHAVE_CONFIG_H -DYYERROR_VERBOSE)
 SET(EXTRA_INCS )
 # gather optional libraries in EXTRA_LIBS
 SET(EXTRA_LIBS )
+
+IF(WIN32)
+  SET(EXTRA_LIBS Bcrypt.lib )
+ENDIF()
+
 using(JPEG)
 using(PNG)
 using(TIFF)
 using(ZLIB)
+
 
 IF(UNIX AND NOT APPLE)
   FIND_PACKAGE(ALSA QUIET)
@@ -60,8 +66,11 @@ IF(CURL_FOUND)
 ENDIF()
 
 IF(PTHREAD_FOUND)
-    ADD_DEFINITIONS(-DHAVE_PTHREAD)
+  ADD_DEFINITIONS(-DHAVE_PTHREAD)
+  SET(EXTRA_INCS ${EXTRA_INCS} ${PTHREAD_INCLUDE_DIR})
+  SET(EXTRA_LIBS ${EXTRA_LIBS} ${PTHREAD_LIBRARIES})
 ENDIF()
+
 
 ADD_DEFINITIONS(-DYY_NEVER_INTERACTIVE)
 using(FLEX)
@@ -83,6 +92,7 @@ ADD_FLEX_BISON_DEPENDENCY(VrmlScanner VrmlParser)
 INCLUDE_DIRECTORIES(
   ${EXTRA_INCS}
   "${CMAKE_CURRENT_BINARY_DIR}/../js"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/oscpp/include"
 )
 set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
 
@@ -103,6 +113,7 @@ SET(VRML_SOURCES
   PlayerFactory.cpp
   PlayerMix.cpp
   PlayerOpenAL.cpp
+  PlayerOsc.cpp
   PlayerOSS.cpp
   pngread.c
   ScriptJDK.cpp
@@ -224,6 +235,7 @@ SET(VRML_HEADERS
   PlayerFactory.h
   PlayerMix.h
   PlayerOpenAL.h
+  PlayerOsc.h
   PlayerOSS.h
   pngread.h
   ScriptJDK.h
@@ -388,7 +400,7 @@ endif()
 COVISE_WNOERROR(coVRML BASEARCH zebu)
 
 TARGET_LINK_LIBRARIES(coVRML
-  coJS ${COVISE_UTIL_LIBRARY}
+  coJS coNet ${COVISE_UTIL_LIBRARY}
   ${EXTRA_LIBS}
   ${CMAKE_THREAD_LIBS_INIT}
 )

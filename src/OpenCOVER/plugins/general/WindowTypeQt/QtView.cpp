@@ -410,9 +410,42 @@ QtViewElement *QtView::elementFactoryImplementation(FileBrowser *fb)
     ve->markForDeletion(a);
     connect(a, &QAction::triggered, [fb](bool){
         QString filters = QString::fromStdString(fb->filter());
-        filters.replace(";", ";;");
-        QString dir = QString::fromStdString(fb->value());
+        auto filterList = filters.split(";;");
+        QStringList formattedFilters;
         QString selectedFilter;
+        for (auto &f: filterList)
+        {
+            f = f.trimmed();
+            if (f.isEmpty())
+                continue;
+            if (f.contains("(") && f.endsWith(")"))
+            {
+                formattedFilters.append(f);
+                selectedFilter = f;
+                continue;
+            }
+
+            QString ext = f;
+            if (ext.startsWith("*"))
+                ext = ext.mid(1);
+            if (ext.startsWith("."))
+                ext = ext.mid(1);
+            if (ext.isEmpty())
+                ext = "All Files";
+
+            if (!f.startsWith("*"))
+            {
+                if (!f.startsWith("."))
+                    f.prepend(".");
+                f.prepend("*");
+            }
+            f = QString("%1 (%2)").arg(ext).arg(f);
+            formattedFilters.append(f);
+            selectedFilter = f;
+        }
+        selectedFilter = formattedFilters.first(); // default to first filter
+        filters = formattedFilters.join(";;");
+        QString dir = QString::fromStdString(fb->value());
         QString file = fb->forSaving()
                 ? QFileDialog::getSaveFileName(nullptr, "Save...", dir, filters, &selectedFilter)
                 : QFileDialog::getOpenFileName(nullptr, "Open...", dir, filters, &selectedFilter);

@@ -13,7 +13,7 @@
 #include <OpenVRUI/vsg/VSGVruiUserDataCollection.h>
 
 #include <OpenVRUI/util/vruiLog.h>
-#include <OpenVRUI/sginterface/vruiRendererInterface.h>
+#include <OpenVRUI/vsg/VSGVruiRendererInterface.h>
 
 using namespace vsg;
 using namespace std;
@@ -48,8 +48,14 @@ void VSGVruiNode::addChild(vruiNode *node)
             break;
         }
     }
-    if(!found)
+    if (!found)
+    {
         group->addChild(newNode);
+        VSGVruiNode* childNode = dynamic_cast<VSGVruiNode*>(node);
+        childNode->parent = new VSGVruiNode(this->node);
+        VSGVruiRendererInterface::the()->assignVsgNodeParent(group);
+    }
+    
 }
 
 void VSGVruiNode::insertChild(int location, vruiNode *node)
@@ -81,15 +87,50 @@ void VSGVruiNode::removeChild(vruiNode *node)
 
 int VSGVruiNode::getNumParents() const
 {
-    cerr << "undefined VSGVruiNode::getNumParents()" << endl;
-    return 0;
+    if (auto nodeParentInfo = node->getObject("parentInfo"))
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 vruiNode *VSGVruiNode::getParent(int parentNumber)
 {
-    
-    cerr << "undefined vruiNode *VSGVruiNode::getParent(int parentNumber)" << endl;
-    return nullptr;
+    if (getNumParents())
+    {
+        auto parentInfo = ParentInfo::create();
+        if (auto nodeParentInfo = node->getAuxiliary()->getObject("parentInfo"))
+        {
+            parentInfo = dynamic_cast<ParentInfo*>(nodeParentInfo);
+            if (!parent)
+            {
+                parent = new VSGVruiNode(parentInfo->parent.ref_ptr());
+            }
+            else
+            {
+                Node* parentNode = parentInfo->parent.ref_ptr().get();
+                if (parentNode != 0)
+                {
+                    parent->node = parentNode;
+                }
+                else
+                {
+                    delete parent;
+                    parent = 0;
+                }
+            }
+        }
+    }
+    else
+    {
+        delete parent;
+        parent = 0;
+    }
+
+    return parent;
 }
 
 Node *VSGVruiNode::getNodePtr()
@@ -111,8 +152,27 @@ std::string VSGVruiNode::getName() const
 
 void VSGVruiNode::removeAllParents()
 {
-
-    cerr << "undefined VSGVruiNode::removeAllParents()" << endl;
+    if (getNumParents()) 
+    {
+        if (parent)
+        {
+            Node* parentNode = parent->getNodePtr();
+            Group* parentGroup = dynamic_cast<Group*>(parentNode);
+            for (auto it = parentGroup->children.begin(); it != parentGroup->children.end(); it++)
+            {
+                if ((*it).get() == this->node.get())
+                {
+                    parentGroup->children.erase(it);
+                    return;
+                }
+            }
+        }
+    }
+    else
+    {
+        cerr << "undefined VSGVruiNode::removeAllParents()" << endl;
+    }
+    
 }
 
 void VSGVruiNode::removeAllChildren()
@@ -123,22 +183,23 @@ void VSGVruiNode::removeAllChildren()
 
 void VSGVruiNode::convertToWorld(vruiMatrix *matrix)
 {
-
-    cerr << "undefined VSGVruiNode::convertToWorld(vruiMatrix *matrix)" << endl;
-   /* VSGVruiMatrix* mat = dynamic_cast<VSGVruiMatrix*>(matrix);
-    Matrix returnMatrix = mat->getMatrix();
+    //cerr << "undefined VSGVruiNode::convertToWorld(vruiMatrix *matrix)" << endl;
+    VSGVruiMatrix* mat = dynamic_cast<VSGVruiMatrix*>(matrix);
+    dmat4 returnMatrix = mat->getMatrix();
     VSGVruiNode *parent = this;
+
     while (parent != 0)
     {
         MatrixTransform *transform = dynamic_cast<MatrixTransform *>(parent->getNodePtr());
         if (transform)
         {
-            Matrix transformMatrix = transform->getMatrix();
-            returnMatrix.postMult(transformMatrix);
+            dmat4 transformMatrix = transform->matrix;
+            returnMatrix = transformMatrix * returnMatrix;
         }
         parent = dynamic_cast<VSGVruiNode *>(parent->getParent());
     }
-    mat->setMatrix(returnMatrix);*/
+
+    mat->setMatrix(returnMatrix);
 }
 
 vruiUserData *VSGVruiNode::getUserData(const std::string &name)
@@ -150,4 +211,5 @@ void VSGVruiNode::setUserData(const string &name, vruiUserData *data)
 {
     VSGVruiUserDataCollection::setUserData(this->node, name, data);
 }
+
 }

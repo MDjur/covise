@@ -433,7 +433,7 @@ MACRO(COVER_ADD_PLUGIN_TARGET targetname)
 
   INCLUDE_DIRECTORIES(SYSTEM
     ${ZLIB_INCLUDE_DIR}
-    ${JPEG_INCLUDE_DIR}
+    ${JPEG_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIR}
     ${TIFF_INCLUDE_DIR}
     ${OPENSCENEGRAPH_INCLUDE_DIRS}
@@ -1036,6 +1036,14 @@ MACRO(COVISE_FIND_PACKAGE package)
    set(pack "${package}")
    set(hbpack "")
    if (APPLE)
+       if (pack STREQUAL "OpenGL" OR pack STREQUAL "GLUT")
+           set(SAVED_CMAKE_FIND_FRAMEWORK ${CMAKE_FIND_FRAMEWORK})
+           if (COVISE_USE_X11)
+              set(CMAKE_FIND_FRAMEWORK NEVER)
+           else()
+              set(CMAKE_FIND_FRAMEWORK ONLY)
+           endif()
+       endif()
        if (pack STREQUAL "Python")
            set(hbpack "python@3")
        endif()
@@ -1110,6 +1118,11 @@ MACRO(COVISE_FIND_PACKAGE package)
    FIND_PACKAGE(${ARGV})
 
    SET(CMAKE_PREFIX_PATH ${SAVED_CMAKE_PREFIX_PATH})
+   if (APPLE)
+       if (pack STREQUAL "OpenGL" OR pack STREQUAL "GLUT")
+           set(CMAKE_FIND_FRAMEWORK ${SAVED_CMAKE_FIND_FRAMEWORK})
+       endif()
+   endif()
 ENDMACRO(COVISE_FIND_PACKAGE PACKAGE)
 
 MACRO(COVISE_USE_OPENMP target)
@@ -1151,7 +1164,16 @@ MACRO(COVISE_FIND_CUDA)
               set(CUDA_NVCC_FLAGS "-g ${CUDA_NVCC_FLAGS}")
           endif()
       endif()
+      covise_find_package(CCCL CONFIG)
   ENDIF()
+
+  if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+      if(CUDAToolkit_VERSION_MAJOR GREATER 12)
+          set(CMAKE_CUDA_ARCHITECTURES 75)
+      else()
+          set(CMAKE_CUDA_ARCHITECTURES 60)
+      endif()
+  endif()
 ENDMACRO(COVISE_FIND_CUDA)
 
 MACRO(COVISE_FIND_BOOST)

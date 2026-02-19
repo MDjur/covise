@@ -81,6 +81,7 @@ class coUpdateManager;
 class coMenu;
 class coToolboxMenu;
 class coRowMenu;
+struct ParentInfo;
 }
 namespace vrml
 {
