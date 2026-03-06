@@ -454,17 +454,6 @@ osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
   // Generate indices.
   auto indices = createIndicesForTube(lengthSegments, circleSegments);
 
-  std::cout << "[DEBUG] Generated " << vertices->size() << " vertices, "
-            << normals->size() << " normals, and " << indices->size()
-            << " indices for tube between points." << std::endl;
-
-  for (size_t i = 0; i < vertices->size(); ++i) {
-    std::cout << "[DEBUG] Index " << i << ": Vertex(" << (*vertices)[i].x() << ", "
-              << (*vertices)[i].y() << ", " << (*vertices)[i].z() << ") Normal("
-              << (*normals)[i].x() << ", " << (*normals)[i].y() << ", "
-              << (*normals)[i].z() << ")\n";
-  }
-
   geometry->setVertexArray(vertices);
   geometry->setNormalArray(normals, osg::Array::BIND_PER_VERTEX);
   geometry->addPrimitiveSet(indices);
@@ -473,11 +462,7 @@ osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
   osg::IntArray *intArray = new osg::IntArray;
   for (size_t i = 0; i < lengthSegments + 1; i++) {
     for (size_t j = 0; j <= circleSegments; j++) {
-      //   intArray->push_back(i);
-      //   intArray->push_back(colorInterpolation ? i : 0);
       int val = (colorInterpolation ? i : 0);
-      //   std::cout << "[DEBUG] indexAttrib[" << (i * circleSegments + j)
-      //             << "] = " << val << std::endl;
       intArray->push_back(val);
     }
   }
