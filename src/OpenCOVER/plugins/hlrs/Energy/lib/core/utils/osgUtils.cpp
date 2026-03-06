@@ -41,9 +41,6 @@
 #include <utility>
 #include <vector>
 
-#include <chrono>
-#include <thread>
-
 namespace core::utils::osgUtils {
 namespace visitors {
 void NodeNameToggler::apply(osg::Node &node) {
