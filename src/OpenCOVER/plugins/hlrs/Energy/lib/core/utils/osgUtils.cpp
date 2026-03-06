@@ -460,8 +460,8 @@ osg::ref_ptr<osg::Geometry> createCylinderBetweenPoints(
 
   // shader attribute mapping from vertices to data value in texture
   osg::IntArray *intArray = new osg::IntArray;
-  for (size_t i = 0; i < lengthSegments + 1; i++) {
-    for (size_t j = 0; j <= circleSegments; j++) {
+  for (size_t i = 0; i < lengthSegments + 1; ++i) {
+    for (size_t j = 0; j <= circleSegments; ++j) {
       int val = (colorInterpolation ? i : 0);
       intArray->push_back(val);
     }
