@@ -6,7 +6,7 @@
 #define EXTERNLIBS GetEnv("EXTERNLIBS")
 #define ARCHSUFFIX GetEnv("ARCHSUFFIX")
 
-#define REVIT_VERSION "2026"
+#define REVIT_VERSION "2027"
 
 
 [Setup]
@@ -42,7 +42,7 @@ ShowLanguageDialog=yes
 Source: {#COVISEDIR}\{#ARCHSUFFIX}\lib\OpenCOVERPlugin.dll; DestDir: {app}
 
 [UninstallDelete]
-Type: files; Name: "{commonappdata}\Autodesk\Revit\Addins\{#REVIT_VERSION}\OpenCOVERPlugin.addin"
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\{#REVIT_VERSION}\OpenCOVERPlugin.addin"
 
 [Code]
 
@@ -54,7 +54,7 @@ fileName :String;
 begin
   if CurStep = ssPostInstall then
   begin
-   fileName :=    ExpandConstant('{commonappdata}')+'\Autodesk\Revit\Addins\{#REVIT_VERSION}\OpenCOVERPlugin.addin';  
+   fileName :=    ExpandConstant('{userappdata}')+'\Autodesk\Revit\Addins\{#REVIT_VERSION}\OpenCOVERPlugin.addin';  
    SaveStringToFile(fileName, '<?xml version="1.0" encoding="utf-8"?>'+ #13#10 +
 '<RevitAddIns>'+ #13#10 +
 '  <AddIn Type="Application"> '+ #13#10 +
