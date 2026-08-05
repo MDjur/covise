@@ -82,7 +82,7 @@ void setBicycleBreak(int breakvalue)
 {
     if ((breakvalue >= 0) && (breakvalue <= 10000))
     {
-        sprintf(buf, "%i\n", breakvalue);
+        snprintf(buf, sizeof(buf), "%i\n", breakvalue);
 
         if (sendto(ssend, buf, BUFLEN, 0, (struct sockaddr *)&si_other, slen) == -1)
         {
@@ -119,10 +119,10 @@ void VrmlNodeBicycle::initFields(VrmlNodeBicycle *node, VrmlNodeType *t)
 {
     VrmlNodeChild::initFields(node, t); // Parent class
     initFieldsHelper(node, t,
-                     exposedField("bikeRotation", node->d_bikeRotation, [node](auto f){
+                     exposedField("bikeRotation", &VrmlNodeBicycle::d_bikeRotation, [node](auto f){
                          node->recalcMatrix();
                      }),
-                     exposedField("bikeTranslation", node->d_bikeTranslation, [node](auto f){
+                     exposedField("bikeTranslation", &VrmlNodeBicycle::d_bikeTranslation, [node](auto f){
                          node->recalcMatrix();
                      }), 
                      eventInCallBack<VrmlSFBool>("thermal", [node](auto fieldValue){

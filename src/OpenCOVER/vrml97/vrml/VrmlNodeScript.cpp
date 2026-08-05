@@ -37,10 +37,10 @@ void VrmlNodeScript::initFields(VrmlNodeScript *node, VrmlNodeType *t)
 {
     VrmlNodeChild::initFields(node, t);
     initFieldsHelper(node, t,
-                     exposedField("url", node->d_url),
-                     field("directOutput", node->d_directOutput),
-                     field("mustEvaluate", node->d_mustEvaluate),
-                     field("myself", node->d_myself));
+                     exposedField("url", &VrmlNodeScript::d_url),
+                     field("directOutput", &VrmlNodeScript::d_directOutput),
+                     field("mustEvaluate", &VrmlNodeScript::d_mustEvaluate),
+                     field("myself", &VrmlNodeScript::d_myself));
 }
 
 const char *VrmlNodeScript::typeName() { return "Script"; }
@@ -375,10 +375,13 @@ void VrmlNodeScript::addField(const char *ename, VrmlField::VrmlFieldType t,
     if (val)
     {
         set(d_fields, ename, val);
-        auto f = field(ename, *(*fieldIter)->value);
-        // initFieldsHelper(this, nullptr, field(ename, *(*fieldIter)->value), [this, fieldIter](){
-        //     set(d_fields, (*fieldIter)->name, (*fieldIter)->value);
-        // });
+        VrmlFieldGetter<VrmlField> getter = [this, fieldIter](VrmlNode *node) -> VrmlField* {
+            return (*fieldIter)->value;
+        };
+        VrmlNode::NameValueStruct<VrmlField, VrmlNode::FieldAccessibility::Private> nvs{ename, getter};
+        // auto f = field(ename, *(*fieldIter)->value);
+        initFieldsHelper(this, nullptr, nvs);
+
     }
 }
 
@@ -392,9 +395,9 @@ VrmlNodeScript::addExposedField(const char *ename,
     if (defaultValue)
         set(d_fields, ename, defaultValue);
 
-    sprintf(tmp, "set_%s", ename);
+    snprintf(tmp, sizeof(tmp), "set_%s", ename);
     add(d_eventIns, tmp, type);
-    sprintf(tmp, "%s_changed", ename);
+    snprintf(tmp, sizeof(tmp), "%s_changed", ename);
     add(d_eventOuts, tmp, type);
     // initFieldsHelper(this, 0, exposedField(ename, *(*fieldIter)->value), [this, fieldIter](){
     //     set(d_fields, (*fieldIter)->name, (*fieldIter)->value);
@@ -474,11 +477,11 @@ VrmlNodeScript::hasExposedField(const char *ename) const
     if ((type = has(d_fields, ename)) == VrmlField::NO_FIELD)
         return VrmlField::NO_FIELD;
 
-    sprintf(tmp, "set_%s", ename);
+    snprintf(tmp, sizeof(tmp), "set_%s", ename);
     if (type != has(d_eventIns, tmp))
         return VrmlField::NO_FIELD;
 
-    sprintf(tmp, "%s_changed", ename);
+    snprintf(tmp, sizeof(tmp), "%s_changed", ename);
     if (type != has(d_eventOuts, tmp))
         return VrmlField::NO_FIELD;
 

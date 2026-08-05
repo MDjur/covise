@@ -45,21 +45,21 @@ void VrmlNodeTUIElement::initFields(VrmlNodeTUIElement *node, VrmlNodeType *t)
 {
     VrmlNodeChild::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("elementName", node->d_elementName, [node](auto f){
+        exposedField("elementName", &VrmlNodeTUIElement::d_elementName, [node](auto f){
             if(node->d_TUIElement != NULL)
             {
                 node->d_TUIElement->setLabel(node->d_elementName.get());
             }
         }),
-        exposedField("parent", node->d_parent),
-        exposedField("shaderParam", node->d_shaderParam),
-        exposedField("pos", node->d_pos, [node](auto f){
+        exposedField("parent", &VrmlNodeTUIElement::d_parent),
+        exposedField("shaderParam", &VrmlNodeTUIElement::d_shaderParam),
+        exposedField("pos", &VrmlNodeTUIElement::d_pos, [node](auto f){
             if(node->d_TUIElement != NULL)
             {
                 node->d_TUIElement->setPos((int)node->d_pos.x(), (int)node->d_pos.y());
             }
         }),
-        exposedField("shared", node->d_shared));
+        exposedField("shared", &VrmlNodeTUIElement::d_shared));
 }
 
 const char *VrmlNodeTUIElement::typeName() 
@@ -250,8 +250,8 @@ void VrmlNodeTUIProgressBar::initFields(VrmlNodeTUIProgressBar *node, vrml::Vrml
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("max", node->d_max),
-        exposedField("value", node->d_value));
+        exposedField("max", &VrmlNodeTUIProgressBar::d_max),
+        exposedField("value", &VrmlNodeTUIProgressBar::d_value));
 }
 
 const char *VrmlNodeTUIProgressBar::typeName() 
@@ -481,23 +481,25 @@ void VrmlNodeTUIButton::render(Viewer *viewer)
 void VrmlNodeTUIToggleButton::initFields(VrmlNodeTUIToggleButton *node, vrml::VrmlNodeType *t)
 {
     VrmlNodeTUIElement::initFields(node, t);
-    initFieldsHelper(node, t, 
-        exposedField("choice", node->d_choice, [node](auto f){
+
+    auto updateFunc = [](VrmlNodeTUIToggleButton *node,bool state){
             if(node->d_TUIElement != NULL)
             {
-                coTUIToggleButton *tb = (coTUIToggleButton *)node->d_TUIElement;
-                node->d_state.set(node->d_choice.get() >= 0);
-                tb->setState(node->d_choice.get() >= 0);
-            }
-        }),
-        exposedField("state", node->d_state, [node](auto f){
-            if(node->d_TUIElement != NULL)
-            {
+                node->d_choice.set(state ? 0 : -1);
+                node->d_state.set(state);
                 coTUIToggleButton *tb = (coTUIToggleButton *)node->d_TUIElement;
                 tb->setState(node->d_state.get());
                 if (node->sharedState && node->d_shared.get())
-				    *node->sharedState = node->d_state.get();
+				    *node->sharedState = state;
             }
+        };
+
+    initFieldsHelper(node, t, 
+        exposedField("choice", &VrmlNodeTUIToggleButton::d_choice, [updateFunc, node](auto f){
+            updateFunc(node, node->d_choice.get() >= 0);
+        }),
+        exposedField("state", &VrmlNodeTUIToggleButton::d_state, [updateFunc, node](auto f){
+            updateFunc(node, node->d_state.get());
         }));
 }
 
@@ -532,23 +534,25 @@ VrmlNodeTUIToggleButton::VrmlNodeTUIToggleButton(const VrmlNodeTUIToggleButton& 
 {
 }
 
+void VrmlNodeTUIToggleButton::sendStateToVrml(bool state)
+{
+    d_state.set(state);
+    d_choice.set(state ? 0 : -1);
+
+    double timeStamp = System::the->time();
+    eventOut(timeStamp, "state", d_state);
+    eventOut(timeStamp, "choice", d_choice);    
+}
+
+
 void VrmlNodeTUIToggleButton::tabletEvent(coTUIElement *)
 {
-    double timeStamp = System::the->time();
     coTUIToggleButton *tb = (coTUIToggleButton *)d_TUIElement;
-    d_state.set(tb->getState());
-    eventOut(timeStamp, "state", d_state);
-
 	
 	if (sharedState)
-	{
-		*sharedState = tb->getState();
-	}
-    if (tb->getState())
-        d_choice.set(0);
-    else
-        d_choice.set(-1);
-    eventOut(timeStamp, "choice", d_choice);
+        *sharedState = tb->getState();
+    
+    sendStateToVrml(tb->getState());
 }
 
 void VrmlNodeTUIToggleButton::render(Viewer *viewer)
@@ -572,14 +576,7 @@ void VrmlNodeTUIToggleButton::render(Viewer *viewer)
                     {
                         coTUIToggleButton* tb = (coTUIToggleButton*)d_TUIElement;
                         tb->setState(*sharedState);
-                        d_state.set(tb->getState());
-                        double timeStamp = System::the->time();
-                        eventOut(timeStamp, "state", d_state);
-                        if (tb->getState())
-                            d_choice.set(0);
-                        else
-                            d_choice.set(-1);
-                        eventOut(timeStamp, "choice", d_choice);
+                        sendStateToVrml(tb->getState());
                     }
                     });
             }
@@ -587,16 +584,7 @@ void VrmlNodeTUIToggleButton::render(Viewer *viewer)
         VrmlNodeTUIElement::render(viewer);
         coTUIToggleButton *tb = (coTUIToggleButton *)d_TUIElement;
         tb->setState(d_state.get());
-
-        double timeStamp = System::the->time();
-        // create eventOuts for default values
-        d_state.set(tb->getState());
-        eventOut(timeStamp, "state", d_state);
-        if (tb->getState())
-            d_choice.set(0);
-        else
-            d_choice.set(-1);
-        eventOut(timeStamp, "choice", d_choice);
+        sendStateToVrml(tb->getState());
         clearModified();
     }
     // the elements are created in subclasses
@@ -616,8 +604,8 @@ void VrmlNodeTUIFrame::initFields(VrmlNodeTUIFrame *node, vrml::VrmlNodeType *t)
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("shape", node->d_shape),
-        exposedField("style", node->d_style));
+        exposedField("shape", &VrmlNodeTUIFrame::d_shape),
+        exposedField("style", &VrmlNodeTUIFrame::d_style));
 }
 
 const char *VrmlNodeTUIFrame::typeName() 
@@ -687,9 +675,9 @@ void VrmlNodeTUISplitter::initFields(VrmlNodeTUISplitter *node, vrml::VrmlNodeTy
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("shape", node->d_shape),
-        exposedField("style", node->d_style),
-        exposedField("orientation", node->d_orientation));
+        exposedField("shape", &VrmlNodeTUISplitter::d_shape),
+        exposedField("style", &VrmlNodeTUISplitter::d_style),
+        exposedField("orientation", &VrmlNodeTUISplitter::d_orientation));
 }
 
 const char *VrmlNodeTUISplitter::typeName() 
@@ -788,17 +776,17 @@ void VrmlNodeTUIFloatSlider::initFields(VrmlNodeTUIFloatSlider *node, vrml::Vrml
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("min", node->d_min, [node](auto f){
+        exposedField("min", &VrmlNodeTUIFloatSlider::d_min, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
                 ts->setMin(node->d_min.get());
         }),
-        exposedField("max", node->d_max, [node](auto f){
+        exposedField("max", &VrmlNodeTUIFloatSlider::d_max, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
                 ts->setMax(node->d_max.get());
         }),
-        exposedField("value", node->d_value, [node](auto f){
+        exposedField("value", &VrmlNodeTUIFloatSlider::d_value, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
             {
@@ -807,7 +795,7 @@ void VrmlNodeTUIFloatSlider::initFields(VrmlNodeTUIFloatSlider *node, vrml::Vrml
                     *node->sharedState = node->d_value.get();
             }
         }),
-        exposedField("orientation", node->d_orientation, [node](auto f){
+        exposedField("orientation", &VrmlNodeTUIFloatSlider::d_orientation, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
             {
@@ -986,22 +974,22 @@ void VrmlNodeTUISlider::initFields(VrmlNodeTUISlider *node, vrml::VrmlNodeType *
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("min", node->d_min, [node](auto f){
+        exposedField("min", &VrmlNodeTUISlider::d_min, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
                 ts->setMin(node->d_min.get());
         }),
-        exposedField("max", node->d_max, [node](auto f){
+        exposedField("max", &VrmlNodeTUISlider::d_max, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
                 ts->setMax(node->d_max.get());
         }),
-        exposedField("value", node->d_value, [node](auto f){
+        exposedField("value", &VrmlNodeTUISlider::d_value, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
                 ts->setValue(node->d_value.get());
         }),
-        exposedField("orientation", node->d_orientation, [node](auto f){
+        exposedField("orientation", &VrmlNodeTUISlider::d_orientation, [node](auto f){
             coTUISlider *ts = dynamic_cast<coTUISlider *>(node->d_TUIElement);
             if(ts)
             {
@@ -1131,10 +1119,10 @@ void VrmlNodeTUIComboBox::initFields(VrmlNodeTUIComboBox *node, vrml::VrmlNodeTy
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("items", node->d_items),
-        exposedField("withNone", node->d_withNone),
-        exposedField("defaultChoice", node->d_defaultChoice),
-        exposedField("choice", node->d_choice, [node](auto f){
+        exposedField("items", &VrmlNodeTUIComboBox::d_items),
+        exposedField("withNone", &VrmlNodeTUIComboBox::d_withNone),
+        exposedField("defaultChoice", &VrmlNodeTUIComboBox::d_defaultChoice),
+        exposedField("choice", &VrmlNodeTUIComboBox::d_choice, [node](auto f){
             coTUIComboBox *cb = dynamic_cast<coTUIComboBox *>(node->d_TUIElement);
             if(cb)
             {
@@ -1238,9 +1226,9 @@ void VrmlNodeTUIListBox::initFields(VrmlNodeTUIListBox *node, vrml::VrmlNodeType
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("items", node->d_items),
-        exposedField("withNone", node->d_withNone),
-        exposedField("defaultChoice", node->d_defaultChoice));
+        exposedField("items", &VrmlNodeTUIListBox::d_items),
+        exposedField("withNone", &VrmlNodeTUIListBox::d_withNone),
+        exposedField("defaultChoice", &VrmlNodeTUIListBox::d_defaultChoice));
 
     if(t)
         t->addEventOut("choice", VrmlField::SFINT32);     
@@ -1333,12 +1321,12 @@ void VrmlNodeTUIMap::initFields(VrmlNodeTUIMap *node, vrml::VrmlNodeType *t)
 {
     VrmlNodeTUIElement::initFields(node, t);
     initFieldsHelper(node, t, 
-        exposedField("ox", node->d_ox),
-        exposedField("oy", node->d_oy),
-        exposedField("xSize", node->d_xSize),
-        exposedField("ySize", node->d_ySize),
-        exposedField("height", node->d_height),
-        exposedField("maps", node->d_maps));
+        exposedField("ox", &VrmlNodeTUIMap::d_ox),
+        exposedField("oy", &VrmlNodeTUIMap::d_oy),
+        exposedField("xSize", &VrmlNodeTUIMap::d_xSize),
+        exposedField("ySize", &VrmlNodeTUIMap::d_ySize),
+        exposedField("height", &VrmlNodeTUIMap::d_height),
+        exposedField("maps", &VrmlNodeTUIMap::d_maps));
 
     if(t)
     {

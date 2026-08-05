@@ -237,6 +237,9 @@ protected:
     using FieldUpdateCallback = std::function<void(const VrmlType*)>;
 
     template<typename VrmlType>
+    using VrmlFieldGetter = std::function<VrmlType*(VrmlNode *node)>;
+    
+    template<typename VrmlType>
     static void registerField(VrmlNode *node, const std::string& name, VrmlType *field, const FieldUpdateCallback<VrmlType> &updateCb = FieldUpdateCallback<VrmlType>{});
 
     VrmlNode(VrmlScene *scene, const std::string &name);
@@ -267,13 +270,42 @@ protected:
 
     bool d_isDeletedInline = false;
 
+
     template <typename VrmlType, FieldAccessibility FT>
     struct NameValueStruct {
         std::string name;
-        VrmlType *value;
+        VrmlFieldGetter<VrmlType> getValue;
         FieldUpdateCallback<VrmlType> updateCb;
     };
+private:
+    template <typename Derived, typename VrmlType, FieldAccessibility FT>
+    static NameValueStruct<VrmlType, FT> getNameValueStruct(const std::string &name, VrmlType Derived::* value, const FieldUpdateCallback<VrmlType> &updateCb = FieldUpdateCallback<VrmlType>()){
+        return NameValueStruct<VrmlType, FT>{name, 
+            [value](VrmlNode *node) -> VrmlType* {
+                Derived *derivedNode = static_cast<Derived*>(node);
+                if(derivedNode){
+                    return &(derivedNode->*(value));
+                }
+                return nullptr;
+            },
+            updateCb
+        };
+    }
 
+    template <typename Derived, typename VrmlType, FieldAccessibility FT, size_t ArraySize>
+    static NameValueStruct<VrmlType, FT> getNameValueStruct(const std::string &name, std::array<VrmlType, ArraySize> Derived::* value, size_t index, const FieldUpdateCallback<VrmlType> &updateCb = FieldUpdateCallback<VrmlType>()){
+        return NameValueStruct<VrmlType, FT>{name, 
+            [value, index](VrmlNode *node) -> VrmlType* {
+                Derived *derivedNode = static_cast<Derived*>(node);
+                if(derivedNode){
+                    return &(derivedNode->*(value))[index];
+                }
+                return nullptr;
+            },
+            updateCb
+        };
+    }
+protected:
 #define FOR_ALL_FIELD_TYPES(code)\
     code(field, FieldAccessibility::Private)\
     code(exposedField, FieldAccessibility::Exposed)\
@@ -281,14 +313,24 @@ protected:
     code(eventOutCallBack, FieldAccessibility::EventOut)\
 
 
+// this defines the field, exposedField, eventInCallBack and eventOutCallBack methods with different overloads to be used in the initFields methods
+// the fields defined by this will be registered in the vrml parser (static part) AND are used to update the values of fields of instantiated nodes (dynamic part)
 #define VRML_NAME_VALUE_FIELD(Name, FieldType)\
-    template<typename VrmlType>\
-    static NameValueStruct<VrmlType, FieldType> Name(const std::string &name, VrmlType &value, const FieldUpdateCallback<VrmlType> &updateCb = FieldUpdateCallback<VrmlType>()) {\
-        return NameValueStruct<VrmlType, FieldType>{name, &value, updateCb};\
+    template<typename Derived,typename VrmlType>\
+    static NameValueStruct<VrmlType, FieldType> Name(const std::string &name, VrmlType Derived:: *value, const FieldUpdateCallback<VrmlType> &updateCb = FieldUpdateCallback<VrmlType>()) {\
+        return getNameValueStruct<Derived,VrmlType, FieldType>(name, value, updateCb);\
     }\
-    template<typename VrmlType, typename Lambda>\
-    static NameValueStruct<VrmlType, FieldType> Name(const std::string &name, VrmlType &value, Lambda &&lambda) {\
-        return NameValueStruct<VrmlType, FieldType>{name, &value, lambda};\
+    template<typename Derived, typename VrmlType, size_t ArraySize>\
+    static NameValueStruct<VrmlType, FieldType> Name(const std::string &name, std::array<VrmlType, ArraySize> Derived:: *value, size_t index, const FieldUpdateCallback<VrmlType> &updateCb = FieldUpdateCallback<VrmlType>()) {\
+        return getNameValueStruct<Derived,VrmlType, FieldType>(name, value, index, updateCb);\
+    }\
+    template<typename Derived, typename VrmlType, typename Lambda>\
+    static NameValueStruct<VrmlType, FieldType> Name(const std::string &name, VrmlType Derived:: *value, Lambda &&updateCb) {\
+         return getNameValueStruct<Derived,VrmlType, FieldType>(name, value, updateCb);\
+    }\
+    template<typename Derived, typename VrmlType, typename Lambda, size_t ArraySize>\
+    static NameValueStruct<VrmlType, FieldType> Name(const std::string &name, std::array<VrmlType, ArraySize> Derived:: *value, size_t index, Lambda &&updateCb) {\
+         return getNameValueStruct<Derived,VrmlType, FieldType>(name, value, index, updateCb);\
     }\
 
     template<typename VrmlType, typename Lambda>
@@ -303,11 +345,12 @@ protected:
 
     FOR_ALL_FIELD_TYPES(VRML_NAME_VALUE_FIELD)
 private:
-#define INIT_FIELDS_HELPER(Name, FieldType)\
-    template <typename VrmlType>\
-    static void initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FieldType> &field);\
+    template<VrmlNode::FieldAccessibility FT>
+    static void addField(VrmlNodeType *t, const std::string &name, VrmlField::VrmlFieldType type);
 
-    FOR_ALL_FIELD_TYPES(INIT_FIELDS_HELPER)
+    template <typename VrmlType, FieldAccessibility FT>
+    static void initFieldsHelperImpl(VrmlNode *node, VrmlNodeType *t, const NameValueStruct<VrmlType, FT> &field);
+
 
 protected:
     template <typename...Args>

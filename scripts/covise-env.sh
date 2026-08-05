@@ -91,26 +91,24 @@ if [ -z "$COENVERROR" ]; then
    esac
 
    ### add our own libraries
-   if [ -d "$EXTERNLIBS" ]; then
-       eval export ${libvar}=${empty}:${extLibPath}:${COVISEDIR}/${ARCHSUFFIX}/lib:${EXTERNLIBS}/ALL/${primlibdir}:${EXTERNLIBS}/ALL/${scndlibdir}:\$${libvar}:${COVISEDIR}/${ARCHSUFFIX}/lib/OpenCOVER/plugins
-   else
-       eval export ${libvar}=${empty}:${extLibPath}:${COVISEDIR}/${ARCHSUFFIX}/lib:\$${libvar}:${COVISEDIR}/${ARCHSUFFIX}/lib/OpenCOVER/plugins
-   fi
-
-   # Sanity: remove dummy/lib
-   eval export ${libvar}=\`echo \$${libvar} \| sed -e 's+:dummy/lib\[0-9\]\*:+:+g'\`
-
-   # Sanity: remove colons at begin+end and double colons in path
-   eval export ${libvar}=\`echo \$${libvar} \| sed -e 's+::+:+g' -e 's+^:++g' -e 's+:\$++g'\`
+   for d in \
+   "${extLibPath}" \
+   "$EXTERNLIBS/ALL/${primlibdir}" \
+   "$EXTERNLIBS/ALL/${scndlibdir}" \
+   ; do
+       test -d "$d" && eval export ${libvar}="${empty}:${d}:\$${libvar}"
+   done
+   eval export ${libvar}=${empty}:${COVISEDIR}/${ARCHSUFFIX}/lib:\$${libvar}:${COVISEDIR}/${ARCHSUFFIX}/lib/OpenCOVER/plugins
 
    export PATH="${COVISEDIR}/${ARCHSUFFIX}/bin:$PATH"
 
-   unset libvar
 
    case "${ARCHSUFFIX}" in
       macos|macosopt)
-      export DYLD_FRAMEWORK_PATH="${EXTERNLIBS}/ALL"
-      export DYLD_LIBRARY_PATH="${EXTERNLIBS}/ALL/lib/osgPlugins:$DYLD_LIBRARY_PATH"
+      test -d "${EXTERNLIBS}/ALL" && export DYLD_FRAMEWORK_PATH="${EXTERNLIBS}/ALL"
+      for d in /opt/homebrew/opt/openscenegraph/lib/osgPlugins-3.6.5 "${EXTERNLIBS}/ALL/lib/osgPlugins" /opt/homebrew/opt/sdl2/lib /opt/homebrew/opt/sdl3/lib; do
+          test -d "$d" && export DYLD_LIBRARY_PATH="${d}:$DYLD_LIBRARY_PATH"
+      done
       ;;
       spack*)
       if [ "$(uname)" = "Darwin" ]; then
@@ -119,6 +117,14 @@ if [ -z "$COENVERROR" ]; then
       fi
       ;;
    esac
+
+   # Sanity: remove dummy/lib
+   eval export ${libvar}=\`echo \$${libvar} \| sed -e 's+:dummy/lib\[0-9\]\*:+:+g'\`
+   # Sanity: remove colons at begin+end and double colons in path
+   eval export ${libvar}=\`echo \$${libvar} \| sed -e 's+::+:+g' -e 's+^:++g' -e 's+:\$++g'\`
+
+   unset libvar
+
    if [ "$(uname)" = "Darwin" ]; then
       export COVISE_DYLD_FRAMEWORK_PATH="${DYLD_FRAMEWORK_PATH}"
       export COVISE_DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH}"
@@ -127,7 +133,7 @@ if [ -z "$COENVERROR" ]; then
    fi
 
    #version 14 no CFX5_UNITS_DIR will be set
-   cfxVersion=`which cfx5solve 2> /dev/null` 
+   cfxVersion=`which cfx5solve 2> /dev/null`
    if [[ "$cfxVersion" != *14* ]] ; then
      # unit path for ReadCFX (path to units.cfx)
      export CFX5_UNITS_DIR="${COVISEDIR}/share/covise/cfx"

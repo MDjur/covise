@@ -29,14 +29,11 @@ using namespace opencover;
 static osg::Vec4 WHITE(1, 1, 1, 1);
 static osg::Vec4 GRAY(1, 1, 1, 0.5);
 
-PlaceLabel::PlaceLabel(const std::string &value, const osg::Vec3 &position, osg::ref_ptr<osg::Group> parent, int size)
+PlaceLabel::PlaceLabel(const std::string &value, const osg::Vec3 &position, osg::ref_ptr<osg::Group> parent, const std::string& font, int size)
     : value(value)
     , position(position)
     , size(size)
 {
-
-    auto font = coVRFileManager::instance()->loadFont(NULL);
-
     auto color = size == 1 ? GRAY : WHITE;
 
     // unlighted geostate

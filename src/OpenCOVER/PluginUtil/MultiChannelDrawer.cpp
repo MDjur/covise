@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <algorithm>
+#include <vector>
 
 #include <osg/Depth>
 #include <osg/Geometry>
@@ -20,18 +21,17 @@
 
 #include <cover/coVRConfig.h>
 #include <cover/coVRPluginSupport.h>
+#include <cover/coVRShader.h>
 
 #ifdef HAVE_CUDA
 #include <cuda.h>
 #include <cuda_gl_interop.h>
 #include <thrust/fill.h>
-#include "CudaTextureRectangle.h"
+#include "CudaTexture2D.h"
 #include "CudaGraphicsResource.h"
 #endif
 
 #include "MultiChannelDrawer.h"
-
-//#define INSTANCED // use instanced points instead of one vertex/pixel
 
 // requires GL 3.2
 #ifndef GL_PROGRAM_POINT_SIZE
@@ -224,200 +224,9 @@ void ChannelData::updateViews() {
         vcd->update();
 }
 
-const char reprojVert[] =
-
-#ifdef INSTANCED
-      // for % operator on integers
-      "#extension GL_EXT_gpu_shader4: enable\n"
-      "#extension GL_ARB_draw_instanced: enable\n"
-#endif
-      "#extension GL_ARB_texture_rectangle: enable\n"
-      "\n"
-      "uniform sampler2DRect col;\n"
-      "uniform sampler2DRect dep;\n"
-      "uniform vec2 size;\n"
-      "uniform mat4 ReprojectionMatrix;\n"
-      "\n"
-
-      "float depth(vec2 xy) {\n"
-      "   return texture2DRect(dep, xy).r;\n"
-      "}\n"
-
-      "vec4 pos(vec2 xy, float d) {\n"
-      "   vec4 p = vec4(xy.x/size.x-0.5, 0.5-xy.y/size.y, d-0.5, 0.5)*2.;\n"
-      "   return ReprojectionMatrix * p;\n"
-      "}\n"
-
-      "void main(void) {\n"
-#ifdef INSTANCED
-      "   vec2 xy = vec2(float(gl_InstanceIDARB%int(size.x)), float(gl_InstanceIDARB/int(size.x)))+vec2(0.5,0.5);\n"
-#else
-      "   vec2 xy = gl_Vertex.xy;\n"
-#endif
-      "   vec4 color = texture2DRect(col, xy);\n"
-      "   gl_FrontColor = color;\n"
-
-      "   gl_Position = pos(xy, depth(xy));\n"
-
-      "}\n";
-
-const char reprojAdaptVert[] =
-
-#ifdef INSTANCED
-      // for % operator on integers
-      "#extension GL_EXT_gpu_shader4: enable\n"
-      "#extension GL_ARB_draw_instanced: enable\n"
-#else
-      // for round
-      "#extension GL_EXT_gpu_shader4: enable\n"
-#endif
-      "#extension GL_ARB_texture_rectangle: enable\n"
-      "\n"
-      "uniform sampler2DRect col;\n"
-      "uniform sampler2DRect dep;\n"
-      "uniform vec2 size;\n"
-      "uniform mat4 ReprojectionMatrix;\n"
-      "uniform vec2 offset;\n"
-      "uniform bool withNeighbors;\n"
-      "\n"
-
-      "bool is_far(float d) {\n"
-      "   return d == 1.;\n"
-      "}\n"
-
-      "float depth(vec2 xy) {\n"
-      "   return texture2DRect(dep, xy).r;\n"
-      "}\n"
-
-      "vec4 pos(vec2 xy, float d) {\n"
-      "   vec4 p = vec4(xy.x/size.x-0.5, 0.5-xy.y/size.y, d-0.5, 0.5)*2.;\n"
-      "   return ReprojectionMatrix * p;\n"
-      "}\n"
-
-      "vec2 screenpos(vec4 p) {\n"
-      "   return round(p.xy/p.w*size.xy*0.5+offset);\n"
-      "}\n"
-
-      "vec2 sdiff(float dd, vec2 xy, vec2 ref) {\n"
-      "   float d = withNeighbors ? depth(xy) : dd;\n"
-      "   if (is_far(d)) return vec2(1.,1.);\n"
-      "   return abs(screenpos(pos(xy, d))-ref);\n"
-      "}\n"
-
-      "void main(void) {\n"
-#ifdef INSTANCED
-      "   vec2 xy = vec2(float(gl_InstanceIDARB%int(size.x)), float(gl_InstanceIDARB/int(size.x)))+vec2(0.5,0.5);\n"
-#else
-      "   vec2 xy = gl_Vertex.xy;\n"
-#endif
-      "   const vec4 Clip = vec4(2.,2.,2.,1.);\n"
-
-      "   float d = depth(xy);\n"
-      "   if (is_far(d)) { gl_Position = Clip; return; }\n"
-      "   gl_Position = pos(xy, d);\n"
-      //"   if (is_far(d)) { gl_PointSize=1.; gl_FrontColor = vec4(1,0,0,1); return; }\n"
-
-      "   vec4 color = texture2DRect(col, xy);\n"
-      "   gl_FrontColor = color;\n"
-
-      "   vec2 spos = screenpos(gl_Position);\n"
-      "   vec2 dxp = sdiff(d, xy+vec2(1.,0.), spos);\n"
-      "   vec2 dyp = sdiff(d, xy+vec2(0.,1.), spos);\n"
-      "   vec2 dxm = sdiff(d, xy+vec2(-1.,0.), spos);\n"
-      "   vec2 dym = sdiff(d, xy+vec2(0.,-1.), spos);\n"
-      "   vec2 dmax = max(max(dxp,dxm),max(dyp,dym));\n"
-      //"   vec2 dmax = max(dxp,dym);\n"
-      "   float ps = max(dmax.x, dmax.y);\n"
-      //"   if (ps > 1.00008 && ps < 2.) { ps=2.; }\n"
-      //"   if (ps > 1. && ps <= 2.) { ps=2.; gl_FrontColor=vec4(1,0,0,1); }\n"
-      //"   if (ps >= 4.) ps = 1.;\n"
-
-      "   gl_PointSize = clamp(ps, 1., 3.);\n"
-      "}\n";
-
-const char reprojFrag[] =
-        "void main(void) {\n"
-        "   gl_FragColor = gl_Color;\n"
-        "}\n";
-
-const char reprojMeshVert[] =
-      "void main(void) {\n"
-      "   gl_Position = vec4(gl_Vertex.xy, 0., 1.);\n"
-      "}\n";
-
-const char reprojMeshGeo[] =
-      "#version 120\n"
-      "#extension GL_EXT_geometry_shader4 : enable\n"
-      "#extension GL_ARB_texture_rectangle: enable\n"
-      "\n"
-      "uniform sampler2DRect col;\n"
-      "uniform sampler2DRect dep;\n"
-      "uniform vec2 size;\n"
-      "uniform mat4 ReprojectionMatrix;\n"
-      "uniform bool withHoles;\n"
-      "uniform vec2 offset;\n"
-      "uniform vec2 off[] = vec2[4]( vec2(0,0), vec2(0,1), vec2(1,0), vec2(1,1) );\n"
-      "const float tolerance = 10.f;\n"
-      "\n"
-
-      "float depth(vec2 xy) {\n"
-      "   return texture2DRect(dep, xy).r;\n"
-      "}\n"
-
-      "vec4 pos(vec2 xy, float d) {\n"
-      "   vec4 p = vec4(xy.x/size.x-0.5, 0.5-xy.y/size.y, d-0.5, 0.5)*2.;\n"
-      "   return ReprojectionMatrix * p;\n"
-      "}\n"
-
-      "vec2 screenpos(vec4 p) {\n"
-      "   return p.xy/p.w*size.xy*0.5+offset;\n"
-      "}\n"
-
-      "vec2 pos2d(vec2 xy) {\n"
-      "   float d = depth(xy);\n"
-      "   return screenpos(pos(xy, d));\n"
-      "}\n"
-
-      "bool is_far(float d) {\n"
-      "   return d == 1.;\n"
-      "}\n"
-
-      "void createVertex(vec2 xy) {\n"
-      "   float d = depth(xy);\n"
-      "   if (is_far(d)) return;\n"
-
-      "   vec4 color = texture2DRect(col, xy);\n"
-      "   gl_FrontColor = color;\n"
-      "   gl_Position = pos(xy, d);\n"
-      "   EmitVertex();\n"
-      "}\n"
-
-      "void main() {\n"
-      "   vec2 xy = gl_PositionIn[0].xy;\n"
-      ""
-      "   bool render = true;\n"
-      "   if (withHoles) {\n"
-      "      vec2 p[4];\n"
-      "      for (int i=0; i<4; ++i)\n"
-      "         p[i] = pos2d(xy+off[i]);\n"
-      "      float mindist = distance(p[0],p[1]), maxdist=mindist;\n"
-      "      for (int i=1; i<4; ++i) {\n"
-      "          for (int j=0; j<i; ++j) {\n"
-      "              float dist = distance(p[i],p[j]);\n"
-      "              mindist = min(mindist, dist);\n"
-      "              maxdist = max(maxdist, dist);\n"
-      "          }\n"
-      "      }\n"
-      "      if (maxdist < 0.001 || mindist*tolerance < maxdist) {\n"
-      "         render = false;\n"
-      "      }\n"
-      "   }\n"
-      "   if (render) {\n"
-      "      for (int i=0; i<4; ++i)\n"
-      "         createVertex(xy+off[i]);\n"
-      "   }\n"
-      "   EndPrimitive();\n"
-      "}\n";
+// GLSL sources for the reprojection and depth-compositing shaders have been
+// extracted into share/covise/materials/MultiChannelDrawer*.xml and are loaded
+// through the coVRShader framework (see createGeometry(ViewData &)).
 
 MultiChannelDrawer::MultiChannelDrawer(bool flipped, bool useCuda)
 : m_flipped(flipped)
@@ -542,9 +351,9 @@ void MultiChannelDrawer::createGeometry(ViewData &vd)
 {
 
    vd.texcoord  = new osg::Vec2Array(4);
-   (*vd.texcoord)[0].set(0.0,480.0);
-   (*vd.texcoord)[1].set(640.0,480.0);
-   (*vd.texcoord)[2].set(640.0,0.0);
+   (*vd.texcoord)[0].set(0.0,1.0);
+   (*vd.texcoord)[1].set(1.0,1.0);
+   (*vd.texcoord)[2].set(1.0,0.0);
    (*vd.texcoord)[3].set(0.0,0.0);
 
    osg::Vec4Array *color = new osg::Vec4Array(1);
@@ -589,22 +398,9 @@ void MultiChannelDrawer::createGeometry(ViewData &vd)
       stateSet->setTextureAttribute(0, texEnv);
       stateSet->setTextureAttribute(1, texEnv);
 
-      osg::Program *depthProgramObj = new osg::Program;
-      osg::Shader *depthFragmentObj = new osg::Shader( osg::Shader::FRAGMENT );
-      depthProgramObj->addShader(depthFragmentObj);
-      depthFragmentObj->setShaderSource(
-            "#version 120\n"
-            "#extension GL_ARB_texture_rectangle : enable\n"
-            "\n"
-            "uniform sampler2DRect col;"
-            "uniform sampler2DRect dep;"
-            "void main(void) {"
-            "   vec4 color = texture2DRect(col, gl_TexCoord[0].xy);"
-            "   gl_FragColor = color;"
-            "   gl_FragDepth = texture2DRect(dep, gl_TexCoord[0].xy).x;"
-            "}"
-            );
-      stateSet->setAttributeAndModes(depthProgramObj, osg::StateAttribute::ON);
+      coVRShader *depthShader = coVRShaderList::instance()->get("MultiChannelDrawerDepth");
+      if (depthShader)
+          depthShader->apply(stateSet);
       vd.fixedGeo->setStateSet(stateSet);
    }
 
@@ -613,11 +409,9 @@ void MultiChannelDrawer::createGeometry(ViewData &vd)
    {
       vd.reprojGeo->setUseDisplayList( false );
       vd.reprojGeo->setComputeBoundingBoxCallback(new EmptyBounding);
-#ifndef INSTANCED
       vd.pointCoord = new osg::Vec2Array(1);
       (*vd.pointCoord)[0].set(0., 0.);
       vd.reprojGeo->setVertexArray(vd.pointCoord);
-#endif
       vd.quadCoord = new osg::Vec2Array(0);
       vd.reprojGeo->setColorArray(color);
       vd.reprojGeo->setColorBinding(osg::Geometry::BIND_OVERALL);
@@ -646,43 +440,39 @@ void MultiChannelDrawer::createGeometry(ViewData &vd)
       stateSet->addUniform(vd.withHoles);
 
       {
-         vd.reprojConstProgram = new osg::Program;
-         osg::Shader *reprojVertexObj = new osg::Shader( osg::Shader::VERTEX );
-         reprojVertexObj->setShaderSource(reprojVert);
-         vd.reprojConstProgram->addShader(reprojVertexObj);
-
-         osg::Shader *reprojFragmentObj = new osg::Shader( osg::Shader::FRAGMENT );
-         reprojFragmentObj->setShaderSource(reprojFrag);
-         vd.reprojConstProgram->addShader(reprojFragmentObj);
+         coVRShader *shader = coVRShaderList::instance()->get("MultiChannelDrawerReproject");
+         if (shader)
+         {
+             shader->apply(stateSet);
+             vd.reprojConstProgram = shader->getProgram();
+         }
       }
 
       {
-         vd.reprojAdaptProgram = new osg::Program;
-         osg::Shader *reprojVertexObj = new osg::Shader( osg::Shader::VERTEX );
-         reprojVertexObj->setShaderSource(reprojAdaptVert);
-         vd.reprojAdaptProgram->addShader(reprojVertexObj);
-
-         osg::Shader *reprojFragmentObj = new osg::Shader( osg::Shader::FRAGMENT );
-         reprojFragmentObj->setShaderSource(reprojFrag);
-         vd.reprojAdaptProgram->addShader(reprojFragmentObj);
+         coVRShader *shader = coVRShaderList::instance()->get("MultiChannelDrawerReprojectAdaptive");
+         if (shader)
+         {
+             shader->apply(stateSet);
+             vd.reprojAdaptProgram = shader->getProgram();
+         }
       }
 
       {
-          vd.reprojMeshProgram = new osg::Program;
-          osg::Shader *reprojVertexObj = new osg::Shader( osg::Shader::VERTEX );
-          reprojVertexObj->setShaderSource(reprojMeshVert);
-          vd.reprojMeshProgram->addShader(reprojVertexObj);
+          coVRShader *shader = coVRShaderList::instance()->get("MultiChannelDrawerReprojectMeshHoles");
+          if (shader)
+          {
+              shader->apply(stateSet);
+              vd.reprojMeshHolesProgram = shader->getProgram();
+          }
+      }
 
-          osg::Shader *reprojGeoObj = new osg::Shader( osg::Shader::GEOMETRY );
-          reprojGeoObj->setShaderSource(reprojMeshGeo);
-          vd.reprojMeshProgram->addShader(reprojGeoObj);
-          vd.reprojMeshProgram->setParameter( GL_GEOMETRY_VERTICES_OUT_EXT, 4 );
-          vd.reprojMeshProgram->setParameter( GL_GEOMETRY_INPUT_TYPE_EXT, GL_POINTS );
-          vd.reprojMeshProgram->setParameter( GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLE_STRIP );
-
-          osg::Shader *reprojFragmentObj = new osg::Shader( osg::Shader::FRAGMENT );
-          reprojFragmentObj->setShaderSource(reprojFrag);
-          vd.reprojMeshProgram->addShader(reprojFragmentObj);
+      {
+          coVRShader *shader = coVRShaderList::instance()->get("MultiChannelDrawerReprojectMesh");
+          if (shader)
+          {
+              shader->apply(stateSet);
+              vd.reprojMeshProgram = shader->getProgram();
+          }
       }
 
       vd.reprojGeo->setStateSet(stateSet);
@@ -703,8 +493,8 @@ void MultiChannelDrawer::initViewData(ViewData &vd) {
 #ifdef HAVE_CUDA
    if (m_useCuda)
    {
-       vd.colorTex = new CudaTextureRectangle;
-       vd.depthTex = new CudaTextureRectangle;
+       vd.colorTex = new CudaTexture2D;
+       vd.depthTex = new CudaTexture2D;
    }
    else
 #endif
@@ -714,14 +504,18 @@ void MultiChannelDrawer::initViewData(ViewData &vd) {
        auto pboc = new osg::PixelBufferObject(vd.colorImg);
        pboc->setUsage(GL_STREAM_DRAW);
        vd.colorImg->setPixelBufferObject(pboc);
+
        vd.depthImg = new osg::Image;
        vd.depthImg->setDataVariance(osg::Object::DYNAMIC);
+       // do not create a second PBO on macOS, in order to avoid mismatched color and depth frames
+#ifndef __APPLE__
        auto pbod = new osg::PixelBufferObject(vd.depthImg);
        pbod->setUsage(GL_STREAM_DRAW);
        vd.depthImg->setPixelBufferObject(pbod);
+#endif
 
-       vd.colorTex = new osg::TextureRectangle;
-       vd.depthTex = new osg::TextureRectangle;
+       vd.colorTex = new osg::Texture2D;
+       vd.depthTex = new osg::Texture2D;
 
        vd.colorTex->setImage(vd.colorImg);
        vd.depthTex->setImage(vd.depthImg);
@@ -736,9 +530,8 @@ void MultiChannelDrawer::initViewData(ViewData &vd) {
        tex->setWrap(osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE);
    }
 
-
    vd.colorTex->setInternalFormat( GL_RGBA );
-   vd.depthTex->setInternalFormat( GL_DEPTH_COMPONENT32F );
+   vd.depthTex->setInternalFormat( GL_R32F );
 
    createGeometry(vd);
 
@@ -783,7 +576,7 @@ void MultiChannelDrawer::swapFrame() {
       if (!haveEye(vd.eye))
           continue;
 
-#ifdef HAVE_CUDA
+#ifdef _NOT_NEEDED_HAVE_CUDA // texture2d dirty is not available, you have to dirty the image instead as done below.
       if (m_useCuda)
       {
           vd.colorTex->dirtyTextureObject();
@@ -843,7 +636,7 @@ void MultiChannelDrawer::resizeView(int idx, int w, int h, GLenum depthFormat, G
 
             osg::State* state = cd->camera->getGraphicsContext()->getState();
 
-            static_cast<CudaTextureRectangle*>(vd.colorTex.get())->resize(state, w, h, colorTypeSize);
+            static_cast<CudaTexture2D*>(vd.colorTex.get())->resize(state, w, h, colorTypeSize);
         }
         else
 #endif
@@ -862,15 +655,23 @@ void MultiChannelDrawer::resizeView(int idx, int w, int h, GLenum depthFormat, G
     {
         //std::cerr << "MultiChannelDrawer: need to update geo, format=" << depthFormat << ", w=" << w << ", h=" << h << std::endl;
         GLenum depthInternalFormat = 0;
+        // pixel format used for uploading/allocating the depth texture's
+        // image data - GL_R32F depth values are plain color data (GL_RED),
+        // whereas packed depth/stencil data still requires GL_DEPTH_COMPONENT
+        GLenum depthPixelFormat = GL_DEPTH_COMPONENT;
         int depthTypeSize = 0;
         switch (depthFormat)
         {
         case GL_FLOAT:
-            depthInternalFormat = GL_DEPTH_COMPONENT32F;
+            // store depth values as a plain single-channel float color
+            // texture (GL_R32F) instead of an actual depth texture
+            depthInternalFormat = GL_R32F;
+            depthPixelFormat = GL_RED;
             depthTypeSize = 4;
             break;
         case GL_UNSIGNED_INT_24_8:
             depthInternalFormat = GL_DEPTH_COMPONENT24;
+            depthPixelFormat = GL_DEPTH_COMPONENT;
             depthTypeSize = 4;
             break;
         default:
@@ -881,20 +682,20 @@ void MultiChannelDrawer::resizeView(int idx, int w, int h, GLenum depthFormat, G
         if (m_useCuda && cd)
         {
             vd.depthTex->setTextureSize(w, h);
-            vd.depthTex->setSourceFormat(GL_DEPTH_COMPONENT);
+            vd.depthTex->setSourceFormat(depthPixelFormat);
             vd.depthTex->setSourceType(depthFormat == GL_UNSIGNED_INT_24_8 ? GL_UNSIGNED_INT : depthFormat);
             vd.depthTex->setInternalFormat(depthInternalFormat);
 
             osg::State* state = cd->camera->getGraphicsContext()->getState();
 
-            static_cast<CudaTextureRectangle*>(vd.depthTex.get())->resize(state, w, h, depthTypeSize);
+            static_cast<CudaTexture2D*>(vd.depthTex.get())->resize(state, w, h, depthTypeSize);
         }
         else
 #endif
         {
             auto dimg = vd.depthImg;
             dimg->setInternalTextureFormat(depthInternalFormat);
-            dimg->allocateImage(w, h, 1, GL_DEPTH_COMPONENT, depthFormat == GL_UNSIGNED_INT_24_8 ? GL_UNSIGNED_INT : depthFormat);
+            dimg->allocateImage(w, h, 1, depthPixelFormat, depthFormat == GL_UNSIGNED_INT_24_8 ? GL_UNSIGNED_INT : depthFormat);
         }
 
         vd.depthWidth = w;
@@ -927,16 +728,16 @@ void MultiChannelDrawer::updateGeoForView(ViewData &vd) {
     h = std::max(h, 1);
 
     if (m_flipped) {
-        (*vd.texcoord)[0].set(0., h);
-        (*vd.texcoord)[1].set(w, h);
-        (*vd.texcoord)[2].set(w, 0.);
+        (*vd.texcoord)[0].set(0., 1);
+        (*vd.texcoord)[1].set(1, 1);
+        (*vd.texcoord)[2].set(1, 0.);
         (*vd.texcoord)[3].set(0., 0.);
     }
     else {
         (*vd.texcoord)[0].set(0., 0.);
-        (*vd.texcoord)[1].set(w, 0.);
-        (*vd.texcoord)[2].set(w, h);
-        (*vd.texcoord)[3].set(0., h);
+        (*vd.texcoord)[1].set(1, 0.);
+        (*vd.texcoord)[2].set(1, 1);
+        (*vd.texcoord)[3].set(0., 1);
     }
     vd.fixedGeo->setTexCoordArray(0, vd.texcoord);
     for (auto &vcd: vd.viewChan) {
@@ -945,7 +746,6 @@ void MultiChannelDrawer::updateGeoForView(ViewData &vd) {
     }
     vd.texcoord->dirty();
 
-#ifndef INSTANCED
     vd.pointCoord->resizeArray(w*h);
     for (int y = 0; y<h; ++y) {
         for (int x = 0; x<w; ++x) {
@@ -954,8 +754,6 @@ void MultiChannelDrawer::updateGeoForView(ViewData &vd) {
     }
     vd.pointCoord->dirty();
     vd.pointArr = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, w*h);
-#endif
-
     vd.quadCoord->resizeArray((w - 1)*(h - 1));
     size_t idx = 0;
     for (int y = 0; y<h - 1; ++y) {
@@ -966,25 +764,57 @@ void MultiChannelDrawer::updateGeoForView(ViewData &vd) {
     vd.quadCoord->dirty();
     vd.quadArr = new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, (w - 1)*(h - 1));
 
-    osg::ref_ptr<osg::DrawArrays> arr = (m_mode == ReprojectMesh || m_mode == ReprojectMeshWithHoles) ? vd.quadArr : vd.pointArr;
-
-    auto updateGeo = [this, arr, w, h](osg::Geometry *geo){
-#ifdef INSTANCED
-        if (geo->getNumPrimitiveSets() > 0) {
-            geo->setPrimitiveSet(0, new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, 1, w*h));
+    // CPU-generated quad mesh for geometry-shader-free ReprojectMesh
+    vd.meshVertices = new osg::Vec2Array(w * h);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            (*vd.meshVertices)[y * w + x].set(x + 0.5f, m_flipped ? y + 0.5f : h - y + 0.5f);
         }
-        else {
-            geo->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, 1, w*h));
-        }
-#else
+    }
+    vd.meshVertices->dirty();
 
+    size_t numTris = (size_t)(w - 1) * (h - 1) * 6;
+    std::vector<GLuint> idxData(numTris);
+    idx = 0;
+    for (int y = 0; y < h - 1; ++y) {
+        for (int x = 0; x < w - 1; ++x) {
+            GLuint a = static_cast<GLuint>(y * w + x);
+            GLuint b = static_cast<GLuint>(y * w + x + 1);
+            GLuint c = static_cast<GLuint>((y + 1) * w + x);
+            GLuint d = static_cast<GLuint>((y + 1) * w + x + 1);
+            idxData[idx++] = a; idxData[idx++] = c; idxData[idx++] = b;
+            idxData[idx++] = b; idxData[idx++] = c; idxData[idx++] = d;
+        }
+    }
+    vd.meshIdx = new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES, numTris, idxData.data());
+
+    // pick vertex array + primitive set for the current mode
+    osg::ref_ptr<osg::Array> curVA;
+    osg::ref_ptr<osg::DrawArrays> curArr = vd.pointArr;
+    osg::ref_ptr<osg::PrimitiveSet> curPset;
+    if (m_mode == ReprojectMesh) {
+        curVA = vd.meshVertices;
+        curPset = vd.meshIdx.get();
+    } else if (m_mode == ReprojectMeshWithHoles) {
+        curVA = vd.quadCoord;
+        curArr = vd.quadArr;
+    }
+
+    auto updateGeo = [&curVA, &curArr, &curPset](osg::Geometry *geo){
+        if (curVA)
+            geo->setVertexArray(curVA);
         if (geo->getNumPrimitiveSets() > 0) {
-            geo->setPrimitiveSet(0, arr);
+            if (curPset)
+                geo->setPrimitiveSet(0, curPset);
+            else if (curArr)
+                geo->setPrimitiveSet(0, curArr);
         } else {
-            geo->addPrimitiveSet(arr);
+            if (curPset)
+                geo->addPrimitiveSet(curPset);
+            else if (curArr)
+                geo->addPrimitiveSet(curArr);
         }
         geo->dirtyDisplayList();
-#endif
     };
     updateGeo(vd.reprojGeo);
     for (auto &vcd: vd.viewChan) {
@@ -1011,7 +841,7 @@ unsigned char *MultiChannelDrawer::rgba(int idx) const {
 #ifdef HAVE_CUDA
     if (m_useCuda)
     {
-        return static_cast<unsigned char*>(static_cast<CudaTextureRectangle*>(vd.colorTex.get())->resourceData());
+        return static_cast<unsigned char*>(static_cast<CudaTexture2D*>(vd.colorTex.get())->resourceData());
     }
     else
 #endif
@@ -1031,7 +861,7 @@ unsigned char *MultiChannelDrawer::depth(int idx) const {
 #ifdef HAVE_CUDA
     if (m_useCuda)
     {
-        return static_cast<unsigned char*>(static_cast<CudaTextureRectangle*>(vd.depthTex.get())->resourceData());
+        return static_cast<unsigned char*>(static_cast<CudaTexture2D*>(vd.depthTex.get())->resourceData());
     }
     else
 #endif
@@ -1046,7 +876,7 @@ void MultiChannelDrawer::clearColor(int idx) {
 #ifdef HAVE_CUDA
     if (m_useCuda)
     {
-        static_cast<CudaTextureRectangle*>(vd.colorTex.get())->clear();
+        static_cast<CudaTexture2D*>(vd.colorTex.get())->clear();
     }
     else
 #endif
@@ -1063,12 +893,12 @@ void MultiChannelDrawer::clearDepth(int idx) {
 #ifdef HAVE_CUDA
     if (m_useCuda)
     {
-        auto texRect = static_cast<CudaTextureRectangle*>(vd.depthTex.get());
-    
-        float *depth = (float *)texRect->resourceData();
+        auto tex = static_cast<CudaTexture2D*>(vd.depthTex.get());
+
+        float *depth = (float *)tex->resourceData();
         if (vd.depthFormat == GL_FLOAT) {
-            thrust::fill(depth, 
-                         depth+texRect->getTotalSizeInBytes()/4,
+            thrust::fill(depth,
+                         depth+tex->getTotalSizeInBytes()/4,
                          1.f);
         } else {
             throw std::runtime_error("MultiChannelDrawer::clearDepth() unimplemented for format!");
@@ -1120,15 +950,6 @@ void MultiChannelDrawer::setMode(MultiChannelDrawer::Mode mode) {
             case Reproject:
             case ReprojectAdaptive:
             case ReprojectAdaptiveWithNeighbors: {
-#ifdef INSTANCED
-                int numpix = vd.width*vd.height;
-                if (geo->getNumPrimitiveSets() > 0) {
-                    geo->setPrimitiveSet(0, new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, 1, numpix));
-                }
-                else {
-                    geo->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POINTS, 0, 1, numpix));
-                }
-#else
                 geo->setVertexArray(vd.pointCoord);
                 if (vd.pointArr) {
                     if (geo->getNumPrimitiveSets() > 0)
@@ -1136,10 +957,19 @@ void MultiChannelDrawer::setMode(MultiChannelDrawer::Mode mode) {
                     else
                         geo->addPrimitiveSet(vd.pointArr);
                 }
-#endif
                 break;
             }
-            case ReprojectMesh:
+            case ReprojectMesh: {
+                geo->setVertexArray(vd.meshVertices);
+                osg::ref_ptr<osg::PrimitiveSet> pset = vd.meshIdx.get();
+                if (pset) {
+                    if (geo->getNumPrimitiveSets() > 0)
+                        geo->setPrimitiveSet(0, pset);
+                    else
+                        geo->addPrimitiveSet(pset);
+                }
+                break;
+            }
             case ReprojectMeshWithHoles:
                 geo->setVertexArray(vd.quadCoord);
                 if (vd.quadArr) {
@@ -1165,6 +995,7 @@ void MultiChannelDrawer::setMode(MultiChannelDrawer::Mode mode) {
             state->setMode(GL_PROGRAM_POINT_SIZE, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojAdaptProgram, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojMeshProgram, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojMeshHolesProgram, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojConstProgram, osg::StateAttribute::ON);
             break;
         case ReprojectAdaptive:
@@ -1172,16 +1003,24 @@ void MultiChannelDrawer::setMode(MultiChannelDrawer::Mode mode) {
             state->setMode(GL_PROGRAM_POINT_SIZE, osg::StateAttribute::ON);
             state->setAttributeAndModes(vd.reprojConstProgram, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojMeshProgram, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojMeshHolesProgram, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojAdaptProgram, osg::StateAttribute::ON);
             vd.withNeighbors->set(mode == ReprojectAdaptiveWithNeighbors ? true : false);
             break;
         case ReprojectMesh:
+            state->setMode(GL_PROGRAM_POINT_SIZE, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojConstProgram, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojAdaptProgram, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojMeshHolesProgram, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojMeshProgram, osg::StateAttribute::ON);
+            break;
         case ReprojectMeshWithHoles:
             state->setMode(GL_PROGRAM_POINT_SIZE, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojConstProgram, osg::StateAttribute::OFF);
             state->setAttributeAndModes(vd.reprojAdaptProgram, osg::StateAttribute::OFF);
-            state->setAttributeAndModes(vd.reprojMeshProgram, osg::StateAttribute::ON);
-            vd.withHoles->set(mode == ReprojectMeshWithHoles ? true : false);
+            state->setAttributeAndModes(vd.reprojMeshProgram, osg::StateAttribute::OFF);
+            state->setAttributeAndModes(vd.reprojMeshHolesProgram, osg::StateAttribute::ON);
+            vd.withHoles->set(true);
             break;
         }
     }

@@ -1552,7 +1552,7 @@ OpenCOVER::readConfigFile()
     std::string line = coCoviseConfig::getEntry("COVER.Notify");
     if (!line.empty())
     {
-        sprintf(envOsgNotifyLevel, "OSG_NOTIFY_LEVEL=%s", line.c_str());
+        snprintf(envOsgNotifyLevel, sizeof(envOsgNotifyLevel), "OSG_NOTIFY_LEVEL=%s", line.c_str());
         putenv(envOsgNotifyLevel);
         /* ALWAYS
       FATAL
@@ -1682,8 +1682,8 @@ void OpenCOVER::restartVrbc()
 
           public:
             bool sendMessage(const covise::Message *msg) const override {
-                if (OpenCOVER::instance()->m_visPlugin)
-                    return coVRPluginList::instance()->sendVisMessage(msg);
+                if (auto visPlugin = OpenCOVER::instance()->m_visPlugin)
+                    return visPlugin->sendVisMessage(msg);
                 return false;
             }
 

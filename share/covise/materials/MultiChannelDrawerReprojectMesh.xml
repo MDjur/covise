@@ -1,0 +1,57 @@
+<MultiChannelDrawerReprojectMesh>
+
+  <uniform name="col" type="sampler2D" value="0"/>
+  <uniform name="dep" type="sampler2D" value="1"/>
+
+  <vertexProgram>
+uniform sampler2D col;
+uniform sampler2D dep;
+uniform vec2 size;
+uniform mat4 ReprojectionMatrix;
+
+// normalized texture coordinates in [0,1] for a pixel coordinate
+vec2 texcoord(vec2 xy) {
+   return xy/size;
+}
+
+float depth(vec2 xy) {
+   return texture2D(dep, texcoord(xy)).r;
+}
+
+vec4 sampleColor(vec2 xy) {
+   return texture2D(col, texcoord(xy));
+}
+
+bool is_far(float d) {
+   return d == 1.;
+}
+
+// map a pixel coordinate + depth value to clip space of the new camera
+vec4 pos(vec2 xy, float d) {
+   vec2 tc = texcoord(xy);
+   vec4 p = vec4(tc.x-0.5, 0.5-tc.y, d-0.5, 0.5)*2.;
+   return ReprojectionMatrix * p;
+}
+
+void main(void) {
+   vec2 xy = gl_Vertex.xy;
+
+   float d = depth(xy);
+   if (is_far(d)) {
+      // NaN makes GL discard any primitive containing this vertex
+      gl_Position = vec4(2., 2., 2., 0./0.);
+      return;
+   }
+
+   gl_FrontColor = sampleColor(xy);
+   gl_Position = pos(xy, d);
+}
+  </vertexProgram>
+
+  <fragmentProgram>
+void main(void) {
+   gl_FragColor = gl_Color;
+}
+  </fragmentProgram>
+
+</MultiChannelDrawerReprojectMesh>
