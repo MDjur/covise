@@ -20,6 +20,16 @@
       }
     },
     {
+      "name": "msvc-buildtools-18",
+      "generator": "Visual Studio 18 2026",
+      "hidden": true,
+      "displayName": "Use MSVC Build Tools 18",
+      "binaryDir": "${sourceDir}/build/msvc-buildtools-18",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo"
+      }
+    },
+    {
       "name": "ccache",
       "hidden": true,
       "cacheVariables": { 
@@ -44,6 +54,14 @@
       }
     },
     {
+      "name": "clang-cl",
+      "hidden": true,
+      "cacheVariables": { 
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl" 
+      }
+    },
+    {
       "name": "lld",
       "hidden": true,
       "displayName": "Use LLD Linker",
@@ -51,6 +69,16 @@
         "CMAKE_LINKER_TYPE": "LLD",
         "CMAKE_C_USING_LINKER_LLD": "-fuse-ld=lld",
         "CMAKE_CXX_USING_LINKER_LLD": "-fuse-ld=lld"
+      }
+    },
+    {
+      "name": "lld-win",
+      "hidden": true,
+      "displayName": "Use LLD Linker clang-cl",
+      "cacheVariables": {
+        "CMAKE_EXE_LINKER_FLAGS": "/lld",
+        "CMAKE_SHARED_LINKER_FLAGS": "/lld",
+        "CMAKE_MODULE_LINKER_FLAGS": "/lld"
       }
     },
     {
@@ -76,8 +104,22 @@
     {
       "name": "ninja-ccache-gcc",
       "inherits": [ "ninja", "gcc", "ccache"]
+    },
+    {
+      "name": "msvc_18_buildtools",
+      "displayName": "MSVC 18 Buildtools",
+      "inherits": [ "msvc-buildtools-18"]
+    },
+    {
+      "name": "msvc_18_buildtools-clang",
+      "displayName": "MSVC 18 Buildtools with clang-cl",
+      "inherits": [ "msvc-buildtools-18", "clang-cl"]
+    },
+    {
+      "name": "msvc_18_buildtools-llvm",
+      "displayName": "MSVC 18 Buildtools with LLVM (clang-cl, lld)",
+      "inherits": [ "msvc-buildtools-18", "clang-cl", "lld-win"]
     }
-
   ],
   "buildPresets": [
     {
@@ -94,6 +136,42 @@
       "name": "relwithdeb-build",
       "configurePreset": "ninja-multi-ccache-clang-lld",
       "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "msvc_18-relwithdeb-build",
+      "configurePreset": "msvc_18_buildtools",
+      "configuration": "RelWithDebInfo",
+      "jobs": 0
+    },
+    {
+      "name": "msvc_18-release-build",
+      "configurePreset": "msvc_18_buildtools",
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "msvc_18-debug-build",
+      "configurePreset": "msvc_18_buildtools",
+      "configuration": "Debug",
+      "jobs": 0
+    },
+    {
+      "name": "msvc_18-llvm-relwithdeb-build",
+      "configurePreset": "msvc_18_buildtools-llvm",
+      "configuration": "RelWithDebInfo",
+      "jobs": 0
+    },
+    {
+      "name": "msvc_18-llvm-release-build",
+      "configurePreset": "msvc_18_buildtools-llvm",
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "msvc_18-llvm-debug-build",
+      "configurePreset": "msvc_18_buildtools-llvm",
+      "configuration": "Debug",
+      "jobs": 0
     }
   ]
 }
