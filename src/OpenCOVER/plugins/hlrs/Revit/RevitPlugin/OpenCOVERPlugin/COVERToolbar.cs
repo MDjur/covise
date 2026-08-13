@@ -373,10 +373,10 @@ namespace OpenCOVERPlugin
             pushButtonConnectToAnyHost.LargeImage = new BitmapImage(new Uri(Path.Combine(COVER.Instance.ButtonIconsFolder, "prompt.png"), UriKind.Absolute));
 
 
-            PushButton settingsButton = ribbonPanelPushButtons.AddItem(new PushButtonData("SettingsButton", "Settings", dllName,
-                 "OpenCOVERPlugin.SettingsButton")) as Autodesk.Revit.UI.PushButton;
-            settingsButton.ToolTip = "VR Settings";
-            settingsButton.LargeImage = new BitmapImage(new Uri(Path.Combine(COVER.Instance.ButtonIconsFolder, "settings.png"), UriKind.Absolute));
+            // PushButton settingsButton = ribbonPanelPushButtons.AddItem(new PushButtonData("SettingsButton", "Settings", dllName,
+            //      "OpenCOVERPlugin.SettingsButton")) as Autodesk.Revit.UI.PushButton;
+            // settingsButton.ToolTip = "VR Settings";
+            // settingsButton.LargeImage = new BitmapImage(new Uri(Path.Combine(COVER.Instance.ButtonIconsFolder, "settings.png"), UriKind.Absolute));
 
 
 
@@ -395,7 +395,8 @@ namespace OpenCOVERPlugin
         /// <param name="e"></param>
         void CtrlApp_DocumentChanged(object sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs e)
         {
-            if(OpenCOVERPlugin.COVER.Instance.isConnected())
+            var cover = OpenCOVERPlugin.COVER.Instance;
+            if(cover.isConnected())
             {
                 // get the current document.
                 Document doc = e.GetDocument();
@@ -406,33 +407,37 @@ namespace OpenCOVERPlugin
                 ICollection<Autodesk.Revit.DB.ElementId> addedElem = e.GetAddedElementIds();
                 foreach (ElementId id in addedElem)
                 {
-                    OpenCOVERPlugin.COVER.Instance.SendElement(doc.GetElement(id));
+                    cover.SendElement(doc.GetElement(id));
                 }
 
                 ICollection<Autodesk.Revit.DB.ElementId> deletedElem = e.GetDeletedElementIds();
                 foreach (ElementId id in deletedElem)
                 {
-                    OpenCOVERPlugin.COVER.Instance.deleteElement(id);
+                    cover.deleteElement(id);
                 }
 
                 ICollection<ElementId> modifiedElem = e.GetModifiedElementIds();
                 foreach (ElementId id in modifiedElem)
                 {
                     Element el = doc.GetElement(id);
-                    if (el is Autodesk.Revit.DB.DesignOption)
+                    if (el is Autodesk.Revit.DB.DesignOption option)
                     {
-                        // design option changed // resend only changes
-                        OpenCOVERPlugin.COVER.Instance.designOptionsChanged(doc, (Autodesk.Revit.DB.DesignOption)el);
+                        continue;
                     }
-                    else
-                    {
-                        OpenCOVERPlugin.COVER.Instance.deleteElement(id);
-                        OpenCOVERPlugin.COVER.Instance.SendElement(el);
-                    }
+
+                    cover.deleteElement(id);
+                    cover.SendElement(el);
+                }
+
+                var activeOptionId = Autodesk.Revit.DB.DesignOption.GetActiveDesignOptionId(doc);
+                if (activeOptionId != ElementId.InvalidElementId)
+                {
+                    cover.pendingDesignOption = activeOptionId;
+                    cover.hasPendingDesignOption = true;
                 }
             }
-
         }
+
         public void application_DocumentOpened(object sender, DocumentOpenedEventArgs args)
         {
             // get document from event args.
