@@ -21,6 +21,7 @@
 #define QT_NO_EMIT
 
 #include <algorithm>
+// #include <ranges>
 
 #include "RevitPlugin.h"
 #include <cover/coVRPluginSupport.h>
@@ -66,11 +67,76 @@
 #include <net/tokenbuffer.h>
 #include <config/CoviseConfig.h>
 #include <util/unixcompat.h>
+#include <cstring>
 
 #include "VrmlNodePhases.h"
 
 using covise::TokenBuffer;
 using covise::coCoviseConfig;
+
+namespace {
+	class FindNodesByName : public osg::NodeVisitor
+	{
+	public:
+	    FindNodesByName(const std::string& name)
+	        : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
+	          _targetName(name)
+	    {}
+
+	    void apply(osg::Node& node) override
+	    {
+	        if (node.getName() == _targetName)
+	        {
+	            _foundNodes.push_back(&node);
+	        }
+
+	        traverse(node);
+	    }
+
+		void apply(osg::MatrixTransform& mt) override {
+			if (mt.getName() == _targetName) 
+			{
+				_foundNodes.push_back(&mt);
+			}
+			traverse(mt);
+		}
+
+	    // Getters for retrieved results
+	    osg::ref_ptr<osg::Node> getFirstFound() const 
+	    { 
+	        return _foundNodes.empty() ? nullptr : _foundNodes.front(); 
+	    }
+
+	    const std::vector<osg::ref_ptr<osg::Node>>& getFoundNodes() const 
+	    { 
+	        return _foundNodes; 
+	    }
+
+	private:
+	    std::string _targetName;
+	    std::vector<osg::ref_ptr<osg::Node>> _foundNodes;
+	};
+
+	struct HighlightMessage {
+	    explicit HighlightMessage(Message* m) {
+			if (!m)
+				return;
+			TokenBuffer tb(m);
+	        tb >> nodeName; 
+	        tb >> menuName;
+	        unsigned char r, g, b;
+	        tb >> r;
+	        tb >> g;
+	        tb >> b;
+	        color.red = r / 255.0f;
+	        color.green = g / 255.0f; 
+	        color.blue = b / 255.0f;
+	    }
+	    std::string nodeName;
+	    std::string menuName;
+	    Revit::Color color;
+	};
+}
 
 int ElementInfo::yPos = 3;
 IKAxisInfo::IKAxisInfo()
@@ -770,11 +836,12 @@ ElementInfo::~ElementInfo()
 	}
 	delete group;
 };
+
 void ElementInfo::addParameter(RevitParameter *p)
 {
 	if (group == NULL)
 	{
-		group = new ui::Group(RevitPlugin::instance()->parameterMenu,name);
+		group = new ui::Group(RevitPlugin::instance()->parameterMenu, name);
 	}
 	yPos++;
 	p->createUI(group, parameters.size());
@@ -1310,6 +1377,11 @@ void RevitPlugin::createMenu()
 
 	objectInfoGroup = new ui::ButtonGroup(objectInfoMenu, "ObjectInfoGroup");
 
+	highlightMenu = new ui::Menu(revitMenu, "Highlight");
+	highlightMenu->setText("Highlight");
+
+	// highlightSystemMenu= new ui::Menu(highlightMenu, "HighlightSystem");
+	// highlightSystemMenu->setText("System");
 
 	typesMenu = new ui::Menu(objectInfoMenu, "Types");
 	typesMenu->setText("Types");
@@ -1373,6 +1445,7 @@ void RevitPlugin::destroyMenu()
 RevitPlugin::RevitPlugin() 
 : coVRPlugin(COVER_PLUGIN_NAME)
 , ui::Owner("RevitPlugin", cover->ui)
+, _highlightmanager(*coVRSelectionManager::instance())
 {
 	fprintf(stderr, "RevitPlugin::RevitPlugin\n");
 
@@ -1544,6 +1617,68 @@ bool RevitPlugin::sendMessage(Message &m)
     return false;
 }
 
+bool RevitPlugin::isButtonWithName(const std::string& name, ui::Button* btn) {
+	if(!btn)
+		return false;
+	return btn->text() == name;	
+}
+
+void RevitPlugin::disableHighlightedNodeButton(osg::ref_ptr<osg::Node> node) {
+	if (!node)
+		return;
+
+	for (auto child : *highlightMenu) {
+		if (!child.elem)
+			continue;
+
+		auto subMenu = dynamic_cast<ui::Menu*>(child.elem);
+		if (!subMenu)
+			continue;
+
+		for (auto subMenuChild : *subMenu) {
+			auto subMenu = subMenuChild.elem;
+			if (!subMenu)
+				continue;
+			if (subMenu->text() == node->getName()) {
+				if (auto button = dynamic_cast<ui::Button*>(subMenu)) {
+					button->setState(false);
+					button->triggerImplementation();
+					button->setVisible(false);
+				}
+			}
+		}
+	}
+}
+
+void RevitPlugin::removeHighlightedNode(osg::ref_ptr<osg::Node> node) {
+	if (!_highlightmanager.isHighlightedNode(node))
+		return;
+	disableHighlightedNodeButton(node);
+	_highlightmanager.remove(node);
+}
+
+bool RevitPlugin::isChildlessParent(osg::ref_ptr<osg::Group> parent) {
+	if (!parent)
+		return false;
+	return parent->getNumChildren() == 0;
+}
+
+bool RevitPlugin::hasParent(osg::ref_ptr<osg::Group> parent) {
+	if (!parent)
+		return false;
+	return parent->getNumParents() > 0;
+}
+
+void RevitPlugin::deleteChildlessParent(osg::ref_ptr<osg::Group> parent) {
+	while (isChildlessParent(parent)
+			&& hasParent(parent)
+			&& parent != revitGroup) {
+		removeHighlightedNode(parent);
+		osg::ref_ptr<osg::Group> grandparent = parent->getParent(0);
+		grandparent->removeChild(parent);
+		parent = grandparent;
+	}
+}
 
 void RevitPlugin::message(int toWhom, int type, int len, const void *buf)
 {
@@ -1785,9 +1920,22 @@ void RevitPlugin::message(int toWhom, int type, int len, const void *buf)
 
 }
 
+void RevitPlugin::clickButton(ui::Button* btn) {
+	if (!btn)
+		return;
+	
+	btn->setState(!btn->state());
+	btn->triggerImplementation();
+}
+
+auto RevitPlugin::findNodesByName(const std::string& name) {
+    FindNodesByName finder(name);
+    revitGroup->accept(finder);
+    return finder.getFoundNodes();
+}
+
 RevitPlugin *RevitPlugin::plugin = NULL;
-void
-RevitPlugin::handleMessage(Message *m)
+void RevitPlugin::handleMessage(Message *m)
 {
 	//cerr << "got Message" << endl;
 	//m->print();
@@ -1810,7 +1958,63 @@ RevitPlugin::handleMessage(Message *m)
 		viewsCombo->setList(items);
 	}
 	break;
-	
+        case MSG_HighlightElement:
+        {
+            HighlightMessage msg{m};
+
+			auto foundNodes = findNodesByName(msg.nodeName);
+			_highlightmanager.add(foundNodes, msg.color);
+
+            ui::Menu *menu { nullptr };
+            for (auto child : *highlightMenu)
+            {
+                if (auto elem = child.elem)
+                {
+                    if (elem->text() == msg.menuName)
+                    {
+                        menu = dynamic_cast<ui::Menu *>(elem);
+                        break;
+                    }
+                }
+            }
+            if (!menu)
+            {
+                menu = new ui::Menu(highlightMenu, msg.menuName);
+                menu->setText("System");
+            }
+			auto btnCallback = [&, foundNodes](bool on) {
+				for (auto node : foundNodes)
+					_highlightmanager.highlight(node, on);
+			};
+
+            ui::Button *button { nullptr };
+            for (auto child : *menu)
+            {
+				if (auto elem = child.elem)
+                {
+                    if (elem->text() == msg.nodeName)
+                    {
+                        button = dynamic_cast<ui::Button *>(elem);
+						bool previousState = button->state();
+						if (previousState)
+							// untoggle
+							clickButton(button);
+						button->setCallback(btnCallback);
+						button->setVisible(true);
+						break;
+                    }
+                }
+            }
+
+			if (button)
+				return;
+
+            button = new ui::Button(menu, msg.nodeName);
+            button->setText(msg.nodeName);
+            button->setCallback(btnCallback);
+            menu->add(button);
+        }
+        break;
     case MSG_Finished:
     {
         for (auto Mat = MaterialInfos.begin(); Mat != MaterialInfos.end(); Mat++)
@@ -1933,6 +2137,21 @@ RevitPlugin::handleMessage(Message *m)
 		info->DocumentID = docID;
 		OSGVruiUserDataCollection::setUserData(newTrans, "RevitInfo", info);
 		currentGroup.push(newTrans);
+
+        std::map<int, ElementInfo *>::iterator it = ElementIDMap[docID].find(ID);
+        if (it != ElementIDMap[docID].end())
+        {
+            ElementInfo *ei = it->second;
+            ei->nodes.push_back(newTrans);
+        }
+        else
+        {
+            ElementInfo *ei = new ElementInfo();
+            ElementIDMap[docID][ID] = ei;
+            ei->name = name;
+            ei->ID = ID;
+            ei->DocumentID = docID;
+        }
 	}
 	break;
 	case MSG_ElevatorPart:
@@ -1971,6 +2190,20 @@ RevitPlugin::handleMessage(Message *m)
             info->DocumentID = docID;
             OSGVruiUserDataCollection::setUserData(newTrans, "RevitInfo", info);
             currentGroup.push(newTrans);
+            std::map<int, ElementInfo *>::iterator it = ElementIDMap[docID].find(ID);
+            if (it != ElementIDMap[docID].end())
+            {
+                ElementInfo *ei = it->second;
+                ei->nodes.push_back(newTrans);
+            }
+            else
+            {
+                ElementInfo *ei = new ElementInfo();
+                ElementIDMap[docID][ID] = ei;
+                ei->name = name;
+                ei->ID = ID;
+                ei->DocumentID = docID;
+            }
         }
 	break;
 	case MSG_NewARMarker:
@@ -2099,10 +2332,16 @@ RevitPlugin::handleMessage(Message *m)
 							break;
 						}
 					}
+                    continue; // do not delete this group as it would delete all otherelements in this list
 				}
+
+				removeHighlightedNode(n);
+
 				while (n->getNumParents())
 				{
-					n->getParent(0)->removeChild(n);
+					osg::ref_ptr<osg::Group> parent = n->getParent(0);
+					parent->removeChild(n);
+					deleteChildlessParent(parent);
 				}
 				//fprintf(stderr, "DeleteID: %d\n", ID);
 			}
@@ -2677,6 +2916,7 @@ RevitPlugin::handleMessage(Message *m)
 		annotationIDs[annotationID] = ID;
 		// check if we have cached changes for this Annotation and send it to Revit.
 	}
+	break;
 	case MSG_NewMaterial:
 	{
 		TokenBuffer tb(m);
@@ -2755,8 +2995,10 @@ RevitPlugin::handleMessage(Message *m)
 			ElementIDMap[docID][ID] = ei;
 			//fprintf(stderr, "NewID: %d\n", ID);
 		}
-		const char *name;
+		const char *name, *parentName;
+		// const char *name;
 		tb >> name;
+		tb >> parentName;
 		ei->name = name;
 		ei->ID = ID;
 		ei->DocumentID = docID;
@@ -2992,7 +3234,24 @@ RevitPlugin::handleMessage(Message *m)
 			}
 			else
 			{
-				currentGroup.top()->addChild(geode);
+				// currentGroup.top()->addChild(geode);
+				// for attaching to existing transforms
+				if (std::strcmp(parentName, "NULL") != 0)
+				{
+					for (uint i = 0; i < revitGroup->getNumChildren(); ++i)
+					{
+						osg::Node *parentNode = revitGroup->getChild(i);
+						if (parentNode && parentNode->getName() == parentName)
+						{
+							parentNode->asGroup()->addChild(geode);
+							break;
+						}
+					}
+				}
+				if (geode->getNumParents() == 0)
+				{
+					currentGroup.top()->addChild(geode);
+				}
 			}
 			setPhaseVisible(ei);
 		}

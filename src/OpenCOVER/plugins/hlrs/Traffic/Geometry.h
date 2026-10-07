@@ -15,9 +15,11 @@ class Vehicle;
 class Geometry
 {
 public:
+    virtual ~Geometry() { };
+
     // Called when the model was updated, can be used to track state,
     // derive current and past behaviour, and update graphis.
-    virtual void update(double deltaTime) { }
+    virtual void update(double deltaTime, double simulationDeltaTime) { }
 
     // Called when the
     virtual void updateTrajectory() { }

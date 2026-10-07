@@ -169,8 +169,8 @@ public:
     int syncMessage(covise::Message *msg); // broadcast in place from master to slaves
     [[nodiscard]] bool syncBool(bool); // broadcast as return value
     [[nodiscard]] std::string syncString(const std::string &s); // broadcast as return value
-    template<typename T> 
-    [[nodiscard]] typename std::enable_if<std::is_pod<T>::value, std::vector<T>>::type syncVector(const std::vector<T> &vec);
+    template<typename T>
+    [[nodiscard]] typename std::enable_if<std::is_standard_layout<T>::value && std::is_trivial<T>::value, std::vector<T>>::type syncVector(const std::vector<T> &vec);
     [[nodiscard]] std::vector<std::string> syncVector(const std::vector<std::string> &vec);
 
     bool reduceOr(bool); // master will receive logical or of all inputs
@@ -224,7 +224,7 @@ private:
     int syncMode;
     int barrierProcess;
     bool m_drawStatistics;
-    Rel_Mcast *multicast;
+    Rel_Mcast *multicast = nullptr;
     int multicastDebugLevel;
     std::string multicastAddress;
     int multicastPort;

@@ -7,6 +7,7 @@
 
 #include "GeoData.h"
 
+#include <iostream>
 #include <cover/coVRPluginSupport.h>
 
 using namespace opencover;
@@ -18,10 +19,12 @@ GeoData::GeoData()
 #endif
 
     m_transformRoot = new osg::MatrixTransform;
+    m_transformRoot->setName("terrainTransform");
     m_transformRoot->setMatrix(osg::Matrixd::identity());
     cover->getObjectsRoot()->addChild(m_transformRoot);
 
     m_terrainRoot = new osg::Group;
+    m_terrainRoot->setName("terrainRoot");
     m_transformRoot->addChild(m_terrainRoot);
 
     setProjection(GEODATA_DEFAULT_PROJECTION_PROJECT);

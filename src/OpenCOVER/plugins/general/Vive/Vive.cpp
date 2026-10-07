@@ -73,7 +73,11 @@ Vive::Vive()
     if (eError != vr::VRInitError_None)
     {
         ivrSystem = nullptr;
-        fprintf(stderr, "Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
+        std::cerr << "Unable to init VR runtime: " << vr::VR_GetVRInitErrorAsEnglishDescription(eError) << std::endl;
+        std::cerr << "This error may be caused by a version mismatch between the version of libopenvr_api.so on your system and the OpenVR runtime (SteamVR)." << std::endl;
+        #ifndef WIN32
+        std::cout << "Library version is " << vr::k_nSteamVRVersionMajor << "." << vr::k_nSteamVRVersionMinor << "." << vr::k_nSteamVRVersionBuild << std::endl;
+        #endif
         return;
     }
 

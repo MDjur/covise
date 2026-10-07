@@ -28,15 +28,18 @@ using Bitmap = System.Drawing.Bitmap;
 using BoundarySegment = Autodesk.Revit.DB.BoundarySegment;
 using ComponentManager = Autodesk.Windows.ComponentManager;
 using Document = Autodesk.Revit.DB.Document;
+using Pipe = Autodesk.Revit.DB.Plumbing.Pipe;
+using PipingSystemType = Autodesk.Revit.DB.Plumbing.PipingSystemType;
 using IWin32Window = System.Windows.Forms.IWin32Window;
 using Panel = Autodesk.Revit.DB.Panel;
 using TaskDialog = Autodesk.Revit.UI.TaskDialog;
 using View = Autodesk.Revit.DB.View;
+using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 //using System.Windows.Media.Media3D;
 
 namespace OpenCOVERPlugin
 {
-
     public class COVERMessage
     {
 
@@ -101,11 +104,55 @@ namespace OpenCOVERPlugin
     public sealed class COVER
     {
 
-        public enum MessageTypes { NewObject = 500, DeleteObject, ClearAll, UpdateObject, NewGroup, NewTransform, EndGroup, AddView, DeleteElement, NewParameters, SetParameter, NewMaterial, NewPolyMesh, NewInstance, EndInstance, SetTransform, UpdateView, AvatarPosition, RoomInfo, NewAnnotation, ChangeAnnotation, ChangeAnnotationText, NewAnnotationID, Views, SetView, Resend, NewDoorGroup, File, Finished, DocumentInfo, NewPointCloud, NewARMarker, DesignOptionSets, SelectDesignOption, IKInfo, Phases, ViewPhase, AddRoomInfo, ObjectInfo, Flip, SelectType, ElevatorPart };
+        public enum MessageTypes { 
+            NewObject = 500, 
+            DeleteObject, 
+            ClearAll, 
+            UpdateObject, 
+            NewGroup, 
+            NewTransform, 
+            EndGroup, 
+            AddView, 
+            DeleteElement, 
+            NewParameters, 
+            SetParameter, 
+            NewMaterial, 
+            NewPolyMesh, 
+            NewInstance, 
+            EndInstance, 
+            SetTransform, 
+            UpdateView, 
+            AvatarPosition, 
+            RoomInfo, 
+            NewAnnotation, 
+            ChangeAnnotation, 
+            ChangeAnnotationText, 
+            NewAnnotationID, 
+            Views, 
+            SetView, 
+            Resend, 
+            NewDoorGroup, 
+            File, 
+            Finished, 
+            DocumentInfo, 
+            NewPointCloud, 
+            NewARMarker, 
+            DesignOptionSets, 
+            SelectDesignOption, 
+            IKInfo, 
+            Phases, 
+            ViewPhase, 
+            AddRoomInfo, 
+            ObjectInfo, 
+            Flip, 
+            SelectType, 
+            ElevatorPart,
+            HighlightElement
+        };
+        private enum HighlightMenu { System };
         public enum ObjectTypes { Mesh = 1, Curve, Instance, Solid, RenderElement, Polymesh, Inline };
         public enum TextureTypes { Diffuse = 1, Bump };
         private Thread messageThread;
-
         private TcpClient toCOVER;
         private Options mOptions;
         public View3D View3D;
@@ -116,6 +163,7 @@ namespace OpenCOVERPlugin
         public bool doRotate=false;
         public RevitLinkInstance CurrentLink = null;
         public int LinkedDocumentID = 0;
+        public int RevitVersion = 0;
         public List<Document> documentList = null;
         public int DocumentID = 0;
         private Document document;
@@ -127,12 +175,33 @@ namespace OpenCOVERPlugin
         public FilteredElementCollector coordinateSystems;
         public DataStorage ConnectionInfo = null;
         public Schema ConnectionInfoSchema = null;
-
         public List<cDesignOptionSet> designOptionSets;
         public Dictionary<ElementId, cDesignOption> designOptionById;
         private DesignOptionModifier.Switcher designoptionMod;
 
         private Dictionary<ElementId, int> phaseDict;
+        // Default walkable surface categories
+        private HashSet<BuiltInCategory> WalkableSurfaceCategories = new(){
+            BuiltInCategory.OST_Stairs,
+            BuiltInCategory.OST_Topography,
+            BuiltInCategory.OST_StairsRuns,
+            BuiltInCategory.OST_StairsLandings,
+            BuiltInCategory.OST_StairsTrisers,
+#if REVIT_2024_OR_GREATER
+            BuiltInCategory.OST_Toposolid,
+            BuiltInCategory.OST_Subdivision,
+#endif
+            BuiltInCategory.OST_Ramps,
+            BuiltInCategory.OST_Floors
+        };
+
+        public HashSet<ElementId> SystemTypeCache { get; set; } = new(){};
+        public Dictionary<ElementId, int> SystemElementCount { get; set; } = new(){};
+        public Dictionary<ElementId, HashSet<ElementId>> SystemElementMap { get; set; } = new(){};
+
+        // Cache for elements sent to OpenCOVER (Currently used to avoid sending the same element multiple times).
+        public HashSet<ElementId> ElementCache { get; set; } = new(){};
+
         public void updateVisibility(Document doc, ElementId activeOptId)
         {
             if (activeDesignOption != ElementId.InvalidElementId &&
@@ -681,25 +750,66 @@ namespace OpenCOVERPlugin
                 sendParameters(iter.Current as Element);
             }
         }
+
+        // Returns systemTypeId containing given Element else InvalidElementId and true or false if the element has been found.
+        private bool TryGetMEPSystemTypeId(ElementId id, out ElementId systemTypeId)
+        {
+            foreach (var systemId in SystemElementMap.Keys)
+            {
+                if (SystemElementMap[systemId].Contains(id))
+                {
+                    systemTypeId = systemId;
+                    return true;
+                }
+            }
+
+            systemTypeId = ElementId.InvalidElementId;
+            return false;
+        }
+
         public void deleteElement(ElementId ID)
         {
             MessageBuffer mb = new();
             mb.add(ID.Value);
             mb.add(DocumentID);
+            if (ElementCache.Contains(ID))
+                ElementCache.Remove(ID);
+
+            if (TryGetMEPSystemTypeId(ID, out ElementId systemTypeId))
+            {
+                SystemElementMap[systemTypeId].Remove(ID);
+                SystemElementCount[systemTypeId]--;
+            }
             sendMessage(mb.buf, MessageTypes.DeleteElement);
         }
-        public void designOptionsChanged(Document doc, ElementId designOptionId)
+
+        private void DeleteElements(FilteredElementCollector elements)
         {
+            foreach (Element el in elements)
+            {   
+                deleteElement(el.Id);
+            }
+        }
+
+        private void CheckForMEPSystemUpdate()
+        {
+            foreach (var systemTypeId in SystemTypeCache)
+            {
+                if (!SystemElementCount.TryGetValue(systemTypeId, out int count) || count == 0)
+                {
+                    SystemTypeCache.Remove(systemTypeId);
+                }
+            }
+        }
+
+        public void DesignOptionChanged(Document doc, ElementId designOptionId)
+        {
+            FilteredElementCollector elements = new(doc);
             if (activeDesignOption != ElementId.InvalidElementId &&
                 designOptionById.TryGetValue(activeDesignOption, out cDesignOption activeOption))
             {
-                FilteredElementCollector elements = new(doc);
                 elements.ContainedInDesignOption(activeOption.des.Id);
-
-                foreach (Element el in elements)
-                {
-                    deleteElement(el.Id);
-                }
+                DeleteElements(elements);
             }
             else
             {
@@ -707,20 +817,16 @@ namespace OpenCOVERPlugin
                 {
                     if (option.visible)
                     {
-                        FilteredElementCollector elements = new(doc);
                         elements.ContainedInDesignOption(option.des.Id);
-
-                        foreach (Element el in elements)
-                        {
-                            deleteElement(el.Id);
-                        }
+                        DeleteElements(elements);
                     }
                 }
             }
+
+            CheckForMEPSystemUpdate();
             updateVisibility(doc, designOptionId);
             SendDesignOptionSetsMetaData(doc);
             FilteredElementCollector new_elements = new(doc);
-
             new_elements.ContainedInDesignOption(designOptionId);
             foreach (Element el in new_elements)
             {
@@ -781,6 +887,7 @@ namespace OpenCOVERPlugin
                 mb.add(elem.Id.Value);
                 mb.add(DocumentID);
                 mb.add(elem.Name + "_FamilySymbol");
+                mb.add("NULL"); // no parent
                 mb.add((int)ObjectTypes.Mesh);
                 mb.add(false);//doWalk
                 addPhases(mb, elem);
@@ -806,10 +913,10 @@ namespace OpenCOVERPlugin
                     mb.add(para.Id.Value);
                     mb.add(para.Definition.Name);
                     mb.add((int)para.StorageType);
-#if REVIT2019 || REVIT2020 || REVIT2021
-                    mb.add("Undefined");
-#else
+#if REVIT_2022_OR_GREATER
                     mb.add(para.Definition.GetDataType().ToString());
+#else
+                    mb.add("Undefined");
 #endif
                     switch (para.StorageType)
                     {
@@ -838,8 +945,6 @@ namespace OpenCOVERPlugin
             }
         }
 
-
-
         public void sendParameters(Element elem)
         {
             // iterate element's parameters
@@ -866,10 +971,10 @@ namespace OpenCOVERPlugin
                     mb.add(para.Id.Value);
                     mb.add(para.Definition.Name);
                     mb.add((int)para.StorageType);
-#if REVIT2019 || REVIT2020 || REVIT2021
-                    mb.add("Undefined");
-#else
+#if REVIT_2022_OR_GREATER
                     mb.add(para.Definition.GetDataType().ToString());
+#else 
+                    mb.add("Undefined");
 #endif
                     switch (para.StorageType)
                     {
@@ -896,16 +1001,121 @@ namespace OpenCOVERPlugin
                 sendMessage(mb.buf, MessageTypes.NewParameters);
             }
         }
+
+        private IEnumerable<Element> GetAllSystemElements(Document doc, ElementId systemTypeId, List<BuiltInCategory> filterList = null, BuiltInParameter systemTypeParam = BuiltInParameter.RBS_PIPING_SYSTEM_TYPE_PARAM)
+        {
+            if (filterList != null)
+            {
+                var categoryFilter = new ElementMulticategoryFilter(filterList);
+                return new FilteredElementCollector(doc)
+                    .WherePasses(categoryFilter)
+                    .WhereElementIsNotElementType()
+                    .Where(sysElem => sysElem.get_Parameter(systemTypeParam)?.AsElementId() == systemTypeId);
+            }
+
+            return new FilteredElementCollector(doc)
+                .WhereElementIsNotElementType()
+                .Where(sysElem => sysElem.get_Parameter(systemTypeParam)?.AsElementId() == systemTypeId);
+        }
+
+        private MessageBuffer CreateMatrixTransformBuffer(ElementId id, string name, Transform matrix)
+        {
+            var mb = new MessageBuffer();
+            mb.add(id.Value);
+            mb.add(DocumentID);
+            mb.add(name);
+            mb.add(matrix.BasisX);
+            mb.add(matrix.BasisY);
+            mb.add(matrix.BasisZ);
+            mb.add(matrix.Origin);
+            return mb;
+        }
+
+        private MessageBuffer CreateHightlightBuffer(string nodeName, HighlightMenu menu, in Color rgb)
+        {
+            var mb = new MessageBuffer();
+            mb.add(nodeName);
+            mb.add(menu.ToString());
+            mb.add(rgb);
+            return mb;
+        }
+
+        private void HighlightSystem(MEPSystemType systemType)
+        {
+            var mb = CreateHightlightBuffer(systemType.Name, HighlightMenu.System, systemType.LineColor);
+            sendMessage(mb.buf, MessageTypes.HighlightElement);
+        }
+
+        private void SendPipeSystem(Document doc, MEPSystem mepSystem)
+        {
+            var systemTypeId = mepSystem.GetTypeId();
+
+            if ( doc.GetElement(systemTypeId) is MEPSystemType systemType) {
+                bool sent = SystemTypeCache.Contains(systemTypeId);
+                SystemTypeCache.Add(systemTypeId);
+
+                var systemTypeName = systemType.Name;
+                // var color = ((PipingSystemType)systemType).LineColor;
+                // NOTE: e.g.
+                // var filterList = new(){
+                //     BuiltInCategory.OST_PipeSegments,           // Pipes Curves
+                //     BuiltInCategory.OST_FlexPipeCurves,           // Flex Pipes Curves
+                //     BuiltInCategory.OST_FlexPipeCurvesInsulation,           // Flex Pipes Curves Insulation
+                //     BuiltInCategory.OST_PipeCurves,           // Pipes Curves
+                //     BuiltInCategory.OST_PipeCurvesDrop,           // Pipes Curves Drop
+                //     BuiltInCategory.OST_PipeCurvesRiseDrop,           // Pipes Curves Rise Drop
+                //     BuiltInCategory.OST_PipeInsulations,      // Insulations
+                //     BuiltInCategory.OST_PipeCurvesInsulation, // Insulation for Pipes curves
+                //     BuiltInCategory.OST_PipeFitting,          // Elbows, Tees, Unions, Reducers
+                //     BuiltInCategory.OST_PipeFittingInsulation,          // Insulation for Elbows, Tees, Unions, Reducers
+                //     BuiltInCategory.OST_PipeAccessory         // Valves, Flanges, Caps, Plugs
+                // };
+                var connectedPipes = GetAllSystemElements(doc, systemTypeId);
+            
+                if (!sent) {
+                    var mb = CreateMatrixTransformBuffer(systemTypeId, systemTypeName, Transform.Identity);
+                    sendMessage(mb.buf, MessageTypes.NewTransform);
+                }
+                // Highlight possible after creating Transform
+                HighlightSystem(systemType);
+
+                HashSet<ElementId> visiblePipes = new(){};
+
+                foreach (var pipe in connectedPipes) {
+                   if (pipe.get_Geometry(mOptions) is GeometryElement g)
+                   {
+                        if (activeDesignOption != ElementId.InvalidElementId)
+                        {
+                            var designOption = pipe.DesignOption;
+                            if (designOption != null)
+                                if (designOption.Id != activeDesignOption)
+                                    continue;
+                        }
+                        SendElement(g, pipe, systemTypeName);
+                        visiblePipes.Add(pipe.Id);
+                   }
+                }
+                SystemElementCount[systemTypeId] = visiblePipes.Count;
+                SystemElementMap[systemTypeId] = visiblePipes;
+
+                if (!sent) {
+                    sendMessage(new byte[0], MessageTypes.EndGroup);
+                }
+            }
+        }
+
         // Note: Some element does not expose geometry, for example, curtain wall and dimension.
         // In case of a curtain wall, try selecting a whole wall by a window/box instead of a single pick.
         // It will then select internal components and be able to display its geometry.
         //
         public void SendElement(Element elem)
         {
-            /* if (elem.GetType() == typeof(Autodesk.Revit.DB.Element))
+            // don't send elements already sent
+            if (ElementCache.Contains(elem.Id) 
+                || TryGetMEPSystemTypeId(elem.Id, out ElementId systemTypeId))
             {
                 return;
-            }*/
+            }
             if (elem is View)
             {
                 sendViewpoint(elem);
@@ -1122,6 +1332,12 @@ namespace OpenCOVERPlugin
 
 
             }
+            else if (elem is Pipe { MEPSystem: not null } pipe)
+            {
+                var mepSystem = pipe.MEPSystem;
+                var doc = pipe.Document;
+                SendPipeSystem(doc, mepSystem);
+            }
             // if it is a Group. we will need to look at its components.
             else if (elem is Group)
             {
@@ -1152,13 +1368,12 @@ namespace OpenCOVERPlugin
                 }
                 // not a group. look at the geom data.
                 GeometryElement geom = elem.get_Geometry(mOptions);
-                if ((geom != null))
+                if (geom != null)
                 {
                     SendElement(geom, elem);
+                    ElementCache.Add(elem.Id);
                 }
             }
-
-
         }
 
         private void sendMaterial(Material materialElement, Element elem)
@@ -1379,10 +1594,10 @@ namespace OpenCOVERPlugin
                             else if (subproperty.Name == "texture_RealWorldScaleX")
                             {
                                 AssetPropertyDistance val = subproperty as AssetPropertyDistance;
-#if REVIT2019 || REVIT2020
-                                ti.sx = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
-#else
+#if REVIT_2021_OR_GREATER
                                 ti.sx = UnitUtils.ConvertFromInternalUnits(val.Value, UnitTypeId.Feet);
+#else
+                                ti.sx = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
 #endif
                             }
                             else if (subproperty.Name == "texture_UScale")
@@ -1398,28 +1613,28 @@ namespace OpenCOVERPlugin
                             else if (subproperty.Name == "texture_RealWorldScaleY")
                             {
                                 AssetPropertyDistance val = subproperty as AssetPropertyDistance;
-#if REVIT2019 || REVIT2020
-                                ti.sy = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
-#else
+#if REVIT_2021_OR_GREATER
                                 ti.sy = UnitUtils.ConvertFromInternalUnits(val.Value, UnitTypeId.Feet);
+#else
+                                ti.sy = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
 #endif
                             }
                             else if (subproperty.Name == "texture_RealWorldOffsetX")
                             {
                                 AssetPropertyDistance val = subproperty as AssetPropertyDistance;
-#if REVIT2019 || REVIT2020
-                                ti.ox = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
-#else
+#if REVIT_2021_OR_GREATER
                                 ti.ox = UnitUtils.ConvertFromInternalUnits(val.Value, UnitTypeId.Feet);
+#else
+                                ti.ox = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
 #endif
                             }
                             else if (subproperty.Name == "texture_RealWorldOffsetY")
                             {
                                 AssetPropertyDistance val = subproperty as AssetPropertyDistance;
-#if REVIT2019 || REVIT2020
-                                ti.oy = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
-#else
+#if REVIT_2021_OR_GREATER
                                 ti.oy = UnitUtils.ConvertFromInternalUnits(val.Value, UnitTypeId.Feet);
+#else
+                                ti.oy = UnitUtils.Convert(val.Value, val.DisplayUnitType, DisplayUnitType.DUT_DECIMAL_FEET);
 #endif
                             }
                             else if (subproperty.Name == "texture_WAngle")
@@ -1474,10 +1689,10 @@ namespace OpenCOVERPlugin
                 {
                     mb.add(para.Definition.Name);
                     mb.add((int)para.StorageType);
-#if REVIT2019 || REVIT2020 || REVIT2021
-                    mb.add("Undefined");
-#else
+#if REVIT_2022_OR_GREATER
                     mb.add(para.Definition.GetDataType().ToString());
+#else
+                    mb.add("Undefined");
 #endif
                     switch (para.StorageType)
                     {
@@ -1510,10 +1725,10 @@ namespace OpenCOVERPlugin
                 {
                     mb.add(para.Definition.Name);
                     mb.add((int)para.StorageType);
-#if REVIT2019 || REVIT2020 || REVIT2021
-                    mb.add("Undefined");
-#else
+#if REVIT_2022_OR_GREATER
                     mb.add(para.Definition.GetDataType().ToString());
+#else
+                    mb.add("Undefined");
 #endif
                     switch (para.StorageType)
                     {
@@ -1587,7 +1802,7 @@ namespace OpenCOVERPlugin
             }
             sendGeomElement(elem, num, geomObject, createGroups, doWalk);
         }
-        private void sendGeomElement(Element elem, int num, GeometryObject geomObject, bool createGroups, bool doWalk)
+        private void sendGeomElement(Element elem, int num, GeometryObject geomObject, bool createGroups, bool doWalk, string parentName = "NULL")
         {
             if (geomObject.Visibility == Autodesk.Revit.DB.Visibility.Visible)
             {
@@ -1627,6 +1842,7 @@ namespace OpenCOVERPlugin
                     mb.add(elem.Id.Value);
                     mb.add(DocumentID);
                     mb.add(elem.Name + "_m_" + num.ToString());
+                    mb.add(parentName);
                     mb.add((int)ObjectTypes.Mesh);
                     mb.add(doWalk);
                     addPhases(mb, elem);
@@ -1694,7 +1910,7 @@ namespace OpenCOVERPlugin
                             {
                                 sendMessage(mb.buf, MessageTypes.NewGroup);
                             }
-                            SendSolid(prefix, (Solid)geomObject, elem, doWalk);
+                            SendSolid(prefix, (Solid)geomObject, elem, doWalk, parentName);
                             mb = new MessageBuffer();
                             if (createGroups)
                             {
@@ -1746,6 +1962,7 @@ namespace OpenCOVERPlugin
                     mb.add(elem.Id.Value);
                     mb.add(DocumentID);
                     mb.add(elem.Name);
+                    mb.add("NULL"); // parentName
                     mb.add((int)ObjectTypes.Inline);
                     mb.add(false);//doWalk
                     addPhases(mb, elem);
@@ -1823,7 +2040,7 @@ namespace OpenCOVERPlugin
             return -1;
         }
 
-        private void SendElement(GeometryElement elementGeom, Element elem)
+        private void SendElement(GeometryElement elementGeom, Element elem, string parentName = "NULL")
         {
             if (elementGeom == null)
                 return;
@@ -1870,7 +2087,7 @@ namespace OpenCOVERPlugin
             }
             else
             {
-                ProcessStandardGeometry(elementGeom, elem, doWalk, hasIK);
+                ProcessStandardGeometry(elementGeom, elem, doWalk, hasIK, parentName);
             }
         }
 
@@ -1981,6 +2198,16 @@ namespace OpenCOVERPlugin
             }
         }
 
+        private BuiltInCategory GetBuiltInCategory(in Element elem)
+        {
+#if REVIT_2024_OR_GREATER
+            return elem.Category.BuiltInCategory;
+#else
+            // unsafe to cast long to enum because long can exceed max int => runtime error
+            return (BuiltInCategory)elem.Category.Id.Value;
+#endif
+        }
+
         private bool DetermineDoWalk(Element elem)
         {
             IList<Parameter> ps = elem.GetParameters("doWalk");
@@ -1991,18 +2218,8 @@ namespace OpenCOVERPlugin
 
             if (elem.Category == null) return false;
 
-            BuiltInCategory category = (BuiltInCategory)elem.Category.Id.Value;
-            return category switch
-            {
-                BuiltInCategory.OST_Stairs or 
-                BuiltInCategory.OST_Topography or 
-                BuiltInCategory.OST_StairsRuns or 
-                BuiltInCategory.OST_StairsLandings or 
-                BuiltInCategory.OST_StairsTrisers or 
-                BuiltInCategory.OST_Ramps or 
-                BuiltInCategory.OST_Floors => true,
-                _ => false
-            };
+            var category = GetBuiltInCategory(elem);
+            return WalkableSurfaceCategories.Contains(category);
         }
 
         private string GetElevatorName(FamilyInstance fi)
@@ -2196,7 +2413,7 @@ namespace OpenCOVERPlugin
             }
         }
 
-        private void ProcessStandardGeometry(GeometryElement elementGeom, Element elem, bool doWalk, bool hasIK)
+        private void ProcessStandardGeometry(GeometryElement elementGeom, Element elem, bool doWalk, bool hasIK, string parentName = "NULL")
         {
             if (hasIK)
             {
@@ -2210,7 +2427,7 @@ namespace OpenCOVERPlugin
             int num = 0;
             foreach (GeometryObject geomObject in elementGeom)
             {
-                sendGeomElement(elem, num, geomObject, false, doWalk);
+                sendGeomElement(elem, num, geomObject, false, doWalk, parentName);
                 num++;
             }
 
@@ -2451,6 +2668,7 @@ namespace OpenCOVERPlugin
                     mbpc.add(elem.Id.Value);
                     mbpc.add(DocumentID);
                     mbpc.add(elem.Name);
+                    mbpc.add("NULL"); // parentName
                     mbpc.add((int)ObjectTypes.Inline);
                     mbpc.add(false);//doWalk
                     addPhases(mb, elem);
@@ -2483,7 +2701,8 @@ namespace OpenCOVERPlugin
             }
             return false;
         }
-        private void SendSolid(string prefix, Solid geomSolid, Element elem, bool doWalk)
+
+        private void SendSolid(string prefix, Solid geomSolid, Element elem, bool doWalk, string parentName = "NULL")
         {
             if (elem.Name == "")
                 return;
@@ -2608,6 +2827,7 @@ namespace OpenCOVERPlugin
                 mb.add(elem.Id.Value);
                 mb.add(DocumentID);
                 mb.add(prefix + elem.Name + "_combined");
+                mb.add(parentName);
                 mb.add((int)ObjectTypes.Mesh);
                 mb.add(doWalk);
                 addPhases(mb, elem);
@@ -2682,6 +2902,7 @@ namespace OpenCOVERPlugin
                                     mb.add(elem.Id.Value);
                                     mb.add(DocumentID);
                                     mb.add(prefix + elem.Name + "_f_" + num.ToString());
+                                    mb.add(parentName); // parentName
                                     mb.add((int)ObjectTypes.Mesh);
                                     mb.add(doWalk);
                                     addPhases(mb, elem);
@@ -2722,6 +2943,7 @@ namespace OpenCOVERPlugin
                             mb.add(elem.Id.Value);
                             mb.add(DocumentID);
                             mb.add(prefix + elem.Name + "_f_" + num.ToString());
+                            mb.add(parentName); // parentName
                             mb.add((int)ObjectTypes.Mesh);
                             mb.add(doWalk);
                             addPhases(mb, elem);
@@ -3297,12 +3519,11 @@ namespace OpenCOVERPlugin
                             mb.add(param.Id.Value);
                             mb.add(param.Definition.Name);
                             mb.add((int)param.StorageType);
-#if REVIT2019 || REVIT2020 || REVIT2021
-                    mb.add("Undefined");
-#else
+#if REVIT_2022_OR_GREATER
                             //mb.add(param.Definition.GetDataType().ToString());
                             mb.add(param.Definition.GetDataType().TypeId);
-
+#else
+                            mb.add("Undefined");
 #endif
                             switch (param.StorageType)
                             {
@@ -3708,10 +3929,23 @@ namespace OpenCOVERPlugin
                 }
             }
         }
+        private int GetAppVersion()
+        {
+            string versionStr = cApplication.ControlledApplication.VersionNumber;
+            if (int.TryParse(versionStr, out int version))
+                return version;
+            return 0;
+        }
+        private void InitVersionViaApp()
+        {
+            RevitVersion = GetAppVersion(); 
+        }
+
         public void startup(UIControlledApplication application)
         {
             idlingHandler = new EventHandler<Autodesk.Revit.UI.Events.IdlingEventArgs>(idleUpdate);
             cApplication = application;
+            InitVersionViaApp();
         }
         public void shutdown(UIControlledApplication application)
         {
@@ -3767,7 +4001,7 @@ namespace OpenCOVERPlugin
                 {
                     if (pendingDesignOption != ElementId.InvalidElementId)
                     {
-                        designOptionsChanged(doc, pendingDesignOption);
+                        DesignOptionChanged(doc, pendingDesignOption);
                         pendingDesignOption = ElementId.InvalidElementId;
                     }
                     hasPendingDesignOption = false;
@@ -4001,11 +4235,10 @@ namespace OpenCOVERPlugin
                     }
 
                     List<View3D> views = new(
-        new FilteredElementCollector(doc)
-          .OfClass(typeof(View3D))
-          .Cast<View3D>()
-          .Where(v =>
-            v.CanBePrinted && !v.IsTemplate));
+                        new FilteredElementCollector(doc)
+                            .OfClass(typeof(View3D))
+                            .Cast<View3D>()
+                            .Where(v => v.CanBePrinted && !v.IsTemplate));
                     int n = views.Count;
 
                     if (0 == n)

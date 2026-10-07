@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
+// Copyright (c) 2014-2018 Bauhaus-Universitaet Weimar
 // This Software is distributed under the Modified BSD License, see license.txt.
 //
 // Virtual Reality and Visualization Research Group 
@@ -10,6 +10,8 @@
 
 #include "Lamure.h"
 #include "LamureEditTool.h"
+
+#include <util/threadname.h>
 
 #include <iostream>
 
@@ -174,6 +176,8 @@ void cut_update_pool::dispatch_cut_update(char *current_gpu_storage_A, char *cur
 
 void cut_update_pool::run()
 {
+    covise::setThreadName("lam:cut_update_pool");
+
     while(true)
     {
         semaphore_.wait();
@@ -1188,6 +1192,9 @@ void cut_update_pool::prefetch_routine()
 
 void cut_update_pool::compile_transfer_list()
 {
+    if (!current_gpu_storage_)
+        return;
+
     model_database *database = model_database::get_instance();
     ooc_cache *ooc_cache = ooc_cache::get_instance(_data_provenance);
 

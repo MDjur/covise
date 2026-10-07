@@ -18,6 +18,7 @@
 #include <osg/Group>
 #include <stack>
 #include <map>
+#include <set>
 #include <cover/coTabletUI.h>
 #include <OpenVRUI/sginterface/vruiActionUserData.h>
 #include <OpenVRUI/coCombinedButtonInteraction.h>
@@ -39,20 +40,15 @@
 #include "IK/CAlgoFactory.h"
 #include "Doors.h"
 #include "Elevators.h"
-
-
-
-
-
-#define REVIT_FEET_TO_M 0.304799999536704
-#define REVIT_M_TO_FEET 3.2808399
+#include "HighlightManager.h"
 
 #include <PluginUtil/coSensor.h>
 
+constexpr double REVIT_FEET_TO_M{0.304799999536704};
+constexpr double REVIT_M_TO_FEET{3.2808399};
 
-class RevitInfo : public vrui::vruiUserData
+struct RevitInfo : public vrui::vruiUserData
 {
-public:
     RevitInfo();
     ~RevitInfo();
     int ObjectID;
@@ -79,27 +75,27 @@ using covise::ServerConnection;
 class RevitDesignOption;
 class RevitDesignOptionSet;
 
-class RevitDesignOption
+struct RevitDesignOption
 {
-public:
     RevitDesignOption(RevitDesignOptionSet *s);
-    RevitDesignOptionSet *set;
     std::string name;
+    RevitDesignOptionSet *set;
     int ID;
     bool visible;
 };
 
-class RevitDesignOptionSet
+struct RevitDesignOptionSet
 {
-public:
     RevitDesignOptionSet();
     ~RevitDesignOptionSet();
+
+    void createSelectionList();
+
+    std::list<RevitDesignOption> designOptions;
     std::string name;
+    ui::SelectionList* designoptionsCombo=nullptr;
     int ID;
     int DocumentID;
-    ui::SelectionList* designoptionsCombo=nullptr;
-    std::list<RevitDesignOption> designOptions;
-    void createSelectionList();
 };
 
 class RevitViewpointEntry
@@ -108,43 +104,45 @@ public:
     RevitViewpointEntry(osg::Vec3 pos, osg::Vec3 dir, osg::Vec3 up, RevitPlugin *plugin, std::string n, int id,int docID, osg::Group *myGroup);
     virtual ~RevitViewpointEntry();
     
+    const std::string & getName()const { return name; };
+
     void setValues(osg::Vec3 pos, osg::Vec3 dir, osg::Vec3 up, std::string n);
     void activate();
     void setActive(bool);
     void deactivate();
-    
     void updateCamera();
+
     int entryNumber;
     int ID;
     int documentID;
     bool isActive = false;
-    const std::string & getName()const { return name; };
 
 private:
-    std::string name;
-    RevitPlugin *myPlugin = nullptr;
-    osg::MatrixTransform *myTransform;
     osg::Vec3 eyePosition;
     osg::Vec3 viewDirection;
     osg::Vec3 upDirection;
+    std::string name;
+    RevitPlugin *myPlugin = nullptr;
+    osg::MatrixTransform *myTransform;
     ui::Button * menuEntry = nullptr;
 };
 
-class RevitRoomInfo
+struct RevitRoomInfo
 {
-public:
     RevitRoomInfo(osg::Vec3 pos, std::string n, int id, int docID, double a);
     virtual ~RevitRoomInfo();
-    void updateBillboard();
 
+    void updateBillboard();
+    const std::string& getName()const { return name; };
+
+    std::string name;
+    osg::Vec3 textPosition;
+    coVRLabel* label;
+
+    double area;
     int ID;
     int documentID;
     bool isActive = false;
-    const std::string& getName()const { return name; };
-    std::string name;
-    osg::Vec3 textPosition;
-    double area;
-    coVRLabel* label;
 };
 
 class ElementInfo
@@ -152,12 +150,14 @@ class ElementInfo
 public:
     ElementInfo();
     virtual ~ElementInfo();
+
+    void addParameter(RevitParameter *p);
+
+    std::string name;
     std::list<osg::Node *> nodes;
     std::list<RevitParameter *> parameters;
-    void addParameter(RevitParameter *p);
     int ID;
     int DocumentID;
-    std::string name;
     int createdPhase;
     int demolishedPhase;
 
@@ -165,19 +165,21 @@ private:
     ui::Group *group = nullptr;
     static int yPos;
 };
-class AnnotationInfo
+
+struct AnnotationInfo
 {
-public:
-    double x,y,z,h,p,r;
     std::string text;
+    double x,y,z,h,p,r;
     int ID;
 };
 
-class IKAxisInfo
+struct IKAxisInfo
 {
-public:
     enum AxisType { Rot=0, Trans,Scale };
+
     IKAxisInfo();
+    void initIK( unsigned int myID);
+
     osg::Matrix mat;
     osg::Matrix invMat;
     osg::Matrix sumMat;
@@ -186,12 +188,11 @@ public:
     osg::Vec3 direction;
     double min;
     double max;
-    AxisType type= AxisType::Rot;
     osg::MatrixTransform* transform;
     osg::MatrixTransform* rotTransform;
     osg::MatrixTransform* scaleTransform;
+    AxisType type= AxisType::Rot;
 
-    void initIK( unsigned int myID);
 };
 
 inline double getAngle(const osg::Vec3& v1, const osg::Vec3& v2, const osg::Vec3& rotAxis) // v1 and v2  need to be normalized
@@ -208,9 +209,8 @@ inline double getAngle(const osg::Vec3& v1, const osg::Vec3& v2, const osg::Vec3
         return (-acos(sp));
 }
 class IKSensor;
-class IKInfo
+struct IKInfo
 {
-public:
     enum IKType { Rot = 0, RotTrans, Trans };
     IKInfo();
     ~IKInfo();
@@ -221,22 +221,24 @@ public:
     void updateGeometry();
     osg::Vec3 getPosition();
     osg::Vec3 getOrientation();
-    int ID;
-    int DocumentID;
+
     std::vector<IKAxisInfo> axis;
 
+    osg::Vec3 basePos;
+    osg::Vec3 vA;
+    osg::Vec3 vB;
+    osg::Vec3 vC;
+
+    IKSensor* iks=nullptr;
     CRobot* robot = nullptr;
 
     float rA, rB, rC;
     float initialAngleA, initialAngleB, initialAngleC;
     float initialLength;
-    osg::Vec3 basePos;
-    osg::Vec3 vA;
-    osg::Vec3 vB;
-    osg::Vec3 vC;
-    IKType type = IKType::Rot;
-    IKSensor* iks=nullptr;
 
+    IKType type = IKType::Rot;
+    int ID;
+    int DocumentID;
 };
 
 
@@ -263,12 +265,11 @@ public:
     void disactivate() override;
 };
 
-
-class ARMarkerInfo
+struct ARMarkerInfo
 {
-public:
 	ARMarkerInfo();
-	MarkerTrackingMarker* marker=nullptr;
+	void setValues(int ID,int docID, int MarkerID, std::string& name, double angle, double offset, osg::Matrix& mat, osg::Matrix& hostMat, int hostID, double size, std::string markerType);
+	void update();
 
 	osg::Matrix mat; // marker coordinates in mm in Revit coordinate system (object coordinates)
 	osg::Matrix invMarker;
@@ -277,61 +278,63 @@ public:
 	osg::Matrix hostMat; // host transformation in feet in Revit coordinate system
 	std::string name;
 	std::string markerType;
-	int ID;
-    int DocumentID;
-	int MarkerID;
-	int hostID;
+	MarkerTrackingMarker* marker=nullptr;
+
 	double offset;
 	double angle;
 	double size;
 	double lastUpdate = 0.0;
-	void setValues(int ID,int docID, int MarkerID, std::string& name, double angle, double offset, osg::Matrix& mat, osg::Matrix& hostMat, int hostID, double size, std::string markerType);
-	void update();
+
+	int ID;
+    int DocumentID;
+	int MarkerID;
+	int hostID;
 };
 
-class TextureInfo
+struct TextureInfo
 {
-public:
-	TextureInfo(TokenBuffer &tb);
-	double sx, sy, ox, oy, angle,amount;
-	std::string texturePath;
-	unsigned char r,g,b;
-    bool requestTexture; // try to get texture from remote after the model has been transferred completely
     enum textureType  { diffuse,bump};
+
+	TextureInfo(TokenBuffer &tb);
+	std::string texturePath;
+    osg::Image *image;
+
+	double sx, sy, ox, oy, angle,amount;
     textureType type;
 	int ID;
-    osg::Image *image;
+    bool requestTexture; // try to get texture from remote after the model has been transferred completely
+	unsigned char r,g,b;
 };
 
-class MaterialInfo
+struct MaterialInfo
 {
-public:
 	MaterialInfo(TokenBuffer &tb);
-	unsigned char r, g, b, a;
+    void updateTexture(TextureInfo::textureType type, osg::Image *image);
+    osg::Image *createNormalMap(osg::Image *heightMap, double pStrength);
+
 	TextureInfo *bumpTexture;
 	TextureInfo *diffuseTexture;
 	osg::ref_ptr<osg::StateSet> geoState;
 	coVRShader *shader;
+
 	int ID;
     int DocumentID;
-    void updateTexture(TextureInfo::textureType type, osg::Image *image);
-    osg::Image *createNormalMap(osg::Image *heightMap, double pStrength);
+
+	unsigned char r, g, b, a;
     bool isTransparent;
 };
 
-class PhaseInfo
+struct PhaseInfo
 {
-public:
-    std::string PhaseName;
-    int ID=0;
-    ui::Button* button=nullptr;
     ~PhaseInfo();
+    std::string PhaseName;
+    ui::Button* button=nullptr;
+    int ID=0;
 };
 
 
-class RevitParameter
+struct RevitParameter
 {
-public:
     RevitParameter(int i, std::string n, int st, std::string pt, int num, ElementInfo *ele)
         : ID(i)
         , name(n)
@@ -339,73 +342,85 @@ public:
         , ParameterType(pt)
         , number(num)
         , element(ele){};
+
     virtual ~RevitParameter();
-    int ID;
-    std::string name;
-    int StorageType;
-    std::string ParameterType;
-    int number; // param number in Element;
-    ElementInfo *element = nullptr;
-    double d;
-    int ElementReferenceID;
-    int i;
-    std::string s;
     void createUI(ui::Group *group, int pos);
 
+    // string: 64 bit  gcc + msvc 32 bytes; llvm 24 bytes stack
+    std::string name;
+    std::string ParameterType;
+    std::string s;
+
+    // ptr: 8 byte on 64 byte typically
+    ElementInfo *element = nullptr;
     ui::Label *uiLabel = nullptr;
     ui::Element *uiElement = nullptr;
 
-private:
+    // double: 8 byte
+    double d;
+
+    // int: 4 byte
+    int ID;
+    int number; // param number in Element;
+    int StorageType;
+    int ElementReferenceID;
+    int i;
 };
 
-class FamilyType
+struct FamilyType
 {
-public:
     FamilyType(TokenBuffer& tb);
     ~FamilyType();
     void createMenuEntry();
     void createFamilyLabel();
-    std::string Name;
-    int ID;
+
     std::string FamilyName;
+    std::string Name;
+
     ui::Action* selectType = nullptr;
     ui::Label* FamilyLabel = nullptr;
+
+    int ID;
     
 };
-class ObjectParamater
+
+struct ObjectParamater
 {
-public:
     ObjectParamater(TokenBuffer& tb,int i);
     ~ObjectParamater();
     void createMenu();
+
     std::string Name;
     std::string Value;
+    std::string ParameterType;
+
     ui::Label* Label = nullptr;
-    int num;
-    int StorageType;
 
     double d;
+
+    int num;
+    int StorageType;
     int ElementReferenceID;
     int i;
-
-    std::string ParameterType;
 };
 
-class ObjectInfo
+struct ObjectInfo
 {
-public:
     ObjectInfo(TokenBuffer& tb);
     ~ObjectInfo();
-    std::string TypeName;
-    int TypeID;
-    std::string CategoryName;
-    int flipInfo;
+
     std::vector<FamilyType*> types;
     std::vector<ObjectParamater*> parameters;
+
+    std::string TypeName;
+    std::string CategoryName;
 
     ui::Action* flipLR = nullptr;
     ui::Action* flipIO = nullptr;
     ui::Label* TypeNameLabel = nullptr;
+
+    int TypeID;
+    int flipInfo;
 };
 
 // connection to Autodesk Revit Architecture
@@ -438,6 +453,7 @@ public:
         //     The data type represents an element and is stored as the id of the element.
         ElementId = 4,
     };
+
 	enum MessageTypes
 	{
 		MSG_NewObject = 500,
@@ -481,8 +497,10 @@ public:
         MSG_ObjectInfo = 538,
         MSG_Flip = 539,
         MSG_SelectType = 540,
-        MSG_ElevatorPart = 541
+        MSG_ElevatorPart = 541,
+        MSG_HighlightElement = 542
     };
+
     enum ObjectTypes
     {
         OBJ_TYPE_Mesh = 1,
@@ -493,36 +511,69 @@ public:
         OBJ_TYPE_PolyMesh,
 		OBJ_TYPE_Inline
     };
+
     RevitPlugin();
     ~RevitPlugin() override;
-    bool init() override;
+
     static RevitPlugin *instance()
     {
         return plugin;
     };
-	bool update() override;
+
     // this will be called in PreFrame
 	void preFrame() override;
     void key(int type, int keySym, int mod) override;
-
+    void destroyMenu();
+    void createMenu();
+    void updateIK();
+    void registerInteraction(IKInfo* i);
+    void unregisterInteraction(IKInfo* i);
+    void message(int toWhom, int type, int len, const void *buf) override;
+    void deactivateAllViewpoints();
+    void flip(int dir);
+    void createNewAnnotation(int id, AnnotationMessage *am);
+    void changeAnnotation(int id, AnnotationMessage *am);
+    void setPhase(std::string phaseName);
+    void setPhase(int phase);
     /// <summary>
     /// set visibility depending on current selected phase
     /// </summary>
     void setPhaseVisible(ElementInfo* ei);
 
+    osg::Group* getCurrentGroup() { return currentGroup.top(); };
+
+    int getAnnotationID(int revitID);
+    int getRevitAnnotationID(int ai);
+
+    bool isInteractionRunning();
+    bool sendMessage(Message &m);
+	bool update() override;
 	bool checkDoors();
+    bool init() override;
 
-    void destroyMenu();
-    void createMenu();
-    void updateIK();
+	std::list<DoorInfo *> doors;
+    std::list<DoorInfo *> activeDoors;
+    std::list<Elevator *> elevators;
+	std::map<int, ARMarkerInfo*> ARMarkers;
+    std::list<RevitDesignOptionSet*> designOptionSets;
+    std::list<PhaseInfo*> phaseInfos;
 
-    int maxEntryNumber;
+    osg::Matrix startCompleteMat;
+    osg::Matrix invStartCompleteMat;
+    osg::Matrix startHand, invStartHand;
+    osg::Matrix NorthRotMat;
+    osg::Matrix RevitScale;
+    osg::Matrix RevitGeoRefference;
+    osg::Vec3 startPosition;
+    osg::Vec3 startOrientation;
+
     ui::Menu *revitMenu = nullptr;
     ui::ButtonGroup* viewpointGroup = nullptr;
     ui::Menu* viewpointMenu = nullptr;
     ui::Menu* parameterMenu = nullptr;
     ui::Menu* phaseMenu = nullptr;
     ui::Menu* objectInfoMenu = nullptr;
+    ui::Menu* highlightMenu = nullptr;
     ui::ButtonGroup* PhaseGroup = nullptr;
     ui::ButtonGroup* objectInfoGroup = nullptr;
     ui::Action* selectObject = nullptr;
@@ -530,103 +581,81 @@ public:
     ui::ButtonGroup* TypesGroup=nullptr;
     ui::Menu* parametersMenu = nullptr;
     ui::ButtonGroup* ParametersGroup = nullptr;
+    ui::Button* toggleRoomLabels = nullptr;
 
     vrui::coCombinedButtonInteraction *selectObjectInteraction = nullptr;
-    /*ui::EditField* xPos;
-    ui::EditField* yPos;
-    ui::EditField* zPos;
-    ui::EditField* xOri;
-    ui::EditField* yOri;
-    ui::EditField* zOri;*/
-
 
     IKInfo *currentIKI=nullptr;
-    osg::Matrix startCompleteMat;
-    osg::Matrix invStartCompleteMat;
-    osg::Matrix startHand, invStartHand;
-    osg::Vec3 startPosition;
-    osg::Vec3 startOrientation;
-    void registerInteraction(IKInfo* i);
-    void unregisterInteraction(IKInfo* i);
-    bool isInteractionRunning();
+    ObjectInfo* currentObjectInfo=nullptr;
 
-    bool sendMessage(Message &m);
-    
-    void message(int toWhom, int type, int len, const void *buf) override;
-    void deactivateAllViewpoints();
-    int getAnnotationID(int revitID);
-    int getRevitAnnotationID(int ai);
-    void createNewAnnotation(int id, AnnotationMessage *am);
-    void changeAnnotation(int id, AnnotationMessage *am);
-	std::list<DoorInfo *> doors;
-    std::list<DoorInfo *> activeDoors;
-    std::list<Elevator *> elevators;
-	std::map<int, ARMarkerInfo*> ARMarkers;
-    std::list<RevitDesignOptionSet*> designOptionSets;
-    std::list<PhaseInfo*> phaseInfos;
-    void setPhase(std::string phaseName);
-    void setPhase(int phase);
-    int currentPhase=0;
     double TrueNorthAngle = 0.0;
     double ProjectHeight = 0.0;
-    osg::Matrix NorthRotMat;
-    osg::Matrix RevitScale;
-    osg::Matrix RevitGeoRefference;
-    osg::Group* getCurrentGroup() { return currentGroup.top(); };
-    ui::Button* toggleRoomLabels = nullptr;
+
+    int maxEntryNumber;
+    int currentPhase=0;
     int currentObjectID=-1;
     int currentDocumentID=-1;
-    ObjectInfo* currentObjectInfo=nullptr;
-    void flip(int dir);
+
 protected:
-    static RevitPlugin *plugin;
-    ui::Label *label1 = nullptr;
-    ui::SelectionList* viewsCombo;
-    ui::Menu *roomInfoMenu = nullptr;
-    std::vector<RevitViewpointEntry*> viewpointEntries;
-    std::vector<RevitRoomInfo*> roomInfos;
-    ui::Action *addCameraButton = nullptr;
-    ui::Action *updateCameraButton = nullptr;
-
-	bool ignoreDepthOnly = false;
-
-    ServerConnection *serverConn = nullptr;
-    std::unique_ptr<ServerConnection> toRevit = nullptr;
     void handleMessage(Message *m);
-
 	MaterialInfo * getMaterial(int revitID);
     osg::Image *readImage(std::string name);
-
-
     void setDefaultMaterial(osg::StateSet *geoState);
-    osg::ref_ptr<osg::Material> globalmtl;
-    osg::ref_ptr<osg::MatrixTransform> revitGroup;
-    std::stack<osg::Group *> currentGroup;
+    void requestTexture(int matID, TextureInfo *texture);
+
+    std::vector<RevitViewpointEntry*> viewpointEntries;
+    std::vector<RevitRoomInfo*> roomInfos;
     std::vector<std::map<int, ElementInfo *>> ElementIDMap;
     std::vector<IKInfo*> ikInfos;
-    osg::Matrix invStartMoveMat;
-    osg::Matrix lastMoveMat;
-    bool MoveFinished;
-    int MovedID;
-    int MovedDocumentID;
-    RevitInfo  *info = nullptr;
     std::vector<int> annotationIDs;
 	std::map<int, MaterialInfo *> MaterialInfos;
 	std::map<std::string, osg::ref_ptr<osg::Node>> inlineNodes;
-    void requestTexture(int matID, TextureInfo *texture);
+    std::stack<osg::Group *> currentGroup;
 
-	
-    float scaleFactor;
+    osg::Matrix invStartMoveMat;
+    osg::Matrix lastMoveMat;
+
     std::string textureDir;
     std::string localTextureDir;
     std::string localTextureFile;
     std::string currentRevitFile;
-    bool setViewpoint;
-    bool firstDocument=true;
-    
 
+    osg::ref_ptr<osg::Material> globalmtl;
+    osg::ref_ptr<osg::MatrixTransform> revitGroup;
+    std::unique_ptr<ServerConnection> toRevit = nullptr;
+
+    static RevitPlugin *plugin;
+    ui::Label *label1 = nullptr;
+    ui::SelectionList* viewsCombo;
+    ui::Menu *roomInfoMenu = nullptr;
+    ui::Action *addCameraButton = nullptr;
+    ui::Action *updateCameraButton = nullptr;
+
+    ServerConnection *serverConn = nullptr;
+    RevitInfo *info = nullptr;
     Message *msg = nullptr;
 
+    float scaleFactor;
+
+    int MovedID;
+    int MovedDocumentID;
+
+    bool MoveFinished;
+    bool setViewpoint;
+    bool firstDocument=true;
+	bool ignoreDepthOnly = false;
+
+private:
+    bool isChildlessParent(osg::ref_ptr<osg::Group> parent);
+    bool hasParent(osg::ref_ptr<osg::Group> parent);
+    bool isButtonWithName(const std::string& name, ui::Button* btn);
+    void clickButton(ui::Button* btn);
+    void deleteChildlessParent(osg::ref_ptr<osg::Group> parent);
+    void removeHighlightedNode(osg::ref_ptr<osg::Node> node);
+    void disableHighlightedNodeButton(osg::ref_ptr<osg::Node> node);
+    auto findNodesByName(const std::string& name);
+
+    Revit::HighlightManager _highlightmanager;
 };
 
 
